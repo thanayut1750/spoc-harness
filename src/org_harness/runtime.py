@@ -35,6 +35,7 @@ from org_harness.models import (
     WorkPackage,
 )
 from org_harness.storage import ArtifactNotFoundError
+from org_harness.text_safety import require_json_text
 from org_harness.triage import conservative_triage
 
 JSON = dict[str, Any]
@@ -161,7 +162,7 @@ def initial_state(
 ) -> ExecutiveState:
     return {
         "run_id": run_id,
-        "user_request": user_request,
+        "user_request": require_json_text(user_request),
         "constitution": Constitution.model_validate(constitution).model_dump(mode="json"),
         "objectives": [],
         "progress": {},
@@ -264,7 +265,7 @@ def _missing_artifact_signal() -> EscalationSignal:
 
 
 def _validate_report(value: Any) -> str:
-    report = TypeAdapter(str).validate_python(value)
+    report = require_json_text(TypeAdapter(str).validate_python(value))
     if not report.strip():
         raise ValueError("The final report must contain a substantive result summary")
     return report

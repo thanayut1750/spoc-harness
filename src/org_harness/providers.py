@@ -19,6 +19,7 @@ from pydantic import Field, SecretStr
 
 from org_harness.config import Settings
 from org_harness.models import ModelSelection
+from org_harness.text_safety import contains_invalid_json_text
 
 
 class ProviderResponseError(ValueError):
@@ -68,6 +69,8 @@ class ZaiChatModel(BaseChatModel):
         return {"model": self.model, "reasoning_effort": self.reasoning_effort}
 
     def _request(self, messages: list[BaseMessage], **kwargs: Any) -> dict[str, Any]:
+        if contains_invalid_json_text([message.model_dump(mode="python") for message in messages]):
+            raise ProviderResponseError("Model request contains unsupported Unicode text")
         allowed = {"tools", "tool_choice", "response_format", "temperature", "top_p"}
         encoded = [encode_message(message) for message in messages]
         if self.protocol != "zai":
@@ -93,6 +96,8 @@ class ZaiChatModel(BaseChatModel):
             if self.reasoning_effort != "none":
                 request["extra_body"] = {"reasoning_effort": self.reasoning_effort}
         request.update({key: value for key, value in kwargs.items() if key in allowed})
+        if contains_invalid_json_text(request):
+            raise ProviderResponseError("Model request contains unsupported Unicode text")
         return request
 
     def _result(self, response: Any) -> ChatResult:
@@ -155,17 +160,20 @@ class ZaiChatModel(BaseChatModel):
                 "output_tokens": usage.completion_tokens,
                 "total_tokens": usage.total_tokens,
             }
-        ai_message = AIMessage(
-            content=content or "",
-            additional_kwargs=extra,
-            tool_calls=calls,
-            invalid_tool_calls=invalid,
-            usage_metadata=metadata,
-            response_metadata={
+        message_values: dict[str, Any] = {
+            "content": content or "",
+            "additional_kwargs": extra,
+            "tool_calls": calls,
+            "invalid_tool_calls": invalid,
+            "usage_metadata": metadata,
+            "response_metadata": {
                 "model_name": getattr(response, "model", self.model),
                 "finish_reason": getattr(choice, "finish_reason", None),
             },
-        )
+        }
+        if contains_invalid_json_text(message_values):
+            raise ProviderResponseError("Provider response contains unsupported Unicode text")
+        ai_message = AIMessage(**message_values)
         return ChatResult(generations=[ChatGeneration(message=ai_message)])
 
     def _generate(

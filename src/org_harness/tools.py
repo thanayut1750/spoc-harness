@@ -17,10 +17,56 @@ import httpx
 
 from org_harness.models import EscalationSignal
 from org_harness.storage import ArtifactNotFoundError, BudgetExceeded, fingerprint
+from org_harness.text_safety import contains_invalid_json_text
 
 
 class ExpectedToolInputError(ValueError):
     """A known model-input/resource failure that is safe to return as a tool result."""
+
+
+def json_safe_display(value: Any) -> Any:
+    """Escape unsafe external text for display, preserving its reversible representation."""
+    if not contains_invalid_json_text(value):
+        return value
+    return _escaped_display(value)
+
+
+def _escaped_display(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=True)[1:-1]
+    if isinstance(value, dict):
+        return {_escaped_display(key): _escaped_display(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_escaped_display(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_escaped_display(item) for item in value)
+    return value
+
+
+def readable_text(body: bytes, *, partial: bool = False) -> str:
+    """Accept UTF-8 text, never reinterpret binary bytes as model-readable content."""
+    import codecs
+
+    if body.startswith(
+        (b"\x89PNG", b"\xff\xd8\xff", b"GIF87a", b"GIF89a", b"%PDF-", b"PK\x03\x04")
+    ):
+        raise ExpectedToolInputError(
+            "This is a binary file. Text tools cannot inspect images or other binary content. "
+            "Use command verification for its type/size and reference its file path or artifact download."
+        )
+    try:
+        content = codecs.getincrementaldecoder("utf-8-sig")().decode(body, final=not partial)
+    except UnicodeError as exc:
+        raise ExpectedToolInputError(
+            "This file is not UTF-8 text. Use command verification or its artifact download; "
+            "text tools cannot inspect binary/image content."
+        ) from exc
+    if contains_invalid_json_text(content):
+        raise ExpectedToolInputError(
+            "This file contains null or invalid text characters. Use command verification "
+            "or its artifact download; read_file and read_artifact support text only."
+        )
+    return content
 
 
 class ReferenceTextParser(HTMLParser):
@@ -194,7 +240,7 @@ class Artifacts:
         if hashlib.sha256(body).hexdigest() != metadata["sha256"]:
             raise ExpectedToolInputError("Artifact content no longer matches its evidence record")
         excerpt = body if limit is None else body[:limit]
-        return metadata, excerpt.decode(errors="replace")
+        return metadata, readable_text(excerpt, partial=len(excerpt) < len(body))
 
 
 class HostTools:
@@ -326,14 +372,25 @@ class HostTools:
         *,
         kind: str,
     ) -> dict:
+        invalid_request = contains_invalid_json_text(request)
+        stored_request = (
+            {"invalid_input": True, "request_fingerprint": fingerprint(request)}
+            if invalid_request
+            else request
+        )
         existing = await self.storage.get_operation(operation_id)
-        if existing and fingerprint(existing["request"]) != fingerprint(request):
+        if existing and fingerprint(existing["request"]) != fingerprint(stored_request):
             raise EscalationSignal(
                 "operation_conflict", "A reused tool-call ID contains a different request"
             )
         if existing and existing["status"] == "done":
             return existing["result"]
-        if existing and existing["status"] == "pending" and kind == "command":
+        if (
+            existing
+            and existing["status"] == "pending"
+            and kind == "command"
+            and not invalid_request
+        ):
             raise EscalationSignal(
                 "unknown_operation", f"Review interrupted command {operation_id}"
             )
@@ -341,13 +398,23 @@ class HostTools:
             await self.storage.reserve_budget(self.run["run_id"], "tool")
         except BudgetExceeded as exc:
             raise EscalationSignal("limit_exceeded", str(exc)) from exc
-        await self.storage.begin_operation(self.run["run_id"], operation_id, kind, request)
+        await self.storage.begin_operation(
+            self.run["run_id"],
+            operation_id,
+            "invalid_input" if invalid_request else kind,
+            stored_request,
+        )
         current = await self.storage.get_run(self.run["run_id"])
         if current.get("cancel_requested"):
             raise EscalationSignal("cancelled", "Run was cancelled")
         if current.get("governance_halt"):
             raise EscalationSignal("suspended", "Execution suspended for constitution review")
         try:
+            if invalid_request:
+                raise ExpectedToolInputError(
+                    "Tool input contains null or invalid Unicode text. Use valid text inputs; "
+                    "binary/image files require command verification or artifact downloads."
+                )
             result = await execute()
         except ExpectedToolInputError as exc:
             # Only failures classified at the input/resource boundary are safe to complete.
@@ -356,6 +423,8 @@ class HostTools:
             if exc.kind == "cancelled":
                 await self.storage.complete_operation(operation_id, {"cancelled": True})
             raise
+        if contains_invalid_json_text(result):
+            result = {**json_safe_display(result), "display_encoding": "json-string-escape"}
         await self.storage.complete_operation(operation_id, result)
         return result
 
@@ -398,11 +467,16 @@ class HostTools:
         async def execute() -> dict:
             target = self.path(path)
             try:
-                return {"path": str(target), "content": target.read_text(errors="replace")[:65536]}
+                with target.open("rb") as source:
+                    body = source.read(262148)
             except (OSError, ValueError) as exc:
                 raise ExpectedToolInputError(
                     f"Host file cannot be read ({type(exc).__name__})"
                 ) from exc
+            return {
+                "path": str(target),
+                "content": readable_text(body, partial=len(body) == 262148)[:65536],
+            }
 
         return await self.journal(call_id, "read_file", {"path": path}, execute)
 
@@ -490,6 +564,8 @@ class HostTools:
                 "duration_seconds": round(elapsed, 3),
                 "artifact_ids": output_artifacts,
             }
+            if contains_invalid_json_text(result):
+                result = {**json_safe_display(result), "display_encoding": "json-string-escape"}
             receipt = await self.artifacts.save(
                 f"{log_id}.command.json",
                 json.dumps(
@@ -553,7 +629,7 @@ class HostTools:
             result = await execute()
             artifact = await self.artifacts.save(
                 f"{name}-{call_id}.json",
-                json.dumps(result, ensure_ascii=False, default=str),
+                json.dumps(result, ensure_ascii=True, default=str),
                 kr_id=self.kr_id,
                 department=self.department,
                 epoch=self.epoch,
@@ -577,9 +653,11 @@ class HostTools:
                 kr_id=self.kr_id,
                 artifact_id=artifact["artifact_id"],
             )
-            encoded = json.dumps(result, ensure_ascii=False, default=str)
+            unsafe_source = contains_invalid_json_text(result)
+            display = json_safe_display(result)
+            encoded = json.dumps(display, ensure_ascii=False, default=str)
             preview = (
-                result
+                display
                 if len(encoded) <= 12000
                 else {
                     "preview": encoded[:12000],
@@ -588,6 +666,10 @@ class HostTools:
                     "read_more": "Use read_artifact with offset and limit for the full stored source.",
                 }
             )
-            return {"artifact_id": artifact["artifact_id"], "result": preview}
+            return {
+                "artifact_id": artifact["artifact_id"],
+                "result": preview,
+                **({"display_encoding": "json-string-escape"} if unsafe_source else {}),
+            }
 
         return await self.journal(call_id, name, request, recorded)

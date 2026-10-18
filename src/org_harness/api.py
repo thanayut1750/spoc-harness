@@ -10,30 +10,31 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from org_harness.config import Settings, configure_tracing
 from org_harness.models import (
     ActivityEvent,
     ConfigurableAgent,
+    Contract,
     Deliverable,
     ModelSelection,
     ReviewDecision,
     RunCreate,
 )
 from org_harness.storage import ConflictError, MemoryStorage, NotFoundError, create_storage
+from org_harness.text_safety import contains_invalid_json_text
 
 
-class NoteCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class NoteCreate(Contract):
     agent_id: str | None = Field(default=None, max_length=100)
     content: str = Field(min_length=1, max_length=20000)
 
 
-class RegenesisRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class RegenesisRequest(Contract):
     confirmation: str
 
 
@@ -119,6 +120,14 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     mutations = asyncio.Lock()
     app.state.reset_generation = 0
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_: Request, exc: RequestValidationError):
+        # Raw inputs/ctx can echo private data or contain a surrogate that the
+        # response itself cannot encode. Public diagnostics need only the field
+        # location and validation category.
+        detail = [{key: error[key] for key in ("type", "loc", "msg")} for error in exc.errors()]
+        return JSONResponse(status_code=422, content={"detail": detail})
+
     @app.exception_handler(NotFoundError)
     async def missing(_: Request, exc: NotFoundError):
         return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -129,6 +138,16 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
 
     @app.middleware("http")
     async def same_origin(request: Request, call_next):
+        if contains_invalid_json_text(
+            [
+                request.scope.get("path", ""),
+                list(request.query_params.multi_items()),
+                list(request.headers.items()),
+            ]
+        ):
+            return JSONResponse(
+                status_code=422, content={"detail": "Request contains unsupported Unicode text"}
+            )
         origin = request.headers.get("origin")
         if (
             request.method not in {"GET", "HEAD", "OPTIONS"}

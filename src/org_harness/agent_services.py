@@ -554,7 +554,11 @@ class AgentServices:
 
         @tool
         async def read_file(path: str, runtime: ToolRuntime) -> str:
-            """Read a host file. Relative paths use this task's working directory."""
+            """Read a UTF-8 text file. Relative paths use this task's working directory.
+
+            Images and other binary files cannot be inspected by this text tool. Verify them with
+            commands and reference their file path/download without claiming visual inspection.
+            """
             return json.dumps(await host.read_file(call_identifier(runtime), path))
 
         @tool
@@ -566,10 +570,12 @@ class AgentServices:
         async def read_artifact(
             artifact_id: str, runtime: ToolRuntime, offset: int = 0, limit: int = 12000
         ) -> str:
-            """Read a stored source or approved input in pages of at most 12000 characters.
+            """Read stored UTF-8 text or approved text inputs in pages of at most 12000 characters.
 
             artifact_id must be an exact ID returned by a tool, never a URL or file path.
             Read URLs with read_web_page. Use next_offset to continue a stored long source.
+            Images and binary artifacts require metadata/downloads or command verification;
+            this text tool cannot visually inspect them.
             """
 
             async def read() -> dict:

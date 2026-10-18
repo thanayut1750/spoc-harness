@@ -1,12 +1,21 @@
 import asyncio
+import base64
+import json
 from pathlib import Path
 
 import httpx
 import pytest
 
 from org_harness.models import EscalationSignal, RunCreate
-from org_harness.storage import MemoryStorage, RunNotFoundError
-from org_harness.tools import Artifacts, ExpectedToolInputError, HostTools, read_reference_page
+from org_harness.storage import MemoryStorage, PostgresStorage, RunNotFoundError, fingerprint
+from org_harness.text_safety import contains_invalid_json_text
+from org_harness.tools import (
+    Artifacts,
+    ExpectedToolInputError,
+    HostTools,
+    json_safe_display,
+    read_reference_page,
+)
 
 
 async def test_reference_fetch_preserves_actual_source_and_removes_hidden_html(monkeypatch):
@@ -68,8 +77,8 @@ async def test_reference_fetch_rejects_non_http_without_network():
         await read_reference_page("file:///etc/passwd")
 
 
-async def make_host(tmp_path):
-    storage = MemoryStorage()
+async def make_host(tmp_path, storage=None):
+    storage = storage or MemoryStorage()
     run = await storage.create_run(
         RunCreate(user_request="Test host tools").model_dump(mode="json")
     )
@@ -352,3 +361,134 @@ async def test_managed_workspace_storage_failure_is_not_an_input_error(tmp_path,
             role="backend_coder",
             emit=host.emit,
         )
+
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCYQAAAAASUVORK5CYII="
+)
+
+
+async def check_pending_png_read_and_completed_command(storage, tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path, storage)
+    png = host.workspace / "render_evidence.png"
+    png.write_bytes(PNG)
+    command = "echo once >> command-count.txt"
+    original = await host.run_command("completed-command", command)
+    read_operation = host.operation_id("pending-image-read", "read_file")
+    await storage.begin_operation(run["run_id"], read_operation, "tool", {"path": str(png)})
+    result, replayed = await asyncio.gather(
+        host.read_file("pending-image-read", str(png)),
+        host.run_command("completed-command", command),
+    )
+    assert result["error"] == "ExpectedToolInputError"
+    assert "binary" in result["detail"]
+    assert not contains_invalid_json_text(result)
+    assert replayed == original
+    assert (host.workspace / "command-count.txt").read_text().splitlines() == ["once"]
+    assert png.read_bytes() == PNG
+    assert (await storage.get_operation(read_operation))["status"] == "done"
+    assert not await storage.uncertain_operations(run["run_id"])
+    artifact = await artifacts.save("image.png", PNG)
+    with pytest.raises(ExpectedToolInputError, match="binary"):
+        await artifacts.read(artifact["artifact_id"])
+    assert Path(artifact["path"]).read_bytes() == PNG
+
+
+async def test_pending_binary_read_recovers_without_replaying_completed_command(tmp_path):
+    await check_pending_png_read_and_completed_command(MemoryStorage(), tmp_path)
+
+
+async def check_unsafe_request_and_output_boundaries(storage, tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path, storage)
+    for index, invalid in enumerate(("\x00", "\ud800", "\udfff")):
+        request = {"command": f"echo never >> unsafe.txt{invalid}", "cwd": None, "timeout": 300}
+        first = await host.run_command(f"unsafe-{index}", request["command"])
+        second = await host.run_command(f"unsafe-{index}", request["command"])
+        assert first == second
+        assert first["error"] == "ExpectedToolInputError"
+        operation = await storage.get_operation(host.operation_id(f"unsafe-{index}", "run_command"))
+        assert operation["request"] == {
+            "invalid_input": True,
+            "request_fingerprint": fingerprint(request),
+        }
+        assert operation["kind"] == "invalid_input"
+        assert operation["status"] == "done"
+        invalid_path = await host.read_file(f"unsafe-path-{index}", f"missing{invalid}")
+        invalid_content = await host.write_file(
+            f"unsafe-content-{index}", "never.txt", f"bad{invalid}"
+        )
+        assert invalid_path["error"] == "ExpectedToolInputError"
+        assert invalid_content["error"] == "ExpectedToolInputError"
+    assert not (host.workspace / "unsafe.txt").exists()
+    assert not (host.workspace / "never.txt").exists()
+    result = await host.run_command("nul-output", "printf 'before\\000after'")
+    assert result["stdout"] == "before\\u0000after"
+    assert result["display_encoding"] == "json-string-escape"
+    logs = [
+        item
+        for item in await storage.list_artifacts(run["run_id"])
+        if item["kind"] == "command_log"
+    ]
+    assert any(Path(item["path"]).read_bytes() == b"before\x00after" for item in logs)
+
+    raw = {
+        "response": {
+            "text": "source\x00content",
+            "surrogate": "\ud800",
+            "\\u0000": "literal",
+            "\x00": "actual",
+        }
+    }
+
+    async def source():
+        return raw
+
+    recorded = await host.record_research(
+        "nul-source", "web_reader", {"url": "https://example.com"}, source
+    )
+    assert recorded["display_encoding"] == "json-string-escape"
+    assert not contains_invalid_json_text(recorded)
+    metadata, content = await artifacts.read(recorded["artifact_id"], limit=None)
+    assert json.loads(content) == raw
+    assert metadata["kind"] == "research"
+    assert not await storage.uncertain_operations(run["run_id"])
+
+
+async def test_unsafe_requests_have_zero_effects_and_outputs_have_lossless_display(tmp_path):
+    await check_unsafe_request_and_output_boundaries(MemoryStorage(), tmp_path)
+
+
+@pytest.mark.integration
+async def test_postgres_binary_read_and_unsafe_request_output_boundaries(tmp_path, postgres_url):
+    storage = PostgresStorage(postgres_url)
+    await storage.open()
+    try:
+        await storage.migrate()
+        await check_pending_png_read_and_completed_command(storage, tmp_path / "png")
+        await check_unsafe_request_and_output_boundaries(storage, tmp_path / "text")
+    finally:
+        await storage.close()
+
+
+def test_display_escaping_is_reversible_without_key_collisions():
+    original = {
+        "\x00": "actual\x00value",
+        "\\u0000": "literal\\u0000value",
+        "nested": ['line\nquote"\ud800'],
+        7: "numeric key",
+    }
+    escaped = json_safe_display(original)
+    assert len(escaped) == 4
+    assert escaped[7] == "numeric key"
+    assert not contains_invalid_json_text(escaped)
+
+    def restore(value):
+        if isinstance(value, str):
+            return json.loads('"' + value + '"')
+        if isinstance(value, dict):
+            return {restore(key): restore(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [restore(item) for item in value]
+        return value
+
+    assert restore(escaped) == original

@@ -55,6 +55,8 @@ Public model selections are immutable run snapshots; per-agent overrides select 
 
 Expected tool-input failures use `ExpectedToolInputError` at the point that interprets a model-supplied file, artifact, URL, directory or command timeout. The journal records those errors as completed results; a model can read the error and correct its call without cancelling parallel work. Unknown run records, persistence failures and raw programming exceptions retain their failure semantics. Identical parallel operation IDs share a per-host lock and reuse the recorded result; conflicting requests still stop for review.
 
+External contracts and provider messages reject U+0000 and unsupported Unicode surrogate code points before persistence. HTTP validation responses omit raw input and exception context. Valid Unicode, emoji, tabs, newlines and literal escape sequences remain supported. Text previews can explicitly escape incompatible characters while original artifact bytes remain intact; database serialization does not silently rewrite requests or evidence.
+
 | Boundary | Expected failure behavior | Protected behavior |
 | --- | --- | --- |
 | Artifact, file and syntax tools | Missing/foreign/corrupt references, paging and path errors become actionable tool results | Missing run records and persistence failures propagate |

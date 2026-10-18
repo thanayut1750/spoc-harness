@@ -1152,3 +1152,18 @@ async def test_optional_triage_expected_unavailability_keeps_conservative_workfl
     assert result["execution_mode"] == "FULL_PYRAMID"
     assert result["triage"]["source"] == "fallback"
     assert services.planning_calls == 1
+
+
+@pytest.mark.parametrize("invalid", ["\x00", "\ud800"])
+async def test_invalid_scalar_report_is_rejected_before_checkpoint_jsonb(invalid):
+    services = Services()
+
+    async def invalid_report(*args):
+        return "Private report" + invalid
+
+    services.synthesize = invalid_report
+    _, result = await invoke(services)
+    assert result["status"] == "failed"
+    assert "Private report" not in result["report"]
+    assert "Approval evidence" in result["report"]
+    assert result["progress"] == {"research": "passed"}

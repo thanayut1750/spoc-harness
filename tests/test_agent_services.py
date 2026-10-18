@@ -22,6 +22,7 @@ from org_harness.models import (
 from org_harness.providers import ProviderResponseError, ZaiChatModel
 from org_harness.runtime import build_graph, gate_approved, initial_state, runtime_config
 from org_harness.storage import MemoryStorage, RunNotFoundError
+from org_harness.text_safety import contains_invalid_json_text
 from org_harness.tools import HostTools
 
 
@@ -467,6 +468,7 @@ async def test_bad_artifact_reference_recovers_without_aborting_parallel_command
         ("read_file", {"path": "missing.txt"}),
         ("read_file", {"path": "."}),
         ("read_file", {"path": "\x00"}),
+        ("read_file", {"path": "binary.png"}),
         ("write_file", {"path": ".", "content": "cannot replace a directory"}),
         ("write_file", {"path": "parent/child.txt", "content": "parent is a file"}),
         ("run_command", {"command": "printf never", "cwd": "missing-directory"}),
@@ -515,6 +517,14 @@ async def test_expected_model_tool_input_failures_allow_correction(tmp_path, nam
 
     async with services_with_provider(tmp_path, script) as (services, storage, run, _, workspace):
         (workspace / "parent").write_text("A regular file")
+        (workspace / "binary.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00")
+        if contains_invalid_json_text(arguments):
+            with pytest.raises(EscalationSignal) as error:
+                await services.execute(work, kr, Constitution(), [], "", 0)
+            assert error.value.kind == "provider_error"
+            assert not storage.operations
+            assert (await storage.get_run(run["run_id"]))["tool_calls"] == 0
+            return
         result = await services.execute(work, kr, Constitution(), [], "", 0)
         assert result.artifact_ids
         assert (workspace / "output.txt").read_text() == "Actual output"

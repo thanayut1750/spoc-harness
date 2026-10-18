@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from org_harness.text_safety import require_json_text
+
 Department = Literal["research", "engineering"]
 ExecutionMode = Literal["FAST_TRACK", "DEPARTMENTAL", "FULL_PYRAMID"]
 Activity = Literal[
@@ -33,7 +35,12 @@ ConfigurableAgent = Literal[
 
 
 class Contract(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def persistable_text(cls, value: Any) -> Any:
+        return require_json_text(value)
 
 
 class Constitution(Contract):
