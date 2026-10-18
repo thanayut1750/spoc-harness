@@ -30,6 +30,7 @@ from org_harness.runtime import (
     validate_plan,
     validate_review_decision,
 )
+from org_harness.storage import ArtifactNotFoundError, RunNotFoundError
 
 
 def kr(identifier="research", department="research", dependencies=()):
@@ -1031,3 +1032,123 @@ async def test_optional_fallback_alone_cannot_satisfy_mandatory_kr_gate():
     assert len(services.evaluations) == 2
     assert all(item[0].fallback for item in services.evaluations)
     assert not any(outcome["status"] == "passed" for outcome in result["outcomes"].values())
+
+
+ERROR_PHASES = (
+    "plan",
+    "plan_work",
+    "execute",
+    "worker_evaluate",
+    "department_evaluate",
+    "synthesize",
+    "publish_report",
+)
+
+
+def inject_service_error(services, phase, error):
+    method = "evaluate" if phase.endswith("evaluate") else phase
+    original = getattr(services, method)
+
+    async def fail(*args, **kwargs):
+        if phase == "department_evaluate" and not args[0].worker_role.endswith("_head"):
+            return await original(*args, **kwargs)
+        raise error
+
+    setattr(services, method, fail)
+
+
+@pytest.mark.parametrize("phase", ERROR_PHASES)
+@pytest.mark.parametrize(
+    "error_type", [KeyError, LookupError, OSError, ValueError, RunNotFoundError]
+)
+async def test_service_programming_and_storage_failures_escape_without_replanning(
+    phase, error_type
+):
+    services = TriagedServices("FAST_TRACK") if phase == "publish_report" else Services()
+    inject_service_error(services, phase, error_type("Unexpected producer failure"))
+    with pytest.raises(error_type):
+        await invoke(services)
+    assert len(services.executions) <= 1
+
+
+@pytest.mark.parametrize("phase", ERROR_PHASES)
+async def test_explicit_service_blockers_remain_recoverable_at_each_phase(phase):
+    services = TriagedServices("FAST_TRACK") if phase == "publish_report" else Services()
+    inject_service_error(
+        services, phase, EscalationSignal("missing_resource", "Resource unavailable")
+    )
+    _, result = await invoke(services)
+    if phase in {"synthesize", "publish_report"}:
+        assert result["status"] == "failed"
+        assert "Approval evidence" in result["report"]
+        assert all(status == "passed" for status in result["progress"].values())
+    else:
+        assert result["status"] == "awaiting_review"
+        assert "Resource unavailable" in result["review"]["reason"]
+
+
+@pytest.mark.parametrize("phase", ["worker_evaluate", "department_evaluate"])
+async def test_only_missing_evidence_artifact_is_recoverable_at_read_only_gates(phase):
+    services = Services()
+    inject_service_error(services, phase, ArtifactNotFoundError("Private path must not be exposed"))
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    assert result["outcomes"]["research"]["escalation"]["kind"] == "artifact_missing"
+    assert "unavailable for evidence review" in result["review"]["reason"]
+    assert "Private path" not in json.dumps(result, default=str)
+
+
+async def test_raw_execution_artifact_lookup_is_not_retried_before_unknown_side_effect_review():
+    services = Services()
+    inject_service_error(services, "execute", ArtifactNotFoundError("Artifact not found"))
+    with pytest.raises(ArtifactNotFoundError):
+        await invoke(services)
+    assert not services.evaluations
+
+
+@pytest.mark.parametrize("phase", ["plan", "plan_work", "execute", "evaluate", "synthesize"])
+async def test_malformed_returned_contracts_are_expected_validation_failures(phase):
+    services = Services()
+
+    async def malformed(*args):
+        return None
+
+    setattr(services, phase, malformed)
+    _, result = await invoke(services)
+    assert result["status"] == ("failed" if phase == "synthesize" else "awaiting_review")
+    reason = result["report"] if phase == "synthesize" else result["review"]["reason"]
+    assert "schema validation" in reason
+
+
+async def test_invalid_response_review_omits_private_model_field_values():
+    services = Services()
+
+    async def malformed(*args):
+        return {"summary": "private response value", "confidence_score": "secret-provider-body"}
+
+    services.execute = malformed
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    public = json.dumps(result, default=str)
+    assert "confidence_score: float_parsing" in public
+    assert "private response value" not in public
+    assert "secret-provider-body" not in public
+
+
+@pytest.mark.parametrize("error_type", [KeyError, RunNotFoundError, OSError])
+async def test_triage_does_not_hide_programming_or_storage_errors(error_type):
+    services = TriagedServices()
+    inject_service_error(services, "triage", error_type("Unexpected classifier failure"))
+    with pytest.raises(error_type):
+        await invoke(services)
+    assert not services.executions
+
+
+async def test_optional_triage_expected_unavailability_keeps_conservative_workflow():
+    services = TriagedServices()
+    inject_service_error(services, "triage", EscalationSignal("provider_error", "Classifier down"))
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert result["execution_mode"] == "FULL_PYRAMID"
+    assert result["triage"]["source"] == "fallback"
+    assert services.planning_calls == 1

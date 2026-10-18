@@ -35,7 +35,12 @@ def request(method: str, path: str, *, body: dict | None = None):
         return response.json()
     except httpx.HTTPStatusError as exc:
         try:
-            detail = exc.response.json().get("detail", "Request rejected")
+            problem = exc.response.json()
+            detail = (
+                problem.get("detail", "Request rejected")
+                if isinstance(problem, dict)
+                else "Request rejected"
+            )
         except ValueError:
             detail = "Request rejected"
         typer.echo(f"HTTP {exc.response.status_code}: {detail}", err=True)
@@ -43,6 +48,17 @@ def request(method: str, path: str, *, body: dict | None = None):
     except httpx.HTTPError:
         typer.echo("Cannot reach the local API; start spoc serve.", err=True)
         raise typer.Exit(1) from None
+    except ValueError:
+        typer.echo(
+            "The local API returned invalid JSON; check that the API service is running.", err=True
+        )
+        raise typer.Exit(1) from None
+
+
+@app.command("retry")
+def retry_run(run_id: str):
+    """Retry failed execution from its checkpoint; interrupted commands still require review."""
+    display(request("POST", f"/api/runs/{run_id}/retry"))
 
 
 @app.command()

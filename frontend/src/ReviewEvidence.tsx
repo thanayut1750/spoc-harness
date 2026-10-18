@@ -7,6 +7,7 @@ import {
   X,
 } from "lucide-react";
 import { ArtifactFiles } from "./ArtifactFiles";
+import { ArtifactLink } from "./ArtifactLink";
 import { pretty } from "./office";
 import { reviewFocus, reviewReason } from "./review";
 import type {
@@ -155,14 +156,15 @@ function Attempt({
           <ul className="attempt-artifact-links">
             {references.map((id) => (
               <li key={id}>
-                <a
-                  href={`/api/artifacts/${encodeURIComponent(id)}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <ArtifactLink
+                  id={id}
+                  name={
+                    files.find((file) => file.artifact_id === id)?.name ?? id
+                  }
                 >
                   <FileText size={12} />
                   {files.find((file) => file.artifact_id === id)?.name ?? id}
-                </a>
+                </ArtifactLink>
               </li>
             ))}
           </ul>

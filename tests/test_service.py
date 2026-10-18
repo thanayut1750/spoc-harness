@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -154,6 +155,144 @@ async def test_worker_recovers_unknown_command_into_review(service):
     assert result["status"] == "review"
     assert result["review"]["kind"] == "unknown_operation"
     assert result["review"]["operation_id"] == "unknown"
+
+
+async def test_retry_failed_run_reviews_pending_command_before_services_or_checkpoint_execute(
+    service,
+):
+    _, storage, settings = service
+    run = await storage.create_run({"user_request": "Build a website", "constitution": {}})
+    await storage.update_run(
+        run["run_id"],
+        status="failed",
+        error="Execution failed (NotFoundError)",
+        model_calls=2,
+        tool_calls=2,
+        epochs={"direct-1": 0},
+        progress={"direct-1": "running"},
+    )
+    await storage.begin_operation(
+        run["run_id"], "pending-listing", "command", {"command": "pwd && ls -la", "cwd": None}
+    )
+    await storage.command(run["run_id"], "retry", {})
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Unknown-command review must precede services and graph execution")
+
+    worker = Worker(settings, storage, services_factory=forbidden, graph_factory=forbidden)
+    assert await worker.run_once()
+    result = await storage.get_run(run["run_id"])
+    assert result["status"] == "review"
+    assert result["review"]["kind"] == "unknown_operation"
+    assert result["review"]["operation_id"] == "pending-listing"
+    assert result["review"]["context"]["operation"]["command"] == "pwd && ls -la"
+    assert result["model_calls"] == result["tool_calls"] == 2
+    assert result["epochs"] == {"direct-1": 0}
+    assert (await storage.get_operation("pending-listing"))["status"] == "pending"
+
+
+async def test_retry_terminal_failed_checkpoint_retains_evidence_and_explains_no_pending_work(
+    service,
+):
+    _, storage, settings = service
+    saver = InMemorySaver()
+    calls = []
+
+    class State(TypedDict, total=False):
+        run_id: str
+        user_request: str
+        constitution: dict
+        status: str
+        report: str
+
+    def graph_factory(*args, **kwargs):
+        def failed(state):
+            calls.append(state["run_id"])
+            return {"status": "failed", "report": "Approved evidence remains available."}
+
+        return (
+            StateGraph(State)
+            .add_node("failed", failed)
+            .add_edge(START, "failed")
+            .add_edge("failed", END)
+            .compile(checkpointer=saver)
+        )
+
+    run = await storage.create_run({"user_request": "Build a website", "constitution": {}})
+    worker = Worker(
+        settings,
+        storage,
+        graph_factory=graph_factory,
+        services_factory=lambda *_: SimpleNamespace(),
+        checkpointer=saver,
+    )
+    assert await worker.run_once()
+    assert (await storage.get_run(run["run_id"]))["status"] == "failed"
+    await storage.command(run["run_id"], "retry", {})
+    assert await worker.run_once()
+    result = await storage.get_run(run["run_id"])
+    assert result["status"] == "failed"
+    assert "no pending checkpoint" in result["error"]
+    assert result["report"] == "Approved evidence remains available."
+    assert calls == [run["run_id"]]
+
+
+async def test_unexpected_worker_failure_records_safe_locations_and_preserves_unknown_commands(
+    service, caplog
+):
+    _, storage, settings = service
+    calls = []
+
+    class State(TypedDict, total=False):
+        run_id: str
+        user_request: str
+        constitution: dict
+        status: str
+
+    def graph_factory(*args, **kwargs):
+        async def broken(state):
+            calls.append(state["run_id"])
+            await storage.begin_operation(
+                state["run_id"], "unconfirmed-command", "command", {"command": "external mutation"}
+            )
+            raise KeyError("private provider body with secret credential")
+
+        return (
+            StateGraph(State)
+            .add_node("broken", broken)
+            .add_edge(START, "broken")
+            .add_edge("broken", END)
+            .compile(checkpointer=kwargs["checkpointer"])
+        )
+
+    run = await storage.create_run({"user_request": "Test", "constitution": {}})
+    worker = Worker(
+        settings,
+        storage,
+        graph_factory=graph_factory,
+        services_factory=lambda *_: SimpleNamespace(),
+        checkpointer=InMemorySaver(),
+    )
+    assert await worker.run_once()
+    failed = await storage.get_run(run["run_id"])
+    assert failed["status"] == "failed"
+    assert failed["failure_context"]["phase"] == "graph_execution"
+    assert failed["failure_context"]["type"] == "KeyError"
+    assert failed["failure_context"]["frames"][-1] == {
+        "file": "test_service.py",
+        "function": "broken",
+        "line": failed["failure_context"]["frames"][-1]["line"],
+    }
+    assert (await storage.get_operation("unconfirmed-command"))["status"] == "pending"
+    assert "secret credential" not in json.dumps(failed)
+    assert "private provider body" not in caplog.text
+    assert "test_service.py" in caplog.text
+    await storage.command(run["run_id"], "retry", {})
+    assert await worker.run_once()
+    resumed = await storage.get_run(run["run_id"])
+    assert resumed["status"] == "review"
+    assert resumed["review"]["kind"] == "unknown_operation"
+    assert calls == [run["run_id"]]
 
 
 async def test_sse_replays_after_cursor_with_normalized_envelope(service):

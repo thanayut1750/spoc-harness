@@ -46,6 +46,7 @@ uv run spoc status
 uv run spoc status RUN_ID
 uv run spoc pause RUN_ID
 uv run spoc cancel RUN_ID
+uv run spoc retry RUN_ID
 uv run spoc doctor
 ```
 
@@ -56,6 +57,8 @@ The office shows the objective/KR hierarchy on the left, actual agent activity i
 Ordinary blockers in the full workflow receive one automatic executive replan per run. Fast-track and departmental work stop for review after their bounded retry allowance. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
 
 The review panel starts with a short explanation and plain choices: retry the task, change its requirements, or stop the run. A normal retry preserves the current requirements and recorded feedback; extra instructions are optional. Rule violations and clarification requests require written guidance. The primary button names the action it will take.
+
+An unexpected execution failure shows its error and a **Retry mission** action. Retry continues the same saved checkpoint, preserving the original request, model selections, budgets, evidence and failure history. Interrupted commands still require review before replay. A finished failed graph with no pending checkpoint needs a new mission instead of silently restarting completed work.
 
 Expand **Review evidence and history** for the mission, blocked KR and acceptance criteria, gate feedback, recorded attempts, and files. Pending dependent KRs appear separately. Older runs recover the available summaries and evidence without rewriting their saved interrupt; unavailable history is labeled explicitly.
 
@@ -78,6 +81,8 @@ Files are grouped as task outputs, sources, verification logs, and submission me
 Immutable earlier file versions and failed checks remain available for inspection. Submission evidence uses current file revisions and final checks, so a corrected file does not remain rejected because of an obsolete broken snapshot.
 
 Research uses Z.AI Search and Reader MCP tools with the configured key. Access depends on the key's tool entitlement; unavailable tools report a blocker rather than returning sample results. `spoc doctor --live` makes real provider requests and consumes provider quota.
+
+Engineering workers can read reference URLs directly with a bounded HTTP `read_web_page` tool while remaining in Engineering. `read_artifact` accepts only IDs returned by tools, not URLs or file paths. Expected resource/input errors are recorded as actionable tool results so the model can correct them. Missing run records, database failures, unknown command effects and programming errors are never presented as successful tool output.
 
 Default configurable limits: 100 model calls and 200 tool calls per run, 12 model calls per worker invocation, a 60-second timeout covering each worker invocation and output extraction, and a 300-second command timeout. Tactical packages are critical by default. A lead may mark an enrichment step optional (`critical=false`); a timeout or ordinary blocker then returns an explicitly incomplete fallback with partial evidence, allowing other work to continue. Fallbacks cannot approve work or waive acceptance criteria. Policy violations, cancellation, budgets, and host commands with unknown side effects still stop for review. The example healthcare/privacy and dollar-budget policies from the initial proposal are not hardcoded. Configure a constitution appropriate to each objective.
 
@@ -115,7 +120,7 @@ Activity values are `idle`, `planning`, `reading`, `writing`, `executing`, `revi
 | --- | --- |
 | `POST /api/runs` | Queue objective, optional workspace, constitution, and limits |
 | `GET /api/runs`, `GET /api/runs/{id}` | Run history and current progress |
-| `POST /api/runs/{id}/pause`, `/resume`, `/cancel` | Lifecycle commands |
+| `POST /api/runs/{id}/pause`, `/resume`, `/cancel`, `/retry` | Lifecycle and saved-checkpoint recovery commands |
 | `POST /api/runs/{id}/notes` | Queue targeted human guidance |
 | `GET /api/settings`, `PUT /api/settings/model` | Read public provider settings and save model defaults |
 | `PUT`, `DELETE /api/settings/agents/{agent_id}` | Set an agent override or return it to the default |

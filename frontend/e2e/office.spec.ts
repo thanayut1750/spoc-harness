@@ -209,8 +209,12 @@ async function fixture(
     if (path === `/api/runs/${runId}`) return route.fulfill({ json: run });
     if (path.endsWith("/artifacts")) return route.fulfill({ json: files });
     if (method === "POST") {
-      const body = route.request().postDataJSON();
+      const body = route.request().postDataJSON() ?? {};
       requests.push({ path, body });
+      if (path.endsWith("/retry")) {
+        run = { ...run, status: "queued", error: null };
+        return route.fulfill({ status: 202, json: run });
+      }
       if (path.endsWith("/pause")) run = { ...run, status: "paused" };
       if (path.endsWith("/resume")) run = { ...run, status: "running" };
       if (path.endsWith("/cancel")) run = { ...run, status: "cancelled" };
@@ -367,6 +371,42 @@ test("terminal runs stop working while external activity and historical evidence
     }),
   ).toBeVisible();
 });
+test("a failed mission explains its error and retries the same saved run", async ({
+  page,
+}) => {
+  const requests = await fixture(page, {
+    status: "failed",
+    error: "Execution failed (NotFoundError)",
+  });
+  const banner = page.getByRole("alert");
+  await expect(
+    banner.getByText("Mission failed", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    banner.getByText("Execution failed (NotFoundError)"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Pause mission", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Review and resume mission" }),
+  ).toBeDisabled();
+  await expect(banner).toContainText(
+    "Continue from saved work. Interrupted commands may require review.",
+  );
+  await banner
+    .getByRole("button", { name: "Retry mission", exact: true })
+    .click();
+  await expect(banner).toBeHidden();
+  await expect(page.locator(".run-controls")).toContainText("Queued");
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue(runId);
+  expect(requests.filter((request) => request.path.endsWith("/retry"))).toEqual(
+    [{ path: `/api/runs/${runId}/retry`, body: {} }],
+  );
+  expect(requests.some((request) => request.path === "/api/runs")).toBe(false);
+});
 test("an engineering fast track shows one worker and leaves Research idle", async ({
   page,
 }) => {
@@ -392,6 +432,188 @@ test("an engineering fast track shows one worker and leaves Research idle", asyn
   await expect(page.locator(".sidebar-note").first()).not.toContainText(
     "Research",
   );
+});
+test("a rejected retry stays visible and its error clears after a successful retry", async ({
+  page,
+}) => {
+  await fixture(page, {
+    status: "failed",
+    error: "Execution failed (NotFoundError)",
+  });
+  let attempts = 0;
+  await page.route(`**/api/runs/${runId}/retry`, (route) => {
+    attempts++;
+    return attempts === 1
+      ? route.fulfill({
+          status: 409,
+          json: { detail: "Another operation is still finishing." },
+        })
+      : route.fallback();
+  });
+  await page
+    .getByRole("button", { name: "Retry mission", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Another operation is still finishing." }),
+  ).toBeVisible();
+  await expect(page.locator(".failure-banner")).toContainText(
+    "Execution failed (NotFoundError)",
+  );
+  await page
+    .getByRole("button", { name: "Retry mission", exact: true })
+    .click();
+  await expect(page.locator(".run-controls")).toContainText("Queued");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+for (const status of ["succeeded", "cancelled"]) {
+  test(`a ${status} mission does not offer recovery actions`, async ({
+    page,
+  }) => {
+    const requests = await fixture(page, {
+      status,
+      error: "Historical failure",
+    });
+    await expect(
+      page.getByRole("button", { name: "Retry mission", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Review and resume mission" }),
+    ).toBeDisabled();
+    expect(requests).toHaveLength(0);
+  });
+}
+test("file-list failures do not hide updated run status and clear after recovery", async ({
+  page,
+}) => {
+  await fixture(page, {
+    status: "failed",
+    error: "Execution failed (NotFoundError)",
+  });
+  await page.route(`**/api/runs/${runId}/artifacts`, (route) =>
+    route.fulfill({
+      status: 503,
+      json: { detail: "Artifact store temporarily unavailable." },
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Retry mission", exact: true })
+    .click();
+  await expect(page.locator(".run-controls")).toContainText("Queued");
+  await expect(page.locator(".failure-banner")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveText(
+    "Could not load files: Artifact store temporarily unavailable.",
+  );
+  await page.unroute(`**/api/runs/${runId}/artifacts`);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "refresh-recovered-files",
+      seq: 11,
+      source: "harness",
+      agent_id: "planner",
+      activity: "completed",
+      run_id: "run-fixture",
+      summary: "Refresh saved state",
+      timestamp: "2026-10-18T10:00:02Z",
+    });
+  });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+test("missing artifact downloads show an inline error and can be downloaded after recovery", async ({
+  page,
+}) => {
+  await fixture(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/artifacts/artifact-1", (route) =>
+    route.fulfill({
+      status: 404,
+      json: { detail: "Artifact content is unavailable" },
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Files" }).click();
+  const file = page.getByRole("link", { name: /acceptance-results.txt/ });
+  const pagesBefore = page.context().pages().length;
+  await file.click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Could not download acceptance-results.txt: Artifact content is unavailable",
+  );
+  expect(page.context().pages()).toHaveLength(pagesBefore);
+  await expect(
+    page.getByRole("heading", { name: "The office." }),
+  ).toBeVisible();
+  await page.unroute("**/api/artifacts/artifact-1");
+  await page.route("**/api/artifacts/artifact-1", (route) =>
+    route.fulfill({
+      body: "All tests passed",
+      contentType: "text/plain",
+    }),
+  );
+  const download = page.waitForEvent("download");
+  await file.click();
+  expect((await download).suggestedFilename()).toBe("acceptance-results.txt");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(errors).toHaveLength(0);
+});
+test("settings HTTP failures stay visible without an unhandled promise or false saved notice", async ({
+  page,
+}) => {
+  await fixture(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/settings/model", (route) =>
+    route.fulfill({
+      status: 502,
+      body: "<html>Proxy unavailable</html>",
+      contentType: "text/html",
+    }),
+  );
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Save model settings", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The harness could not complete this request (502).",
+  );
+  await expect(
+    dialog.getByText("Saved. New missions will use this model."),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Save model settings", exact: true }),
+  ).toBeEnabled();
+  expect(errors).toHaveLength(0);
+});
+test("an invalid office snapshot reports its failure without crashing the workspace", async ({
+  page,
+}) => {
+  await fixture(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/office", (route) =>
+    route.fulfill({ json: { agents: null, cursor: "invalid" } }),
+  );
+  await page.evaluate(() => {
+    (window as unknown as { __officeStreams: EventSource[] }).__officeStreams
+      .at(-1)
+      ?.onerror?.(new Event("error"));
+  });
+  await expect(page.getByRole("status")).toContainText(
+    "The harness returned an invalid office snapshot.",
+  );
+  await expect(
+    page.getByRole("heading", { name: "The office." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue(runId);
+  expect(errors).toHaveLength(0);
 });
 test("pauses, resumes from a durable boundary, and cancels a run", async ({
   page,

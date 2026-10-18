@@ -1,4 +1,5 @@
 import { ArrowDownToLine, FileText } from "lucide-react";
+import { ArtifactLink } from "./ArtifactLink";
 import { artifactGroup, artifactGroups, artifactSizeLabel } from "./review";
 import type { Artifact } from "./types";
 export function ArtifactFiles({
@@ -38,11 +39,10 @@ export function ArtifactFiles({
                 <span>{items.length}</span>
               </h4>
               {items.map((file) => (
-                <a
+                <ArtifactLink
                   key={file.artifact_id}
-                  href={`/api/artifacts/${encodeURIComponent(file.artifact_id)}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  id={file.artifact_id}
+                  name={file.name}
                 >
                   <FileText size={16} />
                   <div>
@@ -62,7 +62,7 @@ export function ArtifactFiles({
                     </span>
                   </div>
                   <ArrowDownToLine size={14} />
-                </a>
+                </ArtifactLink>
               ))}
             </section>
           ) : null;

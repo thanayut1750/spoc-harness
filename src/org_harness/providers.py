@@ -21,6 +21,10 @@ from org_harness.config import Settings
 from org_harness.models import ModelSelection
 
 
+class ProviderResponseError(ValueError):
+    """A malformed external response, distinct from an internal parsing defect."""
+
+
 def encode_message(message: BaseMessage) -> dict[str, Any]:
     role = {"human": "user", "ai": "assistant", "system": "system", "tool": "tool"}.get(
         message.type, message.type
@@ -92,13 +96,34 @@ class ZaiChatModel(BaseChatModel):
         return request
 
     def _result(self, response: Any) -> ChatResult:
-        choice = response.choices[0]
-        message = choice.message
+        choices = getattr(response, "choices", None)
+        if not isinstance(choices, (list, tuple)) or not choices:
+            raise ProviderResponseError("Provider response has no completion choices")
+        choice = choices[0]
+        message = getattr(choice, "message", None)
+        if message is None:
+            raise ProviderResponseError("Provider response has no assistant message")
+        content = getattr(message, "content", None)
+        if content is not None and not isinstance(content, str):
+            raise ProviderResponseError("Provider response has an invalid message content type")
+        tool_calls = getattr(message, "tool_calls", None) or []
+        if not isinstance(tool_calls, (list, tuple)):
+            raise ProviderResponseError("Provider response has invalid tool calls")
         extra = {}
         if getattr(message, "reasoning_content", None) is not None:
             extra["reasoning_content"] = message.reasoning_content
         calls, invalid = [], []
-        for call in message.tool_calls or []:
+        for call in tool_calls:
+            function = getattr(call, "function", None)
+            if not function or not all(
+                isinstance(value, str)
+                for value in (
+                    getattr(call, "id", None),
+                    getattr(function, "name", None),
+                    getattr(function, "arguments", None),
+                )
+            ):
+                raise ProviderResponseError("Provider response has an invalid function call")
             try:
                 args = json.loads(call.function.arguments)
                 if not isinstance(args, dict):
@@ -113,21 +138,33 @@ class ZaiChatModel(BaseChatModel):
                         "error": str(exc),
                     }
                 )
-        usage = response.usage
+        usage = getattr(response, "usage", None)
         metadata = None
         if usage:
+            if not all(
+                isinstance(value, int) and value >= 0
+                for value in (
+                    getattr(usage, "prompt_tokens", None),
+                    getattr(usage, "completion_tokens", None),
+                    getattr(usage, "total_tokens", None),
+                )
+            ):
+                raise ProviderResponseError("Provider response has invalid token usage")
             metadata = {
                 "input_tokens": usage.prompt_tokens,
                 "output_tokens": usage.completion_tokens,
                 "total_tokens": usage.total_tokens,
             }
         ai_message = AIMessage(
-            content=message.content or "",
+            content=content or "",
             additional_kwargs=extra,
             tool_calls=calls,
             invalid_tool_calls=invalid,
             usage_metadata=metadata,
-            response_metadata={"model_name": response.model, "finish_reason": choice.finish_reason},
+            response_metadata={
+                "model_name": getattr(response, "model", self.model),
+                "finish_reason": getattr(choice, "finish_reason", None),
+            },
         )
         return ChatResult(generations=[ChatGeneration(message=ai_message)])
 

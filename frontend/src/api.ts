@@ -8,35 +8,44 @@ import type {
   WorkspaceSettings,
   RegenesisResult,
 } from "./types";
-async function request<T>(
+async function responseFor(
   path: string,
   body?: unknown,
   method = body === undefined ? "GET" : "POST",
-): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    method,
-    headers:
-      body === undefined
-        ? { Accept: "application/json" }
-        : { "Content-Type": "application/json", Accept: "application/json" },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  accept = "application/json",
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method,
+      headers:
+        body === undefined
+          ? { Accept: accept }
+          : { "Content-Type": "application/json", Accept: accept },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the harness. Check the connection and refresh the mission status.",
+    );
+  }
   if (!response.ok) {
-    let message = `Request failed (${response.status})`;
+    let message = `The harness could not complete this request (${response.status}).`;
     try {
       const error = await response.json();
       message =
-        typeof error.detail === "string"
+        typeof error?.detail === "string" && error.detail.trim()
           ? error.detail
-          : Array.isArray(error.detail)
+          : Array.isArray(error?.detail)
             ? error.detail
+                .filter((issue: unknown) => issue && typeof issue === "object")
                 .slice(0, 3)
                 .map(
                   (issue: { loc?: unknown[]; msg?: unknown }) =>
-                    `${issue.loc?.slice(1).join(".") || "Request"}: ${String(issue.msg || "Invalid value")}`,
+                    `${Array.isArray(issue.loc) ? issue.loc.slice(1).join(".") || "Request" : "Request"}: ${String(issue.msg || "Invalid value")}`,
                 )
-                .join("; ")
-            : typeof error.message === "string"
+                .join("; ") || message
+            : typeof error?.message === "string" && error.message.trim()
               ? error.message
               : message;
     } catch {
@@ -44,8 +53,22 @@ async function request<T>(
     }
     throw new Error(message);
   }
+  return response;
+}
+async function request<T>(
+  path: string,
+  body?: unknown,
+  method = body === undefined ? "GET" : "POST",
+): Promise<T> {
+  const response = await responseFor(path, body, method);
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error(
+      "The harness returned an unreadable response. Refresh the mission status to check whether the request completed.",
+    );
+  }
 }
 export const api = {
   settings: () => request<WorkspaceSettings>("/settings"),
@@ -71,9 +94,14 @@ export const api = {
     ),
   runs: async () => {
     const data = await request<Run[] | { runs: Run[] }>("/runs");
-    return Array.isArray(data) ? data : data.runs;
+    const runs = Array.isArray(data) ? data : data?.runs;
+    if (!Array.isArray(runs))
+      throw new Error("The harness returned an invalid mission list.");
+    return runs;
   },
   run: (id: string) => request<Run>(`/runs/${encodeURIComponent(id)}`),
+  retry: (id: string) =>
+    request<Run>(`/runs/${encodeURIComponent(id)}/retry`, undefined, "POST"),
   create: (input: RunInput) =>
     request<{ run_id: string; status: string }>("/runs", input),
   control: (id: string, action: "pause" | "cancel") =>
@@ -85,6 +113,25 @@ export const api = {
       content,
       ...(agent_id ? { agent_id } : {}),
     }),
-  artifacts: (id: string) =>
-    request<Artifact[]>(`/runs/${encodeURIComponent(id)}/artifacts`),
+  artifacts: async (id: string) => {
+    const files = await request<Artifact[]>(
+      `/runs/${encodeURIComponent(id)}/artifacts`,
+    );
+    if (!Array.isArray(files))
+      throw new Error("The harness returned an invalid file list.");
+    return files;
+  },
+  downloadArtifact: async (id: string) => {
+    const response = await responseFor(
+      `/artifacts/${encodeURIComponent(id)}`,
+      undefined,
+      "GET",
+      "*/*",
+    );
+    try {
+      return await response.blob();
+    } catch {
+      throw new Error("The file download was interrupted. Download it again.");
+    }
+  },
 };

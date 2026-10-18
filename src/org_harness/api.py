@@ -206,8 +206,14 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             name: value.model_dump(mode="json") for name, value in agent_models.items()
         }
         if body.workspace_path:
-            workspace = Path(body.workspace_path).expanduser().resolve()
-            if not workspace.is_dir():
+            try:
+                workspace = Path(body.workspace_path).expanduser().resolve()
+                exists = workspace.is_dir()
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise HTTPException(
+                    422, "Workspace path must resolve to an existing directory"
+                ) from exc
+            if not exists:
                 raise HTTPException(422, "Workspace must be an existing directory")
             payload["workspace_path"] = str(workspace)
         run = await storage.create_run(payload, idempotency_key, request_payload=request_payload)
@@ -283,6 +289,12 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     async def pause(run_id: str, idempotency_key: str | None = Header(default=None)):
         result = await storage.command(run_id, "pause", {}, idempotency_key)
         await activity(run_id, "pause requested", idempotency_key)
+        return result
+
+    @app.post("/api/runs/{run_id}/retry", status_code=202)
+    async def retry(run_id: str, idempotency_key: str | None = Header(default=None)):
+        result = await storage.command(run_id, "retry", {}, idempotency_key)
+        await activity(run_id, "recovery queued", idempotency_key)
         return result
 
     @app.post("/api/runs/{run_id}/cancel")
@@ -395,8 +407,15 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     @app.get("/api/artifacts/{artifact_id}")
     async def artifact(artifact_id: str):
         metadata = await storage.get_artifact(artifact_id)
-        path = Path(metadata["path"])
-        if not path.is_file():
+        location = metadata.get("path")
+        if not isinstance(location, (str, Path)) or not str(location):
+            raise HTTPException(404, "Artifact content is unavailable")
+        try:
+            path = Path(location)
+            exists = path.is_file()
+        except (OSError, ValueError) as exc:
+            raise HTTPException(404, "Artifact content is unavailable") from exc
+        if not exists:
             raise HTTPException(404, "Artifact content is unavailable")
         return FileResponse(
             path,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Activity as ActivityIcon,
+  AlertTriangle,
   ArrowRight,
   Check,
   CheckCheck,
@@ -1008,6 +1009,9 @@ export default function App() {
   >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [runsError, setRunsError] = useState("");
+  const [detailError, setDetailError] = useState("");
+  const [artifactsError, setArtifactsError] = useState("");
   const [modalError, setModalError] = useState("");
   const [filter, setFilter] = useState("");
   const [department, setDepartment] = useState("all");
@@ -1028,27 +1032,36 @@ export default function App() {
       const items = await api.runs();
       if (epoch !== dataEpoch.current) return;
       setRuns(items);
+      setRunsError("");
       setRunId((current) => current || items[0]?.run_id || "");
     } catch (failure) {
       if (epoch !== dataEpoch.current) return;
-      setError(failure instanceof Error ? failure.message : "Cannot load runs");
+      setRunsError(
+        `Could not load missions: ${failure instanceof Error ? failure.message : "The request failed."}`,
+      );
     }
   }, []);
   const refreshDetail = useCallback(async (id: string) => {
     const epoch = dataEpoch.current;
-    try {
-      const [detail, files] = await Promise.all([
-        api.run(id),
-        api.artifacts(id),
-      ]);
-      if (epoch === dataEpoch.current && selectedRun.current === id) {
-        setRun(detail);
-        setArtifacts(files);
-      }
-    } catch (failure) {
-      if (epoch !== dataEpoch.current) return;
-      setError(
-        failure instanceof Error ? failure.message : "Cannot load mission",
+    const [detail, files] = await Promise.allSettled([
+      api.run(id),
+      api.artifacts(id),
+    ]);
+    if (epoch !== dataEpoch.current || selectedRun.current !== id) return;
+    if (detail.status === "fulfilled") {
+      setRun(detail.value);
+      setDetailError("");
+    } else {
+      setDetailError(
+        `Could not load mission details: ${detail.reason instanceof Error ? detail.reason.message : "The request failed."}`,
+      );
+    }
+    if (files.status === "fulfilled") {
+      setArtifacts(files.value);
+      setArtifactsError("");
+    } else {
+      setArtifactsError(
+        `Could not load files: ${files.reason instanceof Error ? files.reason.message : "The request failed."}`,
       );
     }
   }, []);
@@ -1098,6 +1111,9 @@ export default function App() {
     setFilter("");
     setDepartment("all");
     setError("");
+    setRunsError("");
+    setDetailError("");
+    setArtifactsError("");
     setModalError("");
     setModal((current) => (current === "settings" ? current : null));
     setOfficeVersion((version) => version + 1);
@@ -1127,6 +1143,8 @@ export default function App() {
   useEffect(() => {
     setRun(null);
     setArtifacts([]);
+    setDetailError("");
+    setArtifactsError("");
     if (!runId) return;
     void refreshDetail(runId);
     const timer = setInterval(() => void refreshDetail(runId), 5000);
@@ -1196,6 +1214,9 @@ export default function App() {
       : run;
   const canControl = run && !terminalStatuses.has(run.status);
   const needsReview = !!reviewRun?.review;
+  const loadError = [runsError, detailError, artifactsError]
+    .filter(Boolean)
+    .join(" ");
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -1402,11 +1423,55 @@ export default function App() {
             </summary>
             <Pyramid run={run} />
           </details>
-          {error && (
+          {(error || loadError) && (
             <div className="error-banner" role="alert">
-              <span>{error}</span>
-              <button aria-label="Dismiss error" onClick={() => setError("")}>
+              <span>{error || loadError}</span>
+              <button
+                aria-label="Dismiss error"
+                onClick={() => {
+                  setError("");
+                  setRunsError("");
+                  setDetailError("");
+                  setArtifactsError("");
+                }}
+              >
                 <X size={14} />
+              </button>
+            </div>
+          )}
+          {!error &&
+            !loadError &&
+            office.connection === "offline" &&
+            office.error && (
+              <div className="error-banner" role="status">
+                {office.error}
+              </div>
+            )}
+          {run?.status === "failed" && (
+            <div className="failure-banner" role="alert">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Mission failed</strong>
+                <p>
+                  {run.error ||
+                    "The mission ended before it could finish. Check its recorded activity for details."}
+                </p>
+                <small>
+                  Continue from saved work. Interrupted commands may require
+                  review.
+                </small>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void perform(() => api.retry(run.run_id))}
+              >
+                {busy ? (
+                  <LoaderCircle size={15} className="spin" />
+                ) : (
+                  <Play size={15} />
+                )}
+                {busy ? "Retrying…" : "Retry mission"}
               </button>
             </div>
           )}

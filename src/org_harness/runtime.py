@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Annotated, Any, Literal, Protocol, TypedDict, cast
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send, interrupt
+from pydantic import TypeAdapter, ValidationError
 
 from org_harness.models import (
     AttemptRecord,
@@ -33,6 +34,7 @@ from org_harness.models import (
     TriageDecision,
     WorkPackage,
 )
+from org_harness.storage import ArtifactNotFoundError
 from org_harness.triage import conservative_triage
 
 JSON = dict[str, Any]
@@ -43,7 +45,11 @@ ROLES = {
 
 
 class RuntimeServices(Protocol):
-    """Model and host integration seam; implementations are scoped to one run."""
+    """Run-scoped integration seam; expected blockers raise EscalationSignal.
+
+    Producers translate input/resource errors where their source is known. Raw
+    storage and programming errors must escape rather than trigger more work.
+    """
 
     async def plan(
         self, user_request: str, constitution: Constitution
@@ -178,7 +184,7 @@ def runtime_config(run_id: str) -> RunnableConfig:
 
 
 def validate_plan(objectives: Sequence[StrategicObjective | JSON]) -> list[StrategicObjective]:
-    parsed = [StrategicObjective.model_validate(item) for item in objectives]
+    parsed = TypeAdapter(list[StrategicObjective]).validate_python(objectives)
     if not 1 <= len(parsed) <= 3:
         raise ValueError("A plan must contain 1–3 objectives")
     ids = [objective.objective_id for objective in parsed]
@@ -216,6 +222,52 @@ def validate_plan(objectives: Sequence[StrategicObjective | JSON]) -> list[Strat
     for kr_id in by_id:
         visit(kr_id)
     return parsed
+
+
+def _validate_work_plan(value: Any, kr: KeyResult) -> list[WorkPackage]:
+    packages = TypeAdapter(list[WorkPackage]).validate_python(value)
+    if not 1 <= len(packages) <= 4:
+        raise ValueError("A tactical plan needs 1–4 work packages")
+    if len({p.work_package_id for p in packages}) != len(packages):
+        raise ValueError("Work package IDs must be unique within a tactical plan")
+    if any(p.kr_id != kr.kr_id or p.role not in ROLES[kr.target_department] for p in packages):
+        raise ValueError("Tactical plan contains an invalid assignment or specialist role")
+    return packages
+
+
+async def _validated_response[ResponseT](
+    response: Awaitable[Any], validate: Callable[[Any], ResponseT], *, invalid_kind: str
+) -> ResponseT:
+    # Keep service execution outside the validation catch. A ValueError in the
+    # producer can be a programming/storage defect, not malformed model output.
+    value = await response
+    try:
+        return validate(value)
+    except ValueError as exc:
+        if isinstance(exc, ValidationError):
+            # ValidationError.__str__ includes input values; keep private model
+            # responses and provider text out of public reviews and event logs.
+            fields = ", ".join(
+                f"{'.'.join(map(str, error['loc'])) or 'response'}: {error['type']}"
+                for error in exc.errors(include_input=False)[:8]
+            )
+            reason = f"Returned response failed schema validation ({fields})."
+        else:
+            reason = str(exc)
+        raise EscalationSignal(invalid_kind, reason) from exc
+
+
+def _missing_artifact_signal() -> EscalationSignal:
+    return EscalationSignal(
+        "artifact_missing", "A referenced recorded artifact is unavailable for evidence review."
+    )
+
+
+def _validate_report(value: Any) -> str:
+    report = TypeAdapter(str).validate_python(value)
+    if not report.strip():
+        raise ValueError("The final report must contain a substantive result summary")
+    return report
 
 
 def gate_approved(
@@ -732,18 +784,20 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         )
         await services.emit(work.role, "executing", work.task, kr_id=kr.kr_id)
         try:
-            result = Deliverable.model_validate(
-                await services.execute(
+            result = await _validated_response(
+                services.execute(
                     work,
                     kr,
                     Constitution.model_validate(state["constitution"]),
                     [Deliverable.model_validate(item) for item in state.get("inputs", [])],
                     feedback,
                     state["epoch"],
-                )
+                ),
+                Deliverable.model_validate,
+                invalid_kind="invalid_output",
             )
-        except (ValueError, EscalationSignal) as exc:
-            kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_output"
+        except EscalationSignal as exc:
+            kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit(work.role, "error", str(exc), kr_id=kr.kr_id, kind=kind)
@@ -827,15 +881,19 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kr_id=deliverable.kr_id,
         )
         try:
-            evaluation = Evaluation.model_validate(
-                await services.evaluate(
+            evaluation = await _validated_response(
+                services.evaluate(
                     deliverable,
                     work.acceptance_criteria,
                     Constitution.model_validate(state["constitution"]),
-                )
+                ),
+                Evaluation.model_validate,
+                invalid_kind="invalid_output",
             )
-        except (ValueError, EscalationSignal) as exc:
-            kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_output"
+        except (EscalationSignal, ArtifactNotFoundError) as exc:
+            if isinstance(exc, ArtifactNotFoundError):
+                exc = _missing_artifact_signal()
+            kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             return {
@@ -895,25 +953,18 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             f"{kr.target_department}_head", "planning", kr.description, kr_id=kr.kr_id
         )
         try:
-            packages = [
-                WorkPackage.model_validate(item)
-                for item in await services.plan_work(
+            packages = await _validated_response(
+                services.plan_work(
                     kr,
                     Constitution.model_validate(state["constitution"]),
                     [Deliverable.model_validate(item) for item in state.get("inputs", [])],
                     feedback,
-                )
-            ]
-            if not 1 <= len(packages) <= 4:
-                raise ValueError("A tactical plan needs 1–4 work packages")
-            if len({p.work_package_id for p in packages}) != len(packages):
-                raise ValueError("Work package IDs must be unique within a tactical plan")
-            if any(
-                p.kr_id != kr.kr_id or p.role not in ROLES[kr.target_department] for p in packages
-            ):
-                raise ValueError("Tactical plan contains an invalid assignment or specialist role")
-        except (ValueError, EscalationSignal) as exc:
-            kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_plan"
+                ),
+                lambda value: _validate_work_plan(value, kr),
+                invalid_kind="invalid_plan",
+            )
+        except EscalationSignal as exc:
+            kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             return {
@@ -1058,15 +1109,19 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kr_id=kr.kr_id,
         )
         try:
-            evaluation = Evaluation.model_validate(
-                await services.evaluate(
+            evaluation = await _validated_response(
+                services.evaluate(
                     combined,
                     kr.acceptance_criteria,
                     Constitution.model_validate(state["constitution"]),
-                )
+                ),
+                Evaluation.model_validate,
+                invalid_kind="invalid_output",
             )
-        except (ValueError, EscalationSignal) as exc:
-            kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_output"
+        except (EscalationSignal, ArtifactNotFoundError) as exc:
+            if isinstance(exc, ArtifactNotFoundError):
+                exc = _missing_artifact_signal()
+            kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             escalation = _escalation(state, kind, str(exc))
@@ -1174,7 +1229,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                         constitution, "Legacy services retain the full workflow.", source="legacy"
                     )
                 )
-            except Exception as exc:
+            except (EscalationSignal, ValueError, TimeoutError) as exc:
                 decision = conservative_triage(
                     constitution,
                     f"Triage unavailable ({type(exc).__name__}); full workflow retained.",
@@ -1245,11 +1300,13 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         notes = await services.notes("planner")
         request = "\n".join([state["user_request"], *notes])
         try:
-            objectives = validate_plan(
-                await services.plan(request, Constitution.model_validate(state["constitution"]))
+            objectives = await _validated_response(
+                services.plan(request, Constitution.model_validate(state["constitution"])),
+                validate_plan,
+                invalid_kind="invalid_plan",
             )
-        except (ValueError, EscalationSignal) as exc:
-            kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_plan"
+        except EscalationSignal as exc:
+            kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit("planner", "error", str(exc), kind=kind)
@@ -1513,7 +1570,11 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         if status == "completed":
             try:
                 if state.get("execution_mode", "FULL_PYRAMID") == "FULL_PYRAMID":
-                    report = await services.synthesize(state["user_request"], objectives, outcomes)
+                    report = await _validated_response(
+                        services.synthesize(state["user_request"], objectives, outcomes),
+                        _validate_report,
+                        invalid_kind="invalid_output",
+                    )
                 else:
                     lines = ["# Execution report", "", f"Workflow: {state['execution_mode']}", ""]
                     for outcome in outcomes:

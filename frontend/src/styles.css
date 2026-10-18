@@ -1246,6 +1246,17 @@ main {
   border-bottom: 1px solid #2d4127;
   color: #9ebc88;
 }
+.artifact-download a[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: wait;
+}
+.artifact-download-error {
+  margin: 5px 0 10px;
+  color: #deb18c;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .artifact-list a > div {
   flex: 1;
   min-width: 0;
@@ -1389,6 +1400,46 @@ main {
 .error-banner button {
   display: flex;
   color: #c4a685;
+}
+.failure-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid #76523e;
+  border-radius: 5px;
+  background: #30251f;
+  color: #dcba9f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.failure-banner > svg {
+  flex-shrink: 0;
+}
+.failure-banner > div {
+  flex: 1;
+  min-width: 160px;
+  overflow-wrap: anywhere;
+}
+.failure-banner strong {
+  color: #f0d3bb;
+  font-size: 13px;
+}
+.failure-banner p {
+  margin: 3px 0 0;
+}
+.failure-banner small {
+  display: block;
+  margin-top: 5px;
+  color: #bdab98;
+  font-size: 12px;
+}
+.failure-banner > button {
+  flex-shrink: 0;
+  min-height: 44px;
+  font-size: 12px;
 }
 .review-banner {
   display: flex;

@@ -141,6 +141,7 @@ export interface Run {
   outcomes?: Record<string, Outcome>;
   review?: Review;
   report?: string;
+  error?: string | null;
 }
 export interface Artifact {
   artifact_id: string;

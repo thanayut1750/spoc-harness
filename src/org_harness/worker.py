@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from contextlib import AsyncExitStack, suppress
+from pathlib import Path
 from uuid import uuid4
 
 from org_harness.config import Settings, configure_tracing
@@ -107,6 +109,7 @@ class Worker:
 
         run_id = run["run_id"]
         services = None
+        phase = "operation_preflight"
         try:
             uncertain = await self.storage.uncertain_operations(run_id)
             if uncertain:
@@ -143,6 +146,7 @@ class Worker:
                     }
                 )
                 return
+            phase = "service_setup"
             if self.services_factory is None:
                 from org_harness.agent_services import AgentServices
 
@@ -153,7 +157,23 @@ class Worker:
                 services, checkpointer=self.checkpointer, store=self.store
             )
             config = runtime_config(run_id)
+            phase = "checkpoint_load"
             snapshot = await graph.aget_state(config)
+            if snapshot.values and not snapshot.next and snapshot.values.get("status") == "failed":
+                message = (
+                    "The saved workflow already ended in failure and has no pending checkpoint. "
+                    "Submit a new run to execute the objective again; recorded evidence is retained."
+                )
+                await self.storage.update_run(run_id, status="failed", error=message)
+                await self.storage.emit(
+                    {
+                        "run_id": run_id,
+                        "agent_id": "executive",
+                        "activity": "error",
+                        "summary": message,
+                    }
+                )
+                return
             interrupts = tuple(getattr(snapshot, "interrupts", ()))
             decision = run.get("resume_decision")
             graph_input: object
@@ -172,6 +192,7 @@ class Worker:
                     "summary": "Recovering execution" if snapshot.values else "Starting execution",
                 }
             )
+            phase = "graph_execution"
             async for values in graph.astream(graph_input, config, stream_mode="values"):
                 projection = {
                     key: values[key]
@@ -192,6 +213,7 @@ class Worker:
                 }
                 if projection:
                     await self.storage.update_run(run_id, **projection)
+            phase = "checkpoint_finalize"
             snapshot = await graph.aget_state(config)
             values = dict(snapshot.values)
             fields = {
@@ -246,16 +268,33 @@ class Worker:
                 logger.info("Execution interrupted; checkpoint recovery remains available")
                 raise
         except Exception as exc:
-            logger.error("Run %s failed (%s)", run_id, type(exc).__name__)
+            # Keep useful locations without exception text, source lines, model
+            # input, tool arguments, or credentials from a provider error body.
+            failure_context = {
+                "phase": phase,
+                "type": type(exc).__name__,
+                "frames": [
+                    {
+                        "file": Path(frame.filename).name,
+                        "function": frame.name,
+                        "line": frame.lineno,
+                    }
+                    for frame in traceback.extract_tb(exc.__traceback__)[-12:]
+                ],
+            }
+            logger.error("Run %s failed: %s", run_id, failure_context)
             await self.storage.update_run(
-                run_id, status="failed", error=f"Execution failed ({type(exc).__name__})"
+                run_id,
+                status="failed",
+                error=f"Execution failed during {phase} ({type(exc).__name__})",
+                failure_context=failure_context,
             )
             await self.storage.emit(
                 {
                     "run_id": run_id,
                     "agent_id": "executive",
                     "activity": "error",
-                    "summary": f"Execution failed ({type(exc).__name__})",
+                    "summary": f"Execution failed during {phase} ({type(exc).__name__})",
                 }
             )
         finally:

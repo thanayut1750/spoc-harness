@@ -51,6 +51,21 @@ Worker invocation and deliverable extraction share a 60-second `asyncio.wait_for
 
 Public model selections are immutable run snapshots; per-agent overrides select server-owned provider connections. Credentials never enter persisted selections. Regenesis serializes API mutations, cancels unfinished work, acquires the same worker guard as execution, then erases managed disk directories and database/checkpoint/store contents. This excludes external user workspaces and preserves migration schemas and server credentials.
 
+## Error boundaries
+
+Expected tool-input failures use `ExpectedToolInputError` at the point that interprets a model-supplied file, artifact, URL, directory or command timeout. The journal records those errors as completed results; a model can read the error and correct its call without cancelling parallel work. Unknown run records, persistence failures and raw programming exceptions retain their failure semantics. Identical parallel operation IDs share a per-host lock and reuse the recorded result; conflicting requests still stop for review.
+
+| Boundary | Expected failure behavior | Protected behavior |
+| --- | --- | --- |
+| Artifact, file and syntax tools | Missing/foreign/corrupt references, paging and path errors become actionable tool results | Missing run records and persistence failures propagate |
+| URL and MCP tools | Engineering reads actual bounded HTTP sources; network/content errors remain explicit; research MCP failures become typed resource blockers | Cancellation, policy and budgets are not replaced by fallback content |
+| Command journal | Invalid pre-start input is recorded; repeated identical IDs execute once | Started commands with unknown or unrecorded effects remain pending until reviewed |
+| Model adapter | Missing response choices/messages/function fields and invalid usage become sanitized provider errors | Internal `KeyError`, storage errors and unrelated `ValueError` are not silently retried |
+| Graph services | Returned contract validation and typed resource escalations have explicit routes | Exceptions inside services are not confused with malformed returned JSON |
+| HTTP, CLI and UI | Resource errors are 404/422; failed runs can retry saved work; artifact/read failures show visible recoverable messages | Mutation requests are not automatically repeated; cancelled/succeeded runs cannot retry |
+
+Unexpected worker failures retain a class-only message and safe diagnostic frames (file basename, function, line and execution phase), excluding exception bodies, prompts and credentials. Recovery preserves usage and epoch counters. The worker checks uncertain commands before constructing services or resuming graph work.
+
 ## Office projection
 
 Version 1 activity events are persisted with monotonically ordered cursors and source-scoped event IDs. Projection updates and event inserts commit together. The browser snapshots a cursor, then replays subsequent SSE events; duplicate events are ignored. Internal handoff events identify both agent endpoints and the KR, allowing animation to reflect real transfers.

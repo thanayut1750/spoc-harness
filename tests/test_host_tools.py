@@ -1,11 +1,71 @@
 import asyncio
 from pathlib import Path
 
+import httpx
 import pytest
 
 from org_harness.models import EscalationSignal, RunCreate
-from org_harness.storage import MemoryStorage
-from org_harness.tools import Artifacts, HostTools
+from org_harness.storage import MemoryStorage, RunNotFoundError
+from org_harness.tools import Artifacts, ExpectedToolInputError, HostTools, read_reference_page
+
+
+async def test_reference_fetch_preserves_actual_source_and_removes_hidden_html(monkeypatch):
+    requests = []
+
+    def response(request):
+        requests.append(request)
+        if request.url.path == "/reference":
+            return httpx.Response(302, headers={"location": "/final"})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html; charset=utf-8"},
+            text="<html><script>untrusted code()</script><h1>Worlds</h1><p>Earth &amp; sky.</p></html>",
+        )
+
+    client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "org_harness.tools.httpx.AsyncClient",
+        lambda **kwargs: client(transport=httpx.MockTransport(response), **kwargs),
+    )
+    result = await read_reference_page("https://example.com/reference")
+    assert result == {
+        "requested_url": "https://example.com/reference",
+        "url": "https://example.com/final",
+        "status_code": 200,
+        "transport": "direct_http",
+        "content_type": "text/html",
+        "text": "Worlds\nEarth & sky.",
+    }
+    assert len(requests) == 2
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        (httpx.Response(403), "HTTP 403"),
+        (httpx.Response(200, content=b"x" * 2_000_001), "source limit"),
+        (httpx.Response(200, headers={"content-type": "image/png"}), "textual page"),
+        (
+            httpx.Response(200, headers={"content-type": "text/html"}, text="<html></html>"),
+            "no readable text",
+        ),
+    ],
+)
+async def test_reference_fetch_failures_are_bounded_tool_input_errors(
+    monkeypatch, response, message
+):
+    client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "org_harness.tools.httpx.AsyncClient",
+        lambda **kwargs: client(transport=httpx.MockTransport(lambda _: response), **kwargs),
+    )
+    with pytest.raises(ValueError, match=message):
+        await read_reference_page("https://example.com/reference")
+
+
+async def test_reference_fetch_rejects_non_http_without_network():
+    with pytest.raises(ValueError, match="http:// or https://"):
+        await read_reference_page("file:///etc/passwd")
 
 
 async def make_host(tmp_path):
@@ -140,3 +200,155 @@ async def test_reused_provider_ids_are_isolated_between_work_packages_and_attemp
         await other.run_command("provider-id", command)
         await other.run_command("provider-id", command)  # Same attempt is a replay.
     assert (host.workspace / "attempts.txt").read_text().splitlines() == ["executed"] * 3
+
+
+async def test_parallel_identical_operation_ids_execute_once(tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    command = "echo executed >> duplicate.txt; sleep 0.05; cat duplicate.txt"
+    first, second = await asyncio.gather(
+        host.run_command("same-id", command), host.run_command("same-id", command)
+    )
+    assert first == second
+    assert (host.workspace / "duplicate.txt").read_text().splitlines() == ["executed"]
+    assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        KeyError("bug"),
+        LookupError("bug"),
+        ValueError("bug"),
+        OSError("storage fault"),
+        RunNotFoundError("Run not found"),
+    ],
+)
+async def test_journal_does_not_complete_unclassified_failures(tmp_path, error):
+    storage, _, _, host = await make_host(tmp_path)
+
+    async def fail():
+        raise error
+
+    with pytest.raises(type(error)):
+        await host.journal("unexpected", "read_file", {}, fail)
+    assert (await storage.get_operation(host.operation_id("unexpected", "read_file")))[
+        "status"
+    ] == "pending"
+
+
+async def test_journal_completes_only_typed_input_error_and_replays_it(tmp_path):
+    storage, run, _, host = await make_host(tmp_path)
+    executions = 0
+
+    async def fail():
+        nonlocal executions
+        executions += 1
+        raise ExpectedToolInputError("Use a real artifact ID")
+
+    first = await host.journal("input-error", "read_artifact", {}, fail)
+    assert first == await host.journal("input-error", "read_artifact", {}, fail)
+    assert first["error"] == "ExpectedToolInputError"
+    assert executions == 1
+    assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
+
+
+@pytest.mark.parametrize("stage", ["get_operation", "reserve_budget", "begin_operation", "get_run"])
+async def test_journal_storage_setup_failure_never_executes_tool(tmp_path, monkeypatch, stage):
+    storage, _, _, host = await make_host(tmp_path)
+    executed = False
+
+    async def storage_failure(*args, **kwargs):
+        raise RunNotFoundError("Run not found")
+
+    async def execute():
+        nonlocal executed
+        executed = True
+        return {"success": True}
+
+    monkeypatch.setattr(storage, stage, storage_failure)
+    with pytest.raises(RunNotFoundError):
+        await host.journal("setup", "read_file", {}, execute)
+    assert not executed
+    assert all(item["status"] == "pending" for item in storage.operations.values())
+
+
+@pytest.mark.parametrize("stage", ["register_artifact", "complete_operation", "final_event"])
+async def test_command_finalization_failure_keeps_side_effect_pending(tmp_path, monkeypatch, stage):
+    storage, run, _, host = await make_host(tmp_path)
+
+    async def fail(*args, **kwargs):
+        raise OSError("Persistence unavailable")
+
+    if stage == "final_event":
+
+        async def emit(role, activity, summary, **kwargs):
+            if summary.startswith("Command exited"):
+                await fail()
+
+        monkeypatch.setattr(host, "emit", emit)
+    else:
+        monkeypatch.setattr(storage, stage, fail)
+    command = "echo once >> effect.txt"
+    with pytest.raises(OSError):
+        await host.run_command("finalization", command)
+    assert (host.workspace / "effect.txt").read_text().splitlines() == ["once"]
+    pending = await storage.uncertain_operations(run["run_id"])
+    assert len(pending) == 1
+    with pytest.raises(EscalationSignal) as error:
+        await host.run_command("finalization", command)
+    assert error.value.kind == "unknown_operation"
+    assert (host.workspace / "effect.txt").read_text().splitlines() == ["once"]
+
+
+async def test_cancelled_command_task_preserves_pending_operation(tmp_path):
+    storage, run, _, host = await make_host(tmp_path)
+    command = "echo started > started.txt; sleep 30"
+    task = asyncio.create_task(host.run_command("interrupted", command))
+    marker = host.workspace / "started.txt"
+    async with asyncio.timeout(5):
+        while not marker.exists():
+            await asyncio.sleep(0.01)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert len(await storage.uncertain_operations(run["run_id"])) == 1
+    with pytest.raises(EscalationSignal) as error:
+        await host.run_command("interrupted", command)
+    assert error.value.kind == "unknown_operation"
+
+
+async def test_configured_workspace_race_is_a_resource_blocker(tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    run["workspace_path"] = str(tmp_path / "removed")
+    with pytest.raises(EscalationSignal) as error:
+        HostTools(
+            storage,
+            artifacts,
+            run,
+            kr_id="kr",
+            department="engineering",
+            epoch=0,
+            role="backend_coder",
+            emit=host.emit,
+        )
+    assert error.value.kind == "missing_resource"
+
+
+async def test_managed_workspace_storage_failure_is_not_an_input_error(tmp_path, monkeypatch):
+    storage, run, artifacts, host = await make_host(tmp_path)
+
+    def fail(*args, **kwargs):
+        raise OSError("Managed data disk unavailable")
+
+    monkeypatch.setattr(Path, "mkdir", fail)
+    with pytest.raises(OSError):
+        HostTools(
+            storage,
+            artifacts,
+            run,
+            kr_id="new-kr",
+            department="engineering",
+            epoch=0,
+            role="backend_coder",
+            emit=host.emit,
+        )

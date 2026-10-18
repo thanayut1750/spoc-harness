@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import {
   appendEvent,
+  activityLabels,
   initialAgents,
   normalizeAgent,
   parseActivityEvent,
@@ -54,6 +55,21 @@ export function useOffice(
       try {
         const state = await api.office();
         if (disposed) return;
+        if (
+          !Array.isArray(state?.agents) ||
+          !Number.isSafeInteger(state.cursor) ||
+          state.cursor < 0
+        )
+          throw new Error("The harness returned an invalid office snapshot.");
+        const snapshotAgents = state.agents.map((raw) => {
+          if (
+            !raw ||
+            typeof raw.agent_id !== "string" ||
+            !Object.hasOwn(activityLabels, raw.activity)
+          )
+            throw new Error("The harness returned an invalid agent activity.");
+          return normalizeAgent(raw);
+        });
         const changed =
           hasSnapshot &&
           ((generation.current !== undefined &&
@@ -76,8 +92,7 @@ export function useOffice(
         setAgents((current) => ({
           ...initialAgents(),
           ...Object.fromEntries(
-            state.agents.map((raw) => {
-              const agent = normalizeAgent(raw);
+            snapshotAgents.map((agent) => {
               const newer = !changed && current[agent.agent_id];
               return [
                 agent.agent_id,

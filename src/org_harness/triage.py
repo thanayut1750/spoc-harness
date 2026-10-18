@@ -7,6 +7,7 @@ from contextlib import suppress
 from typing import Any, Literal, cast
 
 from langchain_typesafe import Choice, ClassifierResponse, TypeSafeClassifier
+from langchain_typesafe.client import TypeSafeError
 
 from org_harness.config import Settings
 from org_harness.models import Constitution, Department, ExecutionMode, TriageDecision
@@ -75,8 +76,11 @@ def conservative_triage(
 
 def route_answers(response: ClassifierResponse, constitution: Constitution) -> TriageDecision:
     """Route on selected-label probabilities, never the confidence shape score."""
-    mode = response.choices["mode"]
-    department = response.choices["department"]
+    choices = response.choices
+    if not {"mode", "department"} <= choices.keys():
+        raise ValueError("TypeSafe response omitted a required routing choice")
+    mode = choices["mode"]
+    department = choices["department"]
     probability = min(
         mode.probabilities.get(mode.choice, 0), department.probabilities.get(department.choice, 0)
     )
@@ -143,7 +147,7 @@ class TriageRouter:
                 timeout=self.settings.typesafe_timeout,
             )
             return route_answers(ClassifierResponse.model_validate(response), constitution)
-        except Exception as exc:
+        except (TypeSafeError, ValueError, TimeoutError) as exc:
             # TypeSafe is an optional fast decision dependency. A malformed or
             # unavailable service expands scope rather than dropping user work.
             return conservative_triage(

@@ -14,7 +14,8 @@ from langchain.agents.middleware import AgentMiddleware, ModelCallLimitMiddlewar
 from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from openai import APIConnectionError, APIStatusError, APITimeoutError
+from langchain_core.tools import ToolException
+from openai import APIConnectionError, APIResponseValidationError, APIStatusError, APITimeoutError
 from pydantic import BaseModel, Field, ValidationError
 
 from org_harness.config import Settings
@@ -34,16 +35,18 @@ from org_harness.models import (
     TriageDecision,
     WorkPackage,
 )
-from org_harness.providers import ZaiChatModel, create_model
-from org_harness.storage import BudgetExceeded, NotFoundError
-from org_harness.tools import Artifacts, HostTools
+from org_harness.providers import ProviderResponseError, ZaiChatModel, create_model
+from org_harness.storage import ArtifactNotFoundError, BudgetExceeded
+from org_harness.tools import Artifacts, ExpectedToolInputError, HostTools, read_reference_page
 
 T = TypeVar("T", bound=BaseModel)
 
 
 def call_identifier(runtime: ToolRuntime) -> str:
-    if runtime.tool_call_id is None:
-        raise ValueError("A tool operation requires a model tool-call ID")
+    if not runtime.tool_call_id:
+        raise EscalationSignal(
+            "invalid_tool_call", "A tool operation requires a model tool-call ID"
+        )
     return runtime.tool_call_id
 
 
@@ -214,6 +217,11 @@ class AgentServices:
                 raise EscalationSignal("limit_exceeded", str(exc)) from exc
             try:
                 return await request()
+            except (ProviderResponseError, APIResponseValidationError) as exc:
+                raise EscalationSignal(
+                    "provider_error",
+                    "Provider returned an invalid response; check model/provider settings.",
+                ) from exc
             except (APIConnectionError, APITimeoutError, APIStatusError) as exc:
                 retryable = not isinstance(exc, APIStatusError) or exc.status_code in {
                     408,
@@ -393,14 +401,20 @@ class AgentServices:
 
     async def _invoke_mcp(self, kind: str, arguments: dict, call_id: str) -> Any:
         remote = await self._mcp_tool(kind)
-        result = await remote.ainvoke(
-            {
-                "type": "tool_call",
-                "id": call_id,
-                "name": remote.name,
-                "args": arguments,
-            }
-        )
+        try:
+            result = await remote.ainvoke(
+                {
+                    "type": "tool_call",
+                    "id": call_id,
+                    "name": remote.name,
+                    "args": arguments,
+                }
+            )
+        except (ToolException, ValidationError) as exc:
+            raise EscalationSignal(
+                "missing_resource",
+                f"The {kind} tool failed; check its inputs, entitlement and quota.",
+            ) from exc
         if isinstance(result, ToolMessage):
             if result.status == "error":
                 raise EscalationSignal(
@@ -554,19 +568,25 @@ class AgentServices:
         ) -> str:
             """Read a stored source or approved input in pages of at most 12000 characters.
 
-            Use next_offset to continue a long source without fetching it from the web again.
+            artifact_id must be an exact ID returned by a tool, never a URL or file path.
+            Read URLs with read_web_page. Use next_offset to continue a stored long source.
             """
 
             async def read() -> dict:
                 if offset < 0 or not 1 <= limit <= 12000:
-                    raise ValueError("Use offset >= 0 and limit between 1 and 12000")
+                    raise ExpectedToolInputError("Use offset >= 0 and limit between 1 and 12000")
+                if artifact_id.lower().startswith(("http://", "https://")):
+                    raise ExpectedToolInputError(
+                        "read_artifact requires an artifact_id returned by a tool, not a URL. "
+                        "Use read_web_page(url=...) to fetch this reference."
+                    )
                 metadata, content = await self.artifacts.read(artifact_id, limit=None)
                 approved_ids = {item for source in inputs for item in source.artifact_ids}
                 own_artifact = (
                     metadata.get("kr_id") == kr.kr_id and metadata.get("version", 1) == kr.version
                 )
                 if not own_artifact and artifact_id not in approved_ids:
-                    raise ValueError(
+                    raise ExpectedToolInputError(
                         "Artifact is outside this assignment and its approved dependencies"
                     )
                 end = min(offset + limit, len(content))
@@ -606,6 +626,10 @@ class AgentServices:
                     return {"passed": True, "path": path}
                 except SyntaxError as exc:
                     return {"passed": False, "path": path, "error": str(exc)}
+                except (OSError, ValueError) as exc:
+                    raise ExpectedToolInputError(
+                        f"Source file cannot be parsed ({type(exc).__name__})"
+                    ) from exc
 
             return json.dumps(
                 await host.record_research(
@@ -632,10 +656,17 @@ class AgentServices:
 
         @tool
         async def read_web_page(url: str, runtime: ToolRuntime) -> str:
-            """Read a web page through Z.AI Reader and preserve the source URL."""
+            """Fetch an HTTP(S) reference URL and preserve its text and source evidence.
+
+            Use this for URLs; read_artifact is only for an artifact_id previously returned by tools.
+            """
 
             async def read() -> dict:
-                result = await self._invoke_mcp("reader", {"url": url}, call_identifier(runtime))
+                result = (
+                    await read_reference_page(url)
+                    if kr.target_department == "engineering"
+                    else await self._invoke_mcp("reader", {"url": url}, call_identifier(runtime))
+                )
                 return {"url": url, "response": result}
 
             return json.dumps(
@@ -660,9 +691,9 @@ class AgentServices:
                 }
             )
 
-        available = [read_file, write_file, read_artifact, escalate_blocker]
+        available = [read_file, write_file, read_artifact, read_web_page, escalate_blocker]
         if kr.target_department == "research":
-            available.extend([search_market_data, read_web_page])
+            available.append(search_market_data)
             if work.role == "data_analyst":
                 available.extend([run_command, validate_code_syntax])
         else:
@@ -677,7 +708,9 @@ class AgentServices:
             "Execute the assignment using your tools. Read dependency artifacts when needed. "
             "Produce the requested task output files using write_file, incrementally in small complete files. "
             "Reading sources alone does not complete the assignment. Long tool responses are excerpts; "
-            "read further pages with read_artifact rather than fetching the same URL again. "
+            "fetch reference URLs with read_web_page. read_artifact accepts only exact artifact IDs "
+            "returned by tools or supplied as prior inputs, never URLs or file paths. Read further "
+            "pages of a stored source with read_artifact rather than fetching the same URL again. "
             "Verify code with actual execution where applicable. "
             "Use only observable evidence; never invent sources or test results. Escalate immediately "
             "if blocked or a constitution rule would be violated. Finish with a concise summary, "
@@ -707,10 +740,6 @@ class AgentServices:
         except (ModelCallLimitExceededError, BudgetExceeded) as exc:
             raise EscalationSignal(
                 "limit_exceeded", "Worker exhausted its execution budget"
-            ) from exc
-        except (OSError, ValueError) as exc:
-            raise EscalationSignal(
-                "tool_error", f"Worker tool failed ({type(exc).__name__})"
             ) from exc
         except Exception as exc:
             if type(exc).__module__.startswith(("mcp.", "fastmcp.", "httpx.", "httpcore.")):
@@ -862,6 +891,10 @@ class AgentServices:
         for artifact_id in deliverable.artifact_ids:
             try:
                 metadata, content = await self.artifacts.read(artifact_id, limit=None)
+            except (ArtifactNotFoundError, ExpectedToolInputError):
+                deterministic = False
+                continue
+            try:
                 if metadata.get("kr_id") == deliverable.kr_id and metadata.get("scope"):
                     evidence_scopes.add(
                         (metadata.get("version", 1), metadata.get("epoch", 0), metadata["scope"])
@@ -890,7 +923,7 @@ class AgentServices:
                         "content": content[:12000],
                     }
                 )
-            except (NotFoundError, OSError, ValueError, SyntaxError):
+            except (ValueError, SyntaxError):
                 deterministic = False
         deterministic = deterministic and substantive_evidence
         check_history = [

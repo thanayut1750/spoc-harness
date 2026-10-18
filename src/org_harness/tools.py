@@ -8,11 +8,111 @@ import os
 import signal
 import tempfile
 from collections.abc import Awaitable, Callable
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
 
 from org_harness.models import EscalationSignal
-from org_harness.storage import BudgetExceeded, NotFoundError, fingerprint
+from org_harness.storage import ArtifactNotFoundError, BudgetExceeded, fingerprint
+
+
+class ExpectedToolInputError(ValueError):
+    """A known model-input/resource failure that is safe to return as a tool result."""
+
+
+class ReferenceTextParser(HTMLParser):
+    """Extract readable reference text without running page scripts."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript", "svg"}:
+            self.hidden.append(tag)
+        if not self.hidden and tag in {"p", "div", "br", "li", "tr", "h1", "h2", "h3"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.hidden and self.hidden[-1] == tag:
+            self.hidden.pop()
+        if not self.hidden and tag in {"p", "div", "li", "tr", "h1", "h2", "h3"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+    def text(self) -> str:
+        return "\n".join(
+            line for part in "".join(self.parts).splitlines() if (line := " ".join(part.split()))
+        )
+
+
+async def read_reference_page(url: str) -> dict:
+    """Fetch a bounded textual reference for engineering without an MCP entitlement."""
+    try:
+        parsed = urlsplit(url)
+    except ValueError as exc:
+        raise ExpectedToolInputError("Reference URL is malformed") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ExpectedToolInputError(
+            "Reference URL must use http:// or https:// and include a hostname"
+        )
+    max_bytes = 2_000_000
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True, max_redirects=5) as client:
+            async with client.stream(
+                "GET",
+                url,
+                headers={
+                    "User-Agent": "SPOC-Harness/0.1 (reference retrieval)",
+                    "Accept": "text/html,application/xhtml+xml,text/plain",
+                },
+            ) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                if content_type and not (
+                    content_type.startswith("text/")
+                    or content_type in {"application/xhtml+xml", "application/json"}
+                ):
+                    raise ExpectedToolInputError(
+                        "Reference URL must return an HTML or textual page"
+                    )
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(body) + len(chunk) > max_bytes:
+                        raise ExpectedToolInputError(
+                            "Reference page exceeds the 2000000-byte source limit"
+                        )
+                    body.extend(chunk)
+                content = body.decode(response.encoding or "utf-8", errors="replace")
+                if content_type in {"text/html", "application/xhtml+xml"} or (
+                    not content_type and content.lstrip().lower().startswith(("<!doctype", "<html"))
+                ):
+                    parser = ReferenceTextParser()
+                    parser.feed(content)
+                    content = parser.text()
+                if not content.strip():
+                    raise ExpectedToolInputError("Reference page returned no readable text")
+                return {
+                    "requested_url": url,
+                    "url": str(response.url),
+                    "status_code": response.status_code,
+                    "transport": "direct_http",
+                    "content_type": content_type,
+                    "text": content,
+                }
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+        status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+        detail = f", HTTP {status}" if status is not None else ""
+        raise ExpectedToolInputError(
+            f"Reference page request failed ({type(exc).__name__}{detail})"
+        ) from exc
 
 
 class Artifacts:
@@ -45,7 +145,7 @@ class Artifacts:
         ).hexdigest()[:32]
         try:
             return await self.storage.get_artifact(artifact_id)
-        except NotFoundError:
+        except ArtifactNotFoundError:
             pass
         self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / artifact_id
@@ -76,12 +176,23 @@ class Artifacts:
         return await self.storage.register_artifact(metadata)
 
     async def read(self, artifact_id: str, *, limit: int | None = 65536) -> tuple[dict, str]:
-        metadata = await self.storage.get_artifact(artifact_id)
+        try:
+            metadata = await self.storage.get_artifact(artifact_id)
+        except ArtifactNotFoundError as exc:
+            raise ExpectedToolInputError(
+                "Artifact ID was not found. Use the exact artifact_id returned by a tool "
+                "or supplied in prior outputs. Read a URL with read_web_page(url=...)."
+            ) from exc
         if metadata["run_id"] != self.run_id:
-            raise ValueError("Artifact belongs to a different run")
-        body = Path(metadata["path"]).read_bytes()
+            raise ExpectedToolInputError("Artifact belongs to a different run")
+        try:
+            body = Path(metadata["path"]).read_bytes()
+        except OSError as exc:
+            raise ExpectedToolInputError(
+                f"Stored artifact content cannot be read ({type(exc).__name__})"
+            ) from exc
         if hashlib.sha256(body).hexdigest() != metadata["sha256"]:
-            raise ValueError("Artifact content no longer matches its evidence record")
+            raise ExpectedToolInputError("Artifact content no longer matches its evidence record")
         excerpt = body if limit is None else body[:limit]
         return metadata, excerpt.decode(errors="replace")
 
@@ -106,18 +217,31 @@ class HostTools:
         self.kr_id, self.department, self.epoch, self.role = kr_id, department, epoch, role
         self.version = version
         self.scope = json.dumps([work_package_id or role, attempt, role])
+        self._operation_locks: dict[str, asyncio.Lock] = {}
         self.emit = emit
         configured = run.get("workspace_path")
-        self.workspace = (
-            Path(configured).expanduser().resolve()
-            if configured
-            else artifacts.root.parent.parent / "workspaces" / run["run_id"] / kr_id / str(epoch)
-        )
-        self.workspace.mkdir(parents=True, exist_ok=True)
+        if configured:
+            try:
+                self.workspace = Path(configured).expanduser().resolve()
+                if not self.workspace.is_dir():
+                    raise ValueError("Workspace is not a directory")
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise EscalationSignal(
+                    "missing_resource",
+                    "Configured workspace is unavailable; provide an existing directory.",
+                ) from exc
+        else:
+            self.workspace = (
+                artifacts.root.parent.parent / "workspaces" / run["run_id"] / kr_id / str(epoch)
+            )
+            self.workspace.mkdir(parents=True, exist_ok=True)
 
     def path(self, path: str) -> Path:
-        value = Path(path).expanduser()
-        return value.resolve() if value.is_absolute() else (self.workspace / value).resolve()
+        try:
+            value = Path(path).expanduser()
+            return value.resolve() if value.is_absolute() else (self.workspace / value).resolve()
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise ExpectedToolInputError(f"Invalid host path ({type(exc).__name__})") from exc
 
     def operation_id(self, call_id: str, name: str) -> str:
         identity = [
@@ -190,6 +314,18 @@ class HostTools:
         kind: str = "tool",
     ) -> dict:
         operation_id = self.operation_id(call_id, name)
+        async with self._operation_locks.setdefault(operation_id, asyncio.Lock()):
+            return await self._journal(operation_id, name, request, execute, kind=kind)
+
+    async def _journal(
+        self,
+        operation_id: str,
+        name: str,
+        request: dict,
+        execute: Callable[[], Awaitable[dict]],
+        *,
+        kind: str,
+    ) -> dict:
         existing = await self.storage.get_operation(operation_id)
         if existing and fingerprint(existing["request"]) != fingerprint(request):
             raise EscalationSignal(
@@ -213,8 +349,8 @@ class HostTools:
             raise EscalationSignal("suspended", "Execution suspended for constitution review")
         try:
             result = await execute()
-        except (OSError, ValueError) as exc:
-            # A known pre-execution failure is complete, not an unknown command outcome.
+        except ExpectedToolInputError as exc:
+            # Only failures classified at the input/resource boundary are safe to complete.
             result = {"error": type(exc).__name__, "detail": str(exc)[:1000]}
         except EscalationSignal as exc:
             if exc.kind == "cancelled":
@@ -226,8 +362,13 @@ class HostTools:
     async def write_file(self, call_id: str, path: str, content: str) -> dict:
         async def execute() -> dict:
             target = self.path(path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content)
+            except (OSError, ValueError) as exc:
+                raise ExpectedToolInputError(
+                    f"Host file cannot be written ({type(exc).__name__})"
+                ) from exc
             artifact = await self.artifacts.save(
                 target.name,
                 content,
@@ -256,7 +397,12 @@ class HostTools:
     async def read_file(self, call_id: str, path: str) -> dict:
         async def execute() -> dict:
             target = self.path(path)
-            return {"path": str(target), "content": target.read_text(errors="replace")[:65536]}
+            try:
+                return {"path": str(target), "content": target.read_text(errors="replace")[:65536]}
+            except (OSError, ValueError) as exc:
+                raise ExpectedToolInputError(
+                    f"Host file cannot be read ({type(exc).__name__})"
+                ) from exc
 
         return await self.journal(call_id, "read_file", {"path": path}, execute)
 
@@ -267,14 +413,17 @@ class HostTools:
         cwd: str | None = None,
         timeout: int | None = None,
     ) -> dict:
-        timeout = min(
-            timeout or self.run.get("limits", {}).get("command_timeout", 300),
-            self.run.get("limits", {}).get("command_timeout", 300),
-        )
-        if timeout < 1:
-            raise ValueError("Command timeout must be positive")
+        configured_timeout = self.run.get("limits", {}).get("command_timeout", 300)
+        timeout = min(timeout if timeout is not None else configured_timeout, configured_timeout)
 
         async def execute() -> dict:
+            if timeout < 1:
+                raise ExpectedToolInputError("Command timeout must be positive")
+            working_directory = self.path(cwd) if cwd else self.workspace
+            if not working_directory.is_dir():
+                raise ExpectedToolInputError("Command cwd must be an existing directory")
+            if "\x00" in command:
+                raise ExpectedToolInputError("Command cannot contain null bytes")
             log_id = self.operation_id(call_id, "run_command")
             log_dir = self.artifacts.root / "operations"
             log_dir.mkdir(parents=True, exist_ok=True)
@@ -282,15 +431,20 @@ class HostTools:
             await self.emit(self.role, "executing", command[:160], kr_id=self.kr_id)
             cancelled, timed_out = False, False
             with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-                process = await asyncio.create_subprocess_exec(
-                    "/bin/bash",
-                    "-lc",
-                    command,
-                    cwd=str(self.path(cwd) if cwd else self.workspace),
-                    stdout=stdout,
-                    stderr=stderr,
-                    start_new_session=True,
-                )
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        "/bin/bash",
+                        "-lc",
+                        command,
+                        cwd=str(working_directory),
+                        stdout=stdout,
+                        stderr=stderr,
+                        start_new_session=True,
+                    )
+                except (OSError, ValueError) as exc:
+                    raise ExpectedToolInputError(
+                        f"Command process could not start ({type(exc).__name__})"
+                    ) from exc
                 started = asyncio.get_running_loop().time()
                 try:
                     while process.returncode is None:

@@ -16,7 +16,19 @@ TERMINAL = {"succeeded", "failed", "cancelled"}
 
 
 class NotFoundError(LookupError):
-    pass
+    resource = "resource"
+
+
+class RunNotFoundError(NotFoundError):
+    resource = "run"
+
+
+class ArtifactNotFoundError(NotFoundError):
+    resource = "artifact"
+
+
+class OperationNotFoundError(NotFoundError):
+    resource = "operation"
 
 
 class ConflictError(ValueError):
@@ -58,9 +70,30 @@ def new_run(payload: dict) -> dict:
 def apply_command(run: dict, kind: str, payload: dict) -> dict:
     """Validate lifecycle changes in one place for memory and SQL transactions."""
     status = run["status"]
-    if status in TERMINAL:
+    if status in TERMINAL and not (status == "failed" and kind == "retry"):
         raise ConflictError(f"Run is already {status}")
-    if kind == "pause":
+    if kind == "retry":
+        if status != "failed":
+            raise ConflictError("Only failed runs can retry execution")
+        history = list(run.get("failure_history", []))
+        history.append(
+            {
+                "error": run.get("error", "Execution failed"),
+                "failure_context": run.get("failure_context"),
+                "failed_at": run.get("updated_at"),
+                "retried_at": timestamp(),
+            }
+        )
+        run.update(
+            status="queued",
+            error=None,
+            failure_context=None,
+            pause_requested=False,
+            resume_decision=None,
+            failure_history=history,
+            retry_count=run.get("retry_count", 0) + 1,
+        )
+    elif kind == "pause":
         if status not in {"queued", "running"}:
             raise ConflictError("Only queued or running runs can pause")
         run["pause_requested"] = True
@@ -222,7 +255,7 @@ class MemoryStorage:
     async def get_run(self, run_id: str) -> dict:
         async with self.lock:
             if run_id not in self.runs:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             return copy.deepcopy(self.runs[run_id])
 
     async def list_runs(self) -> list[dict]:
@@ -234,7 +267,7 @@ class MemoryStorage:
     async def update_run(self, run_id: str, **fields: Any) -> dict:
         async with self.lock:
             if run_id not in self.runs:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             # A finishing graph cannot resurrect a cancelled run.
             if self.runs[run_id]["status"] == "cancelled":
                 fields.pop("status", None)
@@ -258,7 +291,7 @@ class MemoryStorage:
             if cached:
                 return cached
             if run_id not in self.runs:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             run = apply_command(copy.deepcopy(self.runs[run_id]), kind, payload)
             self.runs[run_id] = run
             if kind == "notes":
@@ -271,7 +304,7 @@ class MemoryStorage:
                         "consumed": False,
                     }
                 )
-            if kind == "resume":
+            if kind in {"resume", "retry"}:
                 self.jobs[run_id] = {"owner": None, "lease_until": 0.0}
                 if payload.get("action") == "retry_operation":
                     operation_id = (run.get("review") or {}).get("operation_id")
@@ -354,7 +387,7 @@ class MemoryStorage:
     async def get_artifact(self, artifact_id: str) -> dict:
         async with self.lock:
             if artifact_id not in self.artifacts:
-                raise NotFoundError("Artifact not found")
+                raise ArtifactNotFoundError("Artifact not found")
             return copy.deepcopy(self.artifacts[artifact_id])
 
     async def reserve_budget(self, run_id: str, kind: str, amount: int = 1) -> int:
@@ -393,6 +426,8 @@ class MemoryStorage:
         self, operation_id: str, result: Any, status: str = "done"
     ) -> None:
         async with self.lock:
+            if operation_id not in self.operations:
+                raise OperationNotFoundError("Operation not found")
             self.operations[operation_id].update(status=status, result=copy.deepcopy(result))
 
     async def get_operation(self, operation_id: str) -> dict | None:
@@ -627,7 +662,7 @@ class PostgresStorage:
                 await conn.execute("SELECT data FROM harness_runs WHERE run_id=%s", (run_id,))
             ).fetchone()
             if not row:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             return row["data"]
 
     async def list_runs(self) -> list[dict]:
@@ -645,7 +680,7 @@ class PostgresStorage:
                 )
             ).fetchone()
             if not row:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             run = row["data"]
             if run["status"] == "cancelled":
                 fields.pop("status", None)
@@ -677,7 +712,7 @@ class PostgresStorage:
                 )
             ).fetchone()
             if not row:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             run = apply_command(row["data"], kind, payload)
             await conn.execute(
                 "UPDATE harness_runs SET data=%s WHERE run_id=%s", (self._json(run), run_id)
@@ -693,7 +728,7 @@ class PostgresStorage:
                     "INSERT INTO harness_notes(note_id,run_id,agent_id,data) VALUES(%s,%s,%s,%s)",
                     (note["note_id"], run_id, payload.get("agent_id"), self._json(note)),
                 )
-            if kind == "resume":
+            if kind in {"resume", "retry"}:
                 if payload.get("action") == "retry_operation":
                     op_id = (run.get("review") or {}).get("operation_id")
                     await conn.execute(
@@ -824,7 +859,7 @@ class PostgresStorage:
                 )
             ).fetchone()
             if not row:
-                raise NotFoundError("Artifact not found")
+                raise ArtifactNotFoundError("Artifact not found")
             return row["data"]
 
     async def reserve_budget(self, run_id: str, kind: str, amount: int = 1) -> int:
@@ -837,7 +872,7 @@ class PostgresStorage:
                 )
             ).fetchone()
             if not row:
-                raise NotFoundError("Run not found")
+                raise RunNotFoundError("Run not found")
             run = row["data"]
             field = f"{kind}_calls"
             limit = run.get("limits", {}).get(f"max_{kind}_calls", 100 if kind == "model" else 200)
@@ -887,10 +922,12 @@ class PostgresStorage:
         self, operation_id: str, result: Any, status: str = "done"
     ) -> None:
         async with self.pool.connection() as conn:
-            await conn.execute(
+            completed = await conn.execute(
                 "UPDATE harness_operations SET data=data || %s WHERE operation_id=%s",
                 (self._json({"result": result, "status": status}), operation_id),
             )
+            if completed.rowcount != 1:
+                raise OperationNotFoundError("Operation not found")
 
     async def get_operation(self, operation_id: str) -> dict | None:
         async with self.pool.connection() as conn:

@@ -1,8 +1,10 @@
 import asyncio
 import time
 
+import httpx2
 import pytest
-from langchain_typesafe import ClassifierResponse
+from langchain_typesafe import ClassifierResponse, TypeSafeClassifier
+from langchain_typesafe.client import TypeSafeAPIConnectionError
 
 from org_harness.config import Settings
 from org_harness.models import Constitution
@@ -98,13 +100,58 @@ async def test_unavailable_classifier_is_bounded_and_never_leaks_secret_errors()
 
     class BrokenClassifier:
         async def ainvoke(self, request):
-            raise RuntimeError("Secret API key must never appear")
+            raise TypeSafeAPIConnectionError("Secret API key must never appear")
 
     result = await TriageRouter(Settings(_env_file=None), classifier=BrokenClassifier()).classify(
         "Build site", Constitution()
     )
     assert "Secret API" not in result.reason
-    assert "RuntimeError" in result.reason
+    assert "TypeSafeAPIConnectionError" in result.reason
+
+
+async def test_missing_routing_choice_is_provider_validation_failure_with_fallback():
+    class IncompleteClassifier:
+        async def ainvoke(self, request):
+            return answers().model_copy(update={"answers": {}})
+
+    result = await TriageRouter(
+        Settings(_env_file=None), classifier=IncompleteClassifier()
+    ).classify("Build site", Constitution())
+    assert result.mode == "FULL_PYRAMID"
+    assert result.source == "fallback"
+    assert "ValueError" in result.reason
+
+
+@pytest.mark.parametrize("error_type", [KeyError, RuntimeError, OSError])
+async def test_classifier_programming_and_infrastructure_errors_are_not_hidden(error_type):
+    class BrokenClassifier:
+        async def ainvoke(self, request):
+            raise error_type("Unexpected failure")
+
+    with pytest.raises(error_type):
+        await TriageRouter(Settings(_env_file=None), classifier=BrokenClassifier()).classify(
+            "Build site", Constitution()
+        )
+
+
+@pytest.mark.parametrize("status", [401, 429, 503])
+async def test_native_typesafe_sdk_auth_rate_limit_and_service_failure_fall_back_safely(status):
+    def response(request):
+        return httpx2.Response(status, json={"error": "private provider body"}, request=request)
+
+    with httpx2.Client(transport=httpx2.MockTransport(response)) as sync_client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(response)) as async_client:
+            classifier = TypeSafeClassifier(
+                api_key="synthetic-test-key", client=sync_client, async_client=async_client
+            )
+            result = await TriageRouter(Settings(_env_file=None), classifier=classifier).classify(
+                "Build a site", Constitution()
+            )
+    assert result.mode == "FULL_PYRAMID"
+    assert result.source == "fallback"
+    assert "TypeSafe" in result.reason
+    assert "private provider body" not in result.reason
+    assert "synthetic-test-key" not in result.reason
 
 
 async def test_cancellation_is_not_swallowed_as_classification_fallback():

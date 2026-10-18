@@ -19,9 +19,9 @@ from org_harness.models import (
     StrategicObjective,
     WorkPackage,
 )
-from org_harness.providers import ZaiChatModel
+from org_harness.providers import ProviderResponseError, ZaiChatModel
 from org_harness.runtime import build_graph, gate_approved, initial_state, runtime_config
-from org_harness.storage import MemoryStorage
+from org_harness.storage import MemoryStorage, RunNotFoundError
 from org_harness.tools import HostTools
 
 
@@ -373,6 +373,246 @@ async def test_artifact_reads_require_assignment_or_approved_dependency(
         assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
 
 
+@pytest.mark.parametrize(
+    "bad_artifact_id",
+    ["https://en.wikipedia.org/wiki/Buddhist_cosmology", "unknown-artifact-id"],
+)
+async def test_bad_artifact_reference_recovers_without_aborting_parallel_command(
+    tmp_path, monkeypatch, bad_artifact_id
+):
+    kr, work = assignment()
+    url = "https://en.wikipedia.org/wiki/Buddhist_cosmology"
+    fetched = []
+
+    async def read_reference(requested_url):
+        fetched.append(requested_url)
+        return {
+            "url": requested_url,
+            "transport": "direct_http",
+            "status_code": 200,
+            "text": "A textual reference about Buddhist cosmology.",
+        }
+
+    monkeypatch.setattr("org_harness.agent_services.read_reference_page", read_reference)
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Read the URL and created the requested file.",
+                ).model_dump_json()
+            }
+        names = {item["function"]["name"] for item in body["tools"]}
+        assert "read_web_page" in names
+        assert "search_market_data" not in names
+        results = [message for message in body["messages"] if message["role"] == "tool"]
+        if not results:
+            return {
+                "tool_calls": [
+                    tool_call("read_artifact", {"artifact_id": bad_artifact_id}, "bad-reference"),
+                    tool_call("run_command", {"command": "printf verified"}, "parallel-check"),
+                ]
+            }
+        if len(results) == 2:
+            error = json.loads(
+                next(item["content"] for item in results if item["tool_call_id"] == "bad-reference")
+            )
+            assert error["error"] == "ExpectedToolInputError"
+            assert "read_web_page" in error["detail"]
+            command = json.loads(
+                next(
+                    item["content"] for item in results if item["tool_call_id"] == "parallel-check"
+                )
+            )
+            assert command["exit_code"] == 0
+            return {"tool_calls": [tool_call("read_web_page", {"url": url}, "fetch-reference")]}
+        if len(results) == 3:
+            reference = json.loads(results[-1]["content"])
+            assert reference["result"]["response"]["transport"] == "direct_http"
+            return {
+                "tool_calls": [
+                    tool_call(
+                        "write_file",
+                        {"path": "index.html", "content": "<html>Cosmology</html>"},
+                        "output",
+                    )
+                ]
+            }
+        return {"content": "Created index.html using the retrieved reference."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, workspace):
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert (workspace / "index.html").exists()
+        assert fetched == [url]
+        assert not result.fallback
+        assert all(item["status"] == "done" for item in storage.operations.values())
+        assert not await storage.uncertain_operations(run["run_id"])
+        assert (await storage.get_run(run["run_id"]))["tool_calls"] == 4
+        reference = next(
+            item
+            for item in await storage.list_artifacts(run["run_id"])
+            if item["kind"] == "research"
+        )
+        assert reference["artifact_id"] in result.artifact_ids
+        _, content = await services.artifacts.read(reference["artifact_id"])
+        assert json.loads(content)["response"]["text"].startswith("A textual reference")
+
+
+@pytest.mark.parametrize(
+    ("name", "arguments"),
+    [
+        ("read_file", {"path": "missing.txt"}),
+        ("read_file", {"path": "."}),
+        ("read_file", {"path": "\x00"}),
+        ("write_file", {"path": ".", "content": "cannot replace a directory"}),
+        ("write_file", {"path": "parent/child.txt", "content": "parent is a file"}),
+        ("run_command", {"command": "printf never", "cwd": "missing-directory"}),
+        ("run_command", {"command": "printf never", "cwd": "parent"}),
+        ("run_command", {"command": "printf never", "timeout": 0}),
+        ("run_command", {"command": "printf never", "timeout": -1}),
+        ("run_command", {"command": "bad\x00command"}),
+        ("validate_code_syntax", {"path": "missing.py"}),
+        ("validate_code_syntax", {"path": "."}),
+        ("read_artifact", {"artifact_id": "unknown", "offset": -1}),
+        ("read_artifact", {"artifact_id": "unknown", "limit": 12001}),
+        ("read_web_page", {"url": "file:///not-an-http-reference"}),
+        ("read_web_page", {"url": "https://[malformed"}),
+    ],
+)
+async def test_expected_model_tool_input_failures_allow_correction(tmp_path, name, arguments):
+    kr, work = assignment()
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Corrected the tool input and wrote output.",
+                ).model_dump_json()
+            }
+        results = [message for message in body["messages"] if message["role"] == "tool"]
+        if not results:
+            return {"tool_calls": [tool_call(name, arguments, "bad-input")]}
+        if len(results) == 1:
+            error = json.loads(results[0]["content"])
+            assert error["error"] == "ExpectedToolInputError"
+            assert error["detail"]
+            return {
+                "tool_calls": [
+                    tool_call(
+                        "write_file",
+                        {"path": "output.txt", "content": "Actual output"},
+                        "corrected",
+                    )
+                ]
+            }
+        return {"content": "Created actual output after correcting the input."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, workspace):
+        (workspace / "parent").write_text("A regular file")
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert result.artifact_ids
+        assert (workspace / "output.txt").read_text() == "Actual output"
+        assert all(item["status"] == "done" for item in storage.operations.values())
+        assert not await storage.uncertain_operations(run["run_id"])
+
+
+@pytest.mark.parametrize(
+    "failure", ["foreign_run", "wrong_assignment", "missing_content", "corrupt_content"]
+)
+async def test_model_artifact_resource_failures_are_recoverable_tool_errors(tmp_path, failure):
+    from pathlib import Path
+
+    from org_harness.tools import Artifacts
+
+    kr, work = assignment()
+    artifact_id = ""
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Produced a new verified input.",
+                ).model_dump_json()
+            }
+        results = [message for message in body["messages"] if message["role"] == "tool"]
+        if not results:
+            return {
+                "tool_calls": [
+                    tool_call("read_artifact", {"artifact_id": artifact_id}, "read-bad-evidence")
+                ]
+            }
+        if len(results) == 1:
+            assert json.loads(results[0]["content"])["error"] == "ExpectedToolInputError"
+            return {
+                "tool_calls": [
+                    tool_call(
+                        "write_file",
+                        {"path": "new.txt", "content": "Replacement output"},
+                        "new-evidence",
+                    )
+                ]
+            }
+        return {"content": "Replacement output was saved; unusable evidence was not cited."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, _):
+        artifact_store = services.artifacts
+        if failure == "foreign_run":
+            other = await storage.create_run({"user_request": "Other run"})
+            artifact_store = Artifacts(storage, tmp_path / "data", other["run_id"])
+        artifact = await artifact_store.save(
+            "input.txt",
+            "Original source",
+            kr_id="other" if failure == "wrong_assignment" else kr.kr_id,
+        )
+        artifact_id = artifact["artifact_id"]
+        if failure == "missing_content":
+            Path(artifact["path"]).unlink()
+        elif failure == "corrupt_content":
+            Path(artifact["path"]).write_text("Corrupt contents")
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert artifact_id not in result.artifact_ids
+        assert all(item["status"] == "done" for item in storage.operations.values())
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        RunNotFoundError("Run not found"),
+        OSError("Storage offline"),
+        ValueError("Storage implementation bug"),
+    ],
+)
+async def test_gate_does_not_turn_storage_failure_into_missing_proof(tmp_path, monkeypatch, error):
+    kr, _ = assignment()
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, _, _, _, _):
+
+        async def fail(*args, **kwargs):
+            raise error
+
+        monkeypatch.setattr(services.artifacts, "read", fail)
+        with pytest.raises(type(error)):
+            await services.evaluate(
+                Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role="backend_coder",
+                    summary="Claim",
+                    artifact_ids=("id",),
+                ),
+                kr.acceptance_criteria,
+                Constitution(),
+            )
+
+
 @pytest.mark.parametrize("malformed_suffix", [False, True])
 async def test_syntax_gate_checks_complete_source_beyond_prompt_excerpt(tmp_path, malformed_suffix):
     kr, _ = assignment()
@@ -403,7 +643,10 @@ async def test_syntax_gate_checks_complete_source_beyond_prompt_excerpt(tmp_path
             assert len(payload["recorded_artifact_evidence"][0]["content"]) <= 12000
 
 
-async def test_mcp_execution_error_is_a_blocker_not_research_evidence(tmp_path, monkeypatch):
+@pytest.mark.parametrize("handled", [False, True])
+async def test_mcp_execution_error_is_a_blocker_not_research_evidence(
+    tmp_path, monkeypatch, handled
+):
     kr, work = assignment()
     kr = kr.model_copy(update={"target_department": "research"})
     work = work.model_copy(update={"role": "market_researcher"})
@@ -416,7 +659,7 @@ async def test_mcp_execution_error_is_a_blocker_not_research_evidence(tmp_path, 
         """A remote tool with an MCP-style handled execution error."""
         raise ToolException("Tool quota is unavailable")
 
-    remote_search.handle_tool_error = True
+    remote_search.handle_tool_error = handled
     async with services_with_provider(tmp_path, script) as (services, storage, run, _, _):
 
         async def remote(kind):
@@ -427,6 +670,23 @@ async def test_mcp_execution_error_is_a_blocker_not_research_evidence(tmp_path, 
             await services.execute(work, kr, Constitution(), [], "", 0)
         assert error.value.kind == "missing_resource"
         assert not await storage.list_artifacts(run["run_id"])
+
+
+async def test_malformed_provider_response_is_a_sanitized_single_attempt_blocker(tmp_path):
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, storage, run, _, _):
+        calls = 0
+
+        async def invalid_response():
+            nonlocal calls
+            calls += 1
+            raise ProviderResponseError("Untrusted provider content")
+
+        with pytest.raises(EscalationSignal) as error:
+            await services.model_request(invalid_response)
+        assert error.value.kind == "provider_error"
+        assert "Untrusted provider content" not in error.value.reason
+        assert calls == 1
+        assert (await storage.get_run(run["run_id"]))["model_calls"] == 1
 
 
 async def test_empty_truncated_answer_continues_with_saved_tools_and_actual_manifest(tmp_path):
