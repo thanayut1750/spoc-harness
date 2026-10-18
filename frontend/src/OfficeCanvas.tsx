@@ -369,7 +369,8 @@ export function OfficeCanvas({
       if (!node || !ctx) return;
       const ratio = window.devicePixelRatio || 1;
       const width = node.clientWidth;
-      const height = (width * H) / W;
+      const height = node.clientHeight;
+      if (!width || !height) return;
       if (
         node.width !== Math.round(width * ratio) ||
         node.height !== Math.round(height * ratio)

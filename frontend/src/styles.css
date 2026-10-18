@@ -229,7 +229,6 @@ button {
   min-height: 0;
   width: 100%;
   overflow: hidden;
-  max-width: 1920px;
   margin: auto;
 }
 .strategy-sidebar {
@@ -3541,6 +3540,7 @@ main {
     display: flex;
     flex-direction: column;
     padding-top: 20px;
+    padding-inline: 16px;
   }
   main > *,
   .inspector > * {
@@ -3573,8 +3573,14 @@ main {
     container-type: size;
   }
   .office-canvas {
-    width: min(100cqw, calc(100cqh * 1000 / 650));
+    width: 100%;
+    height: 100%;
     min-width: 0;
+  }
+  .office-canvas canvas {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
   }
   .agent-list {
     width: 100%;
