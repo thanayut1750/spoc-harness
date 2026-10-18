@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type { Run } from "../src/types";
+import type { Artifact, Run } from "../src/types";
 const runId = "run-fixture";
 const initialRun: Run = {
   run_id: runId,
@@ -35,7 +35,19 @@ const initialRun: Run = {
 
   constitution: { mission_statement: "Create practical tools with evidence." },
 };
-async function fixture(page: Page, overrides: Partial<Run> = {}) {
+async function fixture(
+  page: Page,
+  overrides: Partial<Run> = {},
+  files: Artifact[] = [
+    {
+      artifact_id: "artifact-1",
+      name: "acceptance-results.txt",
+      media_type: "text/plain",
+      size: 1024,
+      kr_id: "KR2",
+    },
+  ],
+) {
   let run: Run = { ...initialRun, ...overrides };
   const requests: { path: string; body: Record<string, unknown> }[] = [];
   await page.addInitScript(() => {
@@ -100,18 +112,7 @@ async function fixture(page: Page, overrides: Partial<Run> = {}) {
       });
     }
     if (path === `/api/runs/${runId}`) return route.fulfill({ json: run });
-    if (path.endsWith("/artifacts"))
-      return route.fulfill({
-        json: [
-          {
-            artifact_id: "artifact-1",
-            name: "acceptance-results.txt",
-            media_type: "text/plain",
-            size: 1024,
-            kr_id: "KR2",
-          },
-        ],
-      });
+    if (path.endsWith("/artifacts")) return route.fulfill({ json: files });
     if (method === "POST") {
       const body = route.request().postDataJSON();
       requests.push({ path, body });
@@ -306,5 +307,135 @@ test("submits a versioned KR revision against the current human interrupt", asyn
     kr_id: "KR2",
     description: "Build a tested local API",
     acceptance_criteria: ["Unit tests pass", "API responds locally"],
+  });
+});
+
+test("shows review evidence and separates failed work from waiting dependencies", async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    {
+      status: "review",
+      progress: { KR1: "escalated", KR2: "pending" },
+      outcomes: {
+        KR1: { escalation: { reason: "The worker produced no inventory." } },
+      },
+      review: {
+        interrupt_id: "saved-interrupt",
+        kind: "constitution_violation",
+        reason: "The worker produced no inventory.",
+        kr_ids: ["KR1", "KR2"],
+        allowed_actions: ["provide_context", "revise_kr", "abort"],
+        context: {
+          mission: "Build a useful planning tool with cited evidence",
+          blockers: [
+            { kr_id: "KR1", reason: "The worker produced no inventory." },
+          ],
+          key_results: [
+            {
+              kr_id: "KR1",
+              version: 1,
+              epoch: 3,
+              department: "research",
+              description: "Research validated user needs",
+              acceptance_criteria: ["Cite three sources"],
+              status: "escalated",
+              attempts: [
+                {
+                  attempt_id: "attempt-1",
+                  stage: "worker",
+                  work_package_id: "WP-inventory",
+                  role: "market_researcher",
+                  execution_attempt: 0,
+                  epoch: 3,
+                  summary: "No inventory was produced",
+                  artifact_ids: [],
+                  evidence: [],
+                  evaluation: {
+                    score: 0,
+                    feedback: "Missing the inventory file",
+                    criterion_results: { "Inventory exists": false },
+                  },
+                  approved: false,
+                },
+              ],
+            },
+          ],
+          retry_summary: {
+            automatic_replans_used: 1,
+            automatic_replans_limit: 1,
+            revision_limit: 2,
+            attempts_recorded: 1,
+          },
+        },
+      },
+    },
+    [
+      {
+        artifact_id: "raw",
+        name: "web-reader.json",
+        media_type: "application/json",
+        kind: "research",
+        size: 86000,
+        kr_id: "KR1",
+        epoch: 3,
+      },
+      {
+        artifact_id: "metadata",
+        name: "worker-deliverable.json",
+        media_type: "application/json",
+        kind: "deliverable",
+        size: 270,
+        kr_id: "KR1",
+        epoch: 3,
+      },
+      {
+        artifact_id: "stderr",
+        name: "check.stderr.txt",
+        media_type: "text/plain",
+        kind: "command_log",
+        size: 0,
+        kr_id: "KR1",
+        epoch: 3,
+      },
+    ],
+  );
+  await page.getByRole("button", { name: "Review and resume mission" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("Build a useful planning tool with cited evidence"),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("The worker produced no inventory.", { exact: true }),
+  ).toBeVisible();
+  const kr = dialog.getByRole("region", { name: "Review KR1", exact: true });
+  await expect(
+    kr.getByText("Cite three sources", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    kr.getByText("Missing the inventory file", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    kr.getByText("No inventory was produced", { exact: true }),
+  ).toBeVisible();
+  await expect(kr.getByText("0 task outputs", { exact: true })).toBeVisible();
+  await expect(
+    kr.getByRole("link", { name: /check.stderr.txt Empty log/ }),
+  ).toHaveAttribute("href", "/api/artifacts/stderr");
+  await expect(
+    dialog.getByText("1 key result is waiting on dependencies"),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("region", { name: "Review KR2", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("option", { name: "Continue execution", exact: true }),
+  ).toHaveCount(0);
+  await expect(dialog.getByText("WHAT HAPPENS NEXT")).toBeVisible();
+  await expect(dialog.getByText("1 / 1", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: "test-results/review-context-desktop.png",
+    fullPage: true,
   });
 });

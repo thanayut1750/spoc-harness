@@ -33,3 +33,7 @@ Browser tests use local API and event-stream fixtures and never call an LLM. The
 The ten internal roles have stable desk positions. External agents are keyed by `source:agent_id`, preserving internal identities even when their raw IDs match. The webhook help dialog documents `/api/integrations/events`; incoming external activity does not change internal run records. Up to six external agents fit the displayed integration row, with additional external agents available through the searchable list view.
 
 The native modal dialogs trap focus and support Escape. Every canvas character has a keyboard-operable button; the list view exposes all statuses as text. Reduced-motion preferences disable continuous canvas animation. On narrow screens the inspector appears below the office, and the strategic pyramid is available through an expandable panel.
+
+Human reviews show the saved mission, actual blocked key results and criteria, gate feedback, bounded attempt history, retry counters, and relevant files before the decision form. The UI honors the backend's `allowed_actions` and explains each action's effect. Legacy reviews use their recorded reason and existing outcomes when a complete review packet is unavailable; pending dependencies are shown separately from failures.
+
+Files are grouped as task outputs, sources, verification logs, submission metadata, and other files. Source retrievals and metadata records do not count as produced task outputs. Historical zero-byte diagnostic logs remain downloadable and are explicitly labeled as empty logs.

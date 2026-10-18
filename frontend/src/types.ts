@@ -45,6 +45,9 @@ export interface Objective {
 export interface Evaluation {
   score?: number;
   approved?: boolean;
+  passed_constitution?: boolean;
+  passed_kr_criteria?: boolean;
+  criterion_results?: Record<string, boolean>;
   feedback?: string;
   reasoning?: string;
   [key: string]: unknown;
@@ -57,15 +60,74 @@ export interface Outcome {
 export interface Review {
   interrupt_id: string;
   kind: string;
-  message: string;
+  message?: string;
+  reason?: string;
   kr_id?: string;
+  kr_ids?: string[];
+  allowed_actions?: ReviewAction[];
+  context?: ReviewContext;
   [key: string]: unknown;
+}
+export interface ReviewAttempt {
+  attempt_id: string;
+  kr_id?: string;
+  version?: number;
+  epoch?: number;
+  execution_attempt?: number;
+  stage?: string;
+  work_package_id?: string;
+  role?: string;
+  task?: string;
+  acceptance_criteria?: string[];
+  summary?: string;
+  artifact_ids?: string[];
+  evidence?: string[];
+  evaluation?: Evaluation | null;
+  reason?: string;
+  approved?: boolean;
+  timestamp?: string;
+}
+export interface ReviewKeyResult {
+  kr_id: string;
+  version?: number;
+  epoch?: number;
+  department?: string;
+  description: string;
+  acceptance_criteria: string[];
+  status?: string;
+  reason?: string;
+  evaluation?: Evaluation | null;
+  attempts?: ReviewAttempt[];
+  history_complete?: boolean;
+  summary?: string;
+  artifact_ids?: string[];
+  evidence?: string[];
+}
+export interface ReviewContext {
+  mission?: string;
+  constitution?: Run["constitution"];
+  key_results?: ReviewKeyResult[];
+  blockers?: {
+    kr_id?: string;
+    kind?: string;
+    reason?: string;
+    classification?: string;
+  }[];
+  retry_summary?: {
+    automatic_replans_used?: number;
+    automatic_replans_limit?: number;
+    revision_limit?: number;
+    attempts_recorded?: number;
+  };
+  action_implications?: Partial<Record<ReviewAction, string>>;
+  truncated?: boolean;
 }
 export interface Run {
   run_id: string;
   status: string;
   user_request: string;
   created_at?: string;
+  epochs?: Record<string, number>;
   objectives?: Objective[];
   constitution?: {
     mission_statement?: string;
@@ -83,6 +145,11 @@ export interface Artifact {
   media_type: string;
   size?: number;
   kr_id?: string;
+  kind?: string;
+  epoch?: number;
+  version?: number;
+  created_at?: string;
+  exit_code?: number;
 }
 export interface RunInput {
   user_request: string;

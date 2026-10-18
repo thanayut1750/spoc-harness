@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Activity as ActivityIcon,
-  ArrowDownToLine,
   ArrowRight,
   Check,
   CheckCheck,
@@ -32,6 +31,15 @@ import {
   X,
 } from "lucide-react";
 import { api } from "./api";
+import { ArtifactFiles } from "./ArtifactFiles";
+import { ReviewEvidence } from "./ReviewEvidence";
+import {
+  actionImplications,
+  actionLabels,
+  allowedActions,
+  reviewFocus,
+  reviewReason,
+} from "./review";
 import { OfficeCanvas } from "./OfficeCanvas";
 import {
   activeActivities,
@@ -104,12 +112,14 @@ function Modal({
   children,
   onClose,
   wide = false,
+  className = "",
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -118,7 +128,7 @@ function Modal({
   return (
     <dialog
       ref={dialog}
-      className={`modal ${wide ? "modal-wide" : ""}`}
+      className={`modal ${wide ? "modal-wide" : ""} ${className}`}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === dialog.current) onClose();
@@ -274,164 +284,193 @@ function MissionModal({
 }
 function ReviewModal({
   run,
+  artifacts,
+  events,
   onClose,
   onSubmit,
   busy,
   error,
 }: {
   run: Run;
+  artifacts: Artifact[];
+  events: ActivityEvent[];
   onClose: () => void;
   onSubmit: (input: ResumeInput) => void;
   busy: boolean;
   error: string;
 }) {
-  const [action, setAction] = useState<ReviewAction>(
-    run.review?.kind === "manual_pause" ? "continue" : "provide_context",
+  const options = allowedActions(run);
+  const focus = reviewFocus(run, events);
+  const results =
+    run.objectives?.flatMap((objective) => objective.key_results) ?? [];
+  const initialKr = focus.blocked[0]?.kr_id ?? run.review?.kr_id ?? "";
+  const initialDefinition = results.find(
+    (result) => result.kr_id === initialKr,
   );
+  const [action, setAction] = useState<ReviewAction>(options[0] ?? "abort");
+  const selectedAction = options.includes(action)
+    ? action
+    : (options[0] ?? "abort");
   const [context, setContext] = useState("");
-  const [kr, setKr] = useState(run.review?.kr_id ?? "");
-  const [description, setDescription] = useState("");
-  const [criteria, setCriteria] = useState("");
-  const results = run.objectives?.flatMap((o) => o.key_results) ?? [];
+  const [kr, setKr] = useState(initialKr);
+  const [description, setDescription] = useState(
+    initialDefinition?.description ?? "",
+  );
+  const [criteria, setCriteria] = useState(
+    initialDefinition?.acceptance_criteria.join("\n") ?? "",
+  );
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!run.review) return;
+    if (!run.review || !options.length) return;
     onSubmit({
       interrupt_id: run.review.interrupt_id,
-      action,
+      action: selectedAction,
       ...(context.trim() ? { context: context.trim() } : {}),
-      ...(action === "revise_kr"
+      ...(selectedAction === "revise_kr"
         ? {
             kr_id: kr,
             description: description.trim(),
             acceptance_criteria: criteria
               .split("\n")
-              .map((c) => c.trim())
+              .map((criterion) => criterion.trim())
               .filter(Boolean),
           }
         : {}),
     });
   }
+  const implication =
+    run.review?.context?.action_implications?.[selectedAction] ??
+    actionImplications[selectedAction];
+  const subtitle = focus.blocked.length
+    ? `${focus.blocked.length} key ${focus.blocked.length === 1 ? "result needs" : "results need"} review${focus.waiting.length ? ` · ${focus.waiting.length} waiting on dependencies` : ""}`
+    : "Review the saved evidence before deciding how the organization continues.";
   return (
     <Modal
       title="The office needs your direction"
-      subtitle="Your decision resumes the saved workflow at its review boundary."
+      subtitle={subtitle}
       onClose={onClose}
+      wide
+      className="review-modal"
     >
-      <div className="review-context">
-        <ShieldCheck size={20} />
-        <div>
-          <span className="eyebrow">
-            {pretty(run.review?.kind ?? "Review")}
-          </span>
-          <p>
-            {run.review?.message ??
-              "Waiting for the worker to reach its pause boundary."}
-          </p>
-        </div>
-      </div>
-      <form onSubmit={submit}>
-        <label>
-          Decision
-          <select
-            value={action}
-            onChange={(e) => setAction(e.target.value as ReviewAction)}
-          >
-            <option value="provide_context">Provide context and retry</option>
-            <option value="revise_kr">Revise a key result</option>
-            <option value="retry_operation">
-              Retry the reviewed operation
-            </option>
-            <option value="continue">Continue execution</option>
-            <option value="abort">Abort this run</option>
-          </select>
-        </label>
-        {action === "revise_kr" && (
-          <>
+      <div className="review-layout">
+        <ReviewEvidence run={run} files={artifacts} events={events} />
+        <div className="review-decision-panel">
+          <form onSubmit={submit}>
+            <h3>Your decision</h3>
+            <p className="decision-intro">
+              Choose what the organization should do with the blocked work.
+            </p>
             <label>
-              Key result
+              Decision
               <select
-                required
-                value={kr}
-                onChange={(e) => {
-                  setKr(e.target.value);
-                  const result = results.find(
-                    (r) => r.kr_id === e.target.value,
-                  );
-                  setDescription(result?.description ?? "");
-                  setCriteria(result?.acceptance_criteria.join("\n") ?? "");
-                }}
+                value={selectedAction}
+                onChange={(event) =>
+                  setAction(event.target.value as ReviewAction)
+                }
               >
-                <option value="">Select a key result</option>
-                {results.map((r) => (
-                  <option key={r.kr_id} value={r.kr_id}>
-                    {r.kr_id}: {r.description}
+                {options.map((option) => (
+                  <option key={option} value={option}>
+                    {actionLabels[option]}
                   </option>
                 ))}
               </select>
             </label>
+            <div className="action-implication">
+              <span className="eyebrow">WHAT HAPPENS NEXT</span>
+              <p>{implication}</p>
+            </div>
+            {selectedAction === "revise_kr" && (
+              <>
+                <label>
+                  Key result
+                  <select
+                    required
+                    value={kr}
+                    onChange={(event) => {
+                      setKr(event.target.value);
+                      const definition = results.find(
+                        (result) => result.kr_id === event.target.value,
+                      );
+                      setDescription(definition?.description ?? "");
+                      setCriteria(
+                        definition?.acceptance_criteria.join("\n") ?? "",
+                      );
+                    }}
+                  >
+                    <option value="">Select a key result</option>
+                    {results.map((result) => (
+                      <option value={result.kr_id} key={result.kr_id}>
+                        {result.kr_id}: {result.description}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Revised description
+                  <textarea
+                    required
+                    rows={3}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Acceptance criteria, one per line
+                  <textarea
+                    required
+                    rows={4}
+                    value={criteria}
+                    onChange={(event) => setCriteria(event.target.value)}
+                  />
+                </label>
+              </>
+            )}
             <label>
-              Revised description
+              {selectedAction === "abort" ? "Reason" : "Context for the team"}
               <textarea
-                required
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                rows={5}
+                value={context}
+                onChange={(event) => setContext(event.target.value)}
+                required={selectedAction === "provide_context"}
+                placeholder={
+                  selectedAction === "provide_context"
+                    ? "Explain the missing information or the specific correction the worker should make…"
+                    : "Explain your decision for the team…"
+                }
               />
             </label>
-            <label>
-              Acceptance criteria, one per line
-              <textarea
-                required
-                rows={3}
-                value={criteria}
-                onChange={(e) => setCriteria(e.target.value)}
-              />
-            </label>
-            <small>
-              A revision creates a new KR version and invalidates dependent
-              approvals.
-            </small>
-          </>
-        )}
-        <label>
-          {action === "abort" ? "Reason" : "Context for the team"}
-          <textarea
-            rows={4}
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            required={action === "provide_context"}
-            placeholder="Explain the decision or add the missing information…"
-          />
-        </label>
-        {action === "retry_operation" && (
-          <p className="form-help">
-            The prior operation may have completed before interruption. Review
-            its output before requesting another execution.
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-        )}
-        <div className="modal-footer">
-          <button type="button" className="text-button" onClick={onClose}>
-            Decide later
-          </button>
-          <button
-            className={action === "abort" ? "danger-button" : "primary-button"}
-            disabled={busy || !run.review}
-          >
-            {busy ? (
-              <LoaderCircle size={16} className="spin" />
-            ) : (
-              <Play size={15} />
-            )}{" "}
-            Apply decision
-          </button>
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="modal-footer">
+              <button className="text-button" type="button" onClick={onClose}>
+                Decide later
+              </button>
+              <button
+                className={
+                  selectedAction === "abort"
+                    ? "danger-button"
+                    : "primary-button"
+                }
+                disabled={busy || !run.review || !options.length}
+              >
+                {busy ? (
+                  <LoaderCircle size={15} className="spin" />
+                ) : (
+                  <Play size={15} />
+                )}
+                Apply decision
+              </button>
+            </div>
+            <p className="decision-boundary-note">
+              Your decision applies to this saved interrupt. No work resumes
+              until you apply it.
+            </p>
+          </form>
         </div>
-      </form>
+      </div>
     </Modal>
   );
 }
@@ -790,35 +829,7 @@ function Inspector({
             )}
           </div>
         ) : (
-          <div className="artifact-list">
-            {files.length === 0 ? (
-              <Empty
-                icon={<FileText size={22} />}
-                text="Artifacts and evidence will be collected here."
-              />
-            ) : (
-              files.map((file) => (
-                <a
-                  key={file.artifact_id}
-                  href={`/api/artifacts/${encodeURIComponent(file.artifact_id)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FileText size={18} />
-                  <div>
-                    <strong>{file.name}</strong>
-                    <span>
-                      {file.media_type}
-                      {typeof file.size === "number"
-                        ? ` · ${(file.size / 1024).toFixed(1)} KB`
-                        : ""}
-                    </span>
-                  </div>
-                  <ArrowDownToLine size={15} />
-                </a>
-              ))
-            )}
-          </div>
+          <ArtifactFiles files={files} />
         )}
       </div>
       <form className="guidance" onSubmit={(event) => void submit(event)}>
@@ -1159,7 +1170,7 @@ export default function App() {
               <ShieldCheck size={18} />
               <span>
                 <strong>Your direction is needed</strong>
-                <span>{reviewRun?.review?.message}</span>
+                <span>{reviewRun ? reviewReason(reviewRun) : ""}</span>
               </span>
               <span className="review-action">
                 Review <ArrowRight size={14} />
@@ -1374,6 +1385,8 @@ export default function App() {
       {modal === "review" && reviewRun && (
         <ReviewModal
           run={reviewRun}
+          artifacts={artifacts}
+          events={office.events}
           onClose={() => setModal(null)}
           onSubmit={(input) =>
             void perform(() => api.resume(reviewRun.run_id, input), true)
