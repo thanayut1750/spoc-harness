@@ -46,13 +46,81 @@ def request(method: str, path: str, *, body: dict | None = None):
         typer.echo(f"HTTP {exc.response.status_code}: {detail}", err=True)
         raise typer.Exit(1) from None
     except httpx.HTTPError:
-        typer.echo("Cannot reach the local API; start spoc serve.", err=True)
+        typer.echo("Cannot reach the local API; run spoc start.", err=True)
         raise typer.Exit(1) from None
     except ValueError:
         typer.echo(
             "The local API returned invalid JSON; check that the API service is running.", err=True
         )
         raise typer.Exit(1) from None
+
+
+def service_command(action: str, *, timeout: float, force: bool = False) -> None:
+    from org_harness.lifecycle import LifecycleError, ServiceManager
+
+    try:
+        settings = Settings()
+    except ValueError:
+        typer.echo(
+            "Cannot load service configuration; check .env and environment settings.", err=True
+        )
+        raise typer.Exit(1) from None
+    try:
+        manager = ServiceManager(settings)
+        if action == "start":
+            result = manager.start(timeout=timeout)
+        elif action == "stop":
+            result = manager.stop(timeout=timeout, force=force)
+        elif action == "restart":
+            result = manager.restart(timeout=timeout, force=force)
+        else:
+            raise ValueError("Unknown service command")
+    except LifecycleError as exc:
+        typer.echo(f"Cannot {action} services: {exc}", err=True)
+        raise typer.Exit(1) from None
+    except OSError as exc:
+        typer.echo(
+            f"Cannot {action} services ({type(exc).__name__}); check service files and permissions.",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+    display(result)
+
+
+@app.command()
+def start(
+    timeout: Annotated[
+        float, typer.Option(min=1, max=120, help="Seconds to wait for service startup.")
+    ] = 15,
+):
+    """Start the API and worker in the background; reuse services already running."""
+    service_command("start", timeout=timeout)
+
+
+@app.command()
+def stop(
+    timeout: Annotated[
+        float, typer.Option(min=1, max=120, help="Seconds to allow graceful shutdown.")
+    ] = 15,
+    force: Annotated[
+        bool, typer.Option(help="Force verified service processes to exit after the timeout.")
+    ] = False,
+):
+    """Stop the local API and worker, preserving saved runs and evidence."""
+    service_command("stop", timeout=timeout, force=force)
+
+
+@app.command()
+def restart(
+    timeout: Annotated[
+        float, typer.Option(min=1, max=120, help="Seconds to wait for each shutdown/startup phase.")
+    ] = 15,
+    force: Annotated[
+        bool, typer.Option(help="Force verified service processes to exit after the timeout.")
+    ] = False,
+):
+    """Restart both services using the current environment configuration."""
+    service_command("restart", timeout=timeout, force=force)
 
 
 @app.command("retry")

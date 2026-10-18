@@ -22,15 +22,17 @@ npm ci
 npm run build
 ```
 
-From the repository root, start the API and worker in separate terminals:
+From the repository root, manage the API and worker together:
 
 ```bash
-uv run spoc serve
+uv run spoc start
+uv run spoc stop
+uv run spoc restart
 ```
 
-```bash
-uv run spoc worker
-```
+`start` runs both services in the background and reuses verified services already running. `stop` requests graceful shutdown; `restart` stops both before starting them with the current `.env` and process environment. Saved runs, checkpoints, artifacts and credentials are preserved. These commands do not start PostgreSQL, run migrations, or build the frontend. Logs are in `.harness/api.log` and `.harness/worker.log` (or your `SPOC_DATA_DIR`).
+
+Use `--timeout 30` to allow more startup/shutdown time. Shutdown timeout leaves the remaining service recorded and reports an error; `--force` on `stop` or `restart` explicitly permits termination after that wait. Force termination can leave host commands running or their effects uncertain. Interrupted commands still require the existing recovery review before replay. Linux process identity checks protect against stale or reused PID files, and concurrent lifecycle commands are serialized. `spoc serve` and `spoc worker` remain available as foreground commands for separate terminals or an external service manager.
 
 Open [the office](http://127.0.0.1:8000). The API reference is at [local API docs](http://127.0.0.1:8000/docs).
 
