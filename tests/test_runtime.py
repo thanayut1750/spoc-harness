@@ -1,6 +1,7 @@
 """Behavioral graph tests run genuine nested graphs with scripted model services."""
 
 import asyncio
+import json
 from collections import Counter
 
 import pytest
@@ -8,6 +9,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from org_harness.models import (
+    AttemptRecord,
     Constitution,
     Deliverable,
     EscalationSignal,
@@ -19,6 +21,7 @@ from org_harness.models import (
 from org_harness.runtime import (
     build_graph,
     department_context,
+    enrich_review_context,
     gate_approved,
     initial_state,
     merge_keyed,
@@ -206,6 +209,7 @@ async def test_parallel_departments_wait_for_approved_dependencies_and_isolate_c
         "feedback",
         "revisions",
         "accepted",
+        "attempts",
         "work_index",
     }
 
@@ -236,6 +240,24 @@ async def test_worker_and_department_share_revision_budget_then_only_one_run_rep
     assert [call[0].execution_attempt for call in services.executions] == [0, 1, 2, 0, 1, 2]
     assert result["epochs"] == {"research": 1}
     assert result["review"]["kind"] == "blocked"
+    packet = result["review"]["context"]
+    assert packet["mission"] == "Complete the mission"
+    assert packet["retry_summary"] == {
+        "automatic_replans_used": 1,
+        "automatic_replans_limit": 1,
+        "revision_limit": 2,
+        "attempts_recorded": 6,
+    }
+    reviewed = packet["key_results"][0]
+    assert reviewed["kr_id"] == "research"
+    assert reviewed["acceptance_criteria"] == ["research accepted"]
+    assert len(reviewed["attempts"]) == 6
+    assert {attempt["epoch"] for attempt in reviewed["attempts"]} == {0, 1}
+    assert reviewed["evaluation"]["score"] == 0.2
+    assert reviewed["artifact_ids"]
+    assert "new execution epoch" in packet["action_implications"]["provide_context"]
+    assert result["outcomes"]["research"]["deliverable"] is not None
+    assert result["outcomes"]["research"]["evaluation"] is not None
     assert services.planning_calls == 1
     assert all(call[3] for call in services.executions[1:])
     before = len(services.executions)
@@ -309,18 +331,84 @@ async def test_constitution_failure_skips_retries_and_auto_replan():
     services.judge = lambda deliverable, criteria: evaluation(
         criteria,
         passed_constitution=False,
+        constitution_violations=("Observed prohibited action",),
         feedback="Prohibited action detected",
     )
     graph, result = await invoke(services)
     assert result["status"] == "awaiting_review"
     assert result["auto_replans"] == 0
     assert result["review"]["kind"] == "constitution_violation"
+    outcome = result["outcomes"]["research"]
+    assert outcome["evaluation"]["passed_constitution"] is False
+    assert outcome["deliverable"]["summary"]
+    assert outcome["attempts"][0]["stage"] == "worker"
     assert len(services.executions) == 2
     assert not any(status == "passed" for status in result["progress"].values())
     result = await graph.ainvoke(Command(resume={"action": "abort"}), runtime_config("test"))
     assert result["status"] == "cancelled"
     assert services.planning_calls == 1
     assert len(services.executions) == 2
+
+
+async def test_missing_evidence_under_default_mission_is_quality_failure_not_policy_violation():
+    services = Services()
+    services.judge = lambda deliverable, criteria: evaluation(
+        criteria,
+        passed_constitution=False,
+        passed_kr_criteria=False,
+        score=0,
+        feedback="Traceable evidence is missing; complete the work.",
+        criterion_results=dict.fromkeys(criteria, False),
+    )
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    assert result["review"]["kind"] == "blocked"
+    assert result["auto_replans"] == 1
+    assert not services.governance_halt
+    assert len(services.executions) == 6
+    assert (
+        result["review"]["context"]["blockers"][0]["classification"]
+        == "quality_or_execution_failure"
+    )
+
+
+async def test_explicit_constitution_policies_remain_enforced_for_legacy_judges():
+    services = Services()
+    services.judge = lambda deliverable, criteria: evaluation(
+        criteria,
+        passed_constitution=False,
+        feedback="Observed prohibited network access",
+    )
+    _, result = await invoke(
+        services, Constitution(prohibited_actions=("Do not access the network",))
+    )
+    assert result["review"]["kind"] == "constitution_violation"
+    assert result["auto_replans"] == 0
+    assert len(services.executions) == 1
+
+
+async def test_structured_policy_violation_overrides_contradictory_approval():
+    services = Services()
+    services.judge = lambda deliverable, criteria: evaluation(
+        criteria,
+        passed_constitution=True,
+        passed_kr_criteria=True,
+        score=1,
+        constitution_violations=("Observed prohibited action despite the approval flag",),
+    )
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    assert result["review"]["kind"] == "constitution_violation"
+    assert result["auto_replans"] == 0
+    assert len(services.executions) == 1
+    assert services.governance_halt
+    outcome = result["outcomes"]["research"]
+    assert outcome["status"] == "escalated"
+    assert not gate_approved(
+        Deliverable.model_validate(outcome["deliverable"]),
+        Evaluation.model_validate(outcome["evaluation"]),
+        ("work accepted",),
+    )
 
 
 async def test_one_blocker_in_each_parallel_department_uses_one_global_replan():
@@ -442,6 +530,7 @@ async def test_durable_constitution_halt_survives_crash_before_outcome_checkpoin
     services.judge = lambda deliverable, criteria: evaluation(
         criteria,
         passed_constitution=False,
+        constitution_violations=("Observed constitution violation",),
         feedback="Constitution violation evidence",
     )
 
@@ -629,3 +718,128 @@ def test_keyed_reducer_replaces_replayed_updates_and_preserves_concurrent_siblin
         "b": {"status": "passed"},
     }
     assert len(merge_keyed(first, first)) == 2
+
+
+def test_review_context_is_bounded_and_excludes_private_transcripts():
+    key_results = [kr(f"kr-{index}") for index in range(9)]
+    state = initial_state("bounded", "mission" * 10000, Constitution())
+    state["objectives"] = [objective(*key_results).model_dump(mode="json")]
+    state["progress"] = {item.kr_id: "escalated" for item in key_results}
+    state["attempt_history"] = {
+        f"{item.kr_id}:{attempt}": AttemptRecord(
+            attempt_id=f"{item.kr_id}:{attempt}",
+            kr_id=item.kr_id,
+            stage="worker",
+            role="market_researcher",
+            execution_attempt=attempt,
+            summary="界" * 2000,
+            evidence=tuple("界" * 600 for _ in range(8)),
+            evaluation=evaluation(
+                tuple("界" * 500 + str(index) for index in range(16)), feedback="界" * 2000
+            ),
+        ).model_dump(mode="json")
+        for item in key_results
+        for attempt in range(6)
+    }
+    state["messages"] = [{"content": "PRIVATE TRANSCRIPT MUST NOT LEAK"}]
+    packet = enrich_review_context(
+        {
+            "interrupt_id": "stable",
+            "kind": "blocked",
+            "reason": "Missing output",
+            "kr_ids": list(state["progress"]),
+            "allowed_actions": ["provide_context", "abort"],
+        },
+        state,
+    )
+    encoded = json.dumps(packet["context"], ensure_ascii=False).encode()
+    assert len(encoded) <= 65536
+    assert packet["context"]["truncated"]
+    assert packet["interrupt_id"] == "stable"
+    assert b"PRIVATE TRANSCRIPT" not in encoded
+    assert packet["context"]["key_results"]
+
+
+def test_legacy_review_surfaces_available_evidence_without_inventing_history():
+    first, pending = kr("first"), kr("pending", "engineering", ("first",))
+    state = {
+        "run_id": "legacy",
+        "user_request": "Build a researched visualization",
+        "constitution": {},
+        "objectives": [objective(first, pending).model_dump(mode="json")],
+        "progress": {"first": "escalated", "pending": "pending"},
+        "outcomes": {
+            "first": {
+                "kr_id": "first",
+                "epoch": 3,
+                "version": 1,
+                "status": "escalated",
+                "escalation": {
+                    "kind": "constitution_violation",
+                    "reason": "Worker did not produce task output",
+                },
+            }
+        },
+        "messages": [{"content": "private model conversation"}],
+    }
+    review = {
+        "interrupt_id": "do-not-change",
+        "kind": "constitution_violation",
+        "reason": "Worker did not produce task output",
+        "kr_ids": ["first", "pending"],
+        "allowed_actions": ["provide_context", "revise_kr", "abort"],
+    }
+    deliverable = Deliverable(
+        kr_id="first",
+        department="research",
+        worker_role="market_researcher",
+        summary="No task output was returned",
+    )
+    packet = enrich_review_context(
+        review,
+        state,
+        artifacts=[
+            {
+                "artifact_id": "source-receipt",
+                "kr_id": "first",
+                "name": "reader.json",
+                "kind": "research",
+                "size": 9000,
+            },
+            {
+                "artifact_id": "empty-result",
+                "kr_id": "first",
+                "name": "deliverable.json",
+                "kind": "deliverable",
+                "epoch": 3,
+                "deliverable": deliverable.model_dump(mode="json"),
+            },
+        ],
+        events=[
+            {
+                "source": "harness",
+                "kr_id": "first",
+                "data": {
+                    "evaluation": evaluation(
+                        ("first accepted",), passed_constitution=False, score=0
+                    ).model_dump(mode="json"),
+                    "messages": "private event payload",
+                },
+            }
+        ],
+    )
+    context = packet["context"]
+    assert packet["interrupt_id"] == review["interrupt_id"]
+    assert packet["allowed_actions"] == review["allowed_actions"]
+    assert [item["kr_id"] for item in context["key_results"]] == ["first"]
+    inspected = context["key_results"][0]
+    assert inspected["epoch"] == 3  # Legacy record omitted epochs; outcome/receipt still prove it.
+    assert inspected["evaluation"]["score"] == 0
+    assert inspected["attempts"][0]["summary"] == "No task output was returned"
+    assert not inspected["history_complete"]
+    assert "source-receipt" in inspected["artifact_ids"]
+    assert context["retry_summary"]["automatic_replans_used"] is None
+    assert context["blockers"][0]["classification"] == "quality_or_execution_failure"
+    assert "private" not in json.dumps(context)
+    state["epochs"] = {"first": 7}
+    assert enrich_review_context(review, state)["context"]["key_results"][0]["epoch"] == 7

@@ -675,7 +675,10 @@ class PostgresStorage:
     async def list_artifacts(self, run_id: str) -> list[dict]:
         async with self.pool.connection() as conn:
             rows = await (
-                await conn.execute("SELECT data FROM harness_artifacts WHERE run_id=%s", (run_id,))
+                await conn.execute(
+                    "SELECT data FROM harness_artifacts WHERE run_id=%s ORDER BY data->>'created_at',artifact_id",
+                    (run_id,),
+                )
             ).fetchall()
             return [row["data"] for row in rows]
 

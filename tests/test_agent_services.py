@@ -86,6 +86,7 @@ async def services_with_provider(tmp_path, script, *, limits=None):
             "reasoning_content": "private-provider-data",
         }
         message.update(script(body, requests))
+        finish_reason = message.pop("_finish_reason", "stop")
         return httpx.Response(
             200,
             json={
@@ -93,7 +94,7 @@ async def services_with_provider(tmp_path, script, *, limits=None):
                 "object": "chat.completion",
                 "created": 1,
                 "model": "glm-5.3-flash",
-                "choices": [{"index": 0, "finish_reason": "stop", "message": message}],
+                "choices": [{"index": 0, "finish_reason": finish_reason, "message": message}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
             },
         )
@@ -328,6 +329,7 @@ async def test_artifact_reads_require_assignment_or_approved_dependency(
                     department="engineering",
                     worker_role=work.role,
                     summary="Inspected input",
+                    artifact_ids=(artifact_id,) if approved_dependency else (),
                 ).model_dump_json()
             }
         if len(requests) == 1:
@@ -350,9 +352,13 @@ async def test_artifact_reads_require_assignment_or_approved_dependency(
             summary="Approved research",
             artifact_ids=(artifact_id,),
         )
-        await services.execute(
-            work, kr, Constitution(), [dependency] if approved_dependency else [], "", 0
-        )
+        if approved_dependency:
+            result = await services.execute(work, kr, Constitution(), [dependency], "", 0)
+            assert result.artifact_ids == (artifact_id,)
+        else:
+            with pytest.raises(EscalationSignal) as error:
+                await services.execute(work, kr, Constitution(), [], "", 0)
+            assert error.value.kind == "missing_deliverable"
         tool_result = next(
             message["content"] for message in requests[1]["messages"] if message["role"] == "tool"
         )
@@ -415,6 +421,246 @@ async def test_mcp_execution_error_is_a_blocker_not_research_evidence(tmp_path, 
             await services.execute(work, kr, Constitution(), [], "", 0)
         assert error.value.kind == "missing_resource"
         assert not await storage.list_artifacts(run["run_id"])
+
+
+async def test_empty_truncated_answer_continues_with_saved_tools_and_actual_manifest(tmp_path):
+    kr, work = assignment()
+
+    def script(body, requests):
+        if body.get("response_format"):
+            payload = json.loads(body["messages"][-1]["content"])
+            assert payload["recorded_tool_artifacts"][0]["name"] == "answer.py"
+            return {
+                "content": json.dumps(
+                    {
+                        "kr_id": kr.kr_id,
+                        "department": "engineering",
+                        "worker_role": work.role,
+                        "summary": "Wrote the Python answer",
+                        "artifact_ids": [],
+                        "evidence": [],
+                        "confidence_score": 0.5,
+                    }
+                )
+            }
+        tools = [item for item in body["messages"] if item["role"] == "tool"]
+        if not tools:
+            return {
+                "tool_calls": [
+                    tool_call("write_file", {"path": "answer.py", "content": "answer = 42\n"})
+                ]
+            }
+        if len(requests) == 2:
+            return {"content": "", "_finish_reason": "length"}
+        assert any(
+            "Continue from the tool results" in item.get("content", "")
+            for item in body["messages"]
+            if item["role"] == "user"
+        )
+        assert tools[0]["tool_call_id"] == "tool-1"
+        return {"content": "Wrote answer.py; the saved artifact contains answer = 42."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, requests, _):
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert len(requests) == 4
+        assert len(storage.operations) == 1  # Continuation does not repeat the write.
+        assert len(result.artifact_ids) == 1  # Actual manifest repairs a dropped model reference.
+        _, content = await services.artifacts.read(result.artifact_ids[0])
+        assert content == "answer = 42\n"
+
+
+async def test_repeated_empty_response_is_explicit_and_never_saved_as_deliverable(tmp_path):
+    kr, work = assignment()
+
+    def script(body, requests):
+        assert not body.get("response_format"), "Empty output must not reach extraction"
+        return {"content": "", "_finish_reason": "length"}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, requests, _):
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "incomplete_worker_output"
+        assert len(requests) == 2
+        assert not await storage.list_artifacts(run["run_id"])
+
+
+async def test_corrected_source_and_check_supersede_broken_snapshots(tmp_path):
+    kr, work = assignment()
+    observed = []
+
+    def script(body, requests):
+        if body.get("response_format"):
+            payload = json.loads(body["messages"][-1]["content"])
+            if "worker_result" not in payload:
+                assert [
+                    item["exit_code"]
+                    for item in payload["recorded_check_history"]
+                    if item.get("command")
+                ] == [1, 0]
+                assert [
+                    item["passed"]
+                    for item in payload["recorded_check_history"]
+                    if item.get("verification_tool")
+                ] == [False, True]
+                return {"content": json.dumps(approve(kr.acceptance_criteria))}
+            return {
+                "content": json.dumps(
+                    {
+                        "kr_id": kr.kr_id,
+                        "department": "engineering",
+                        "worker_role": work.role,
+                        "summary": "Corrected and verified answer.py",
+                        "artifact_ids": observed,
+                        "evidence": ["The final Python execution printed verified and exited 0"],
+                    }
+                )
+            }
+        tools = [json.loads(item["content"]) for item in body["messages"] if item["role"] == "tool"]
+        observed[:] = list(
+            dict.fromkeys(
+                item
+                for result in tools
+                for item in (
+                    [result["artifact_id"]]
+                    if "artifact_id" in result
+                    else result.get("artifact_ids", [])
+                )
+            )
+        )
+        actions = [
+            tool_call("write_file", {"path": "answer.py", "content": "def broken(\n"}, "broken"),
+            tool_call("validate_code_syntax", {"path": "answer.py"}, "syntax-failed"),
+            tool_call("run_command", {"command": "python3 answer.py"}, "failed-check"),
+            tool_call(
+                "write_file",
+                {"path": "answer.py", "content": "answer = 42\nprint('verified')\n"},
+                "corrected",
+            ),
+            tool_call("validate_code_syntax", {"path": "answer.py"}, "syntax-passed"),
+            tool_call("run_command", {"command": "python3 answer.py"}, "passed-check"),
+        ]
+        return (
+            {"tool_calls": [actions[len(tools)]]}
+            if len(tools) < len(actions)
+            else {"content": "Corrected the source and verified it successfully."}
+        )
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, _):
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        evaluation = await services.evaluate(result, kr.acceptance_criteria, Constitution())
+        assert evaluation.deterministic_checks_passed
+        assert len(result.artifact_ids) == 4
+        history = await storage.list_artifacts(run["run_id"])
+        old_source = next(item for item in history if item["kind"] == "source")
+        assert old_source["artifact_id"] not in result.artifact_ids
+        assert any(item.get("exit_code") == 1 for item in history)
+
+
+async def test_no_tool_evidence_never_creates_an_empty_submission(tmp_path):
+    kr, work = assignment()
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": json.dumps(
+                    {
+                        "kr_id": kr.kr_id,
+                        "department": "engineering",
+                        "worker_role": work.role,
+                        "summary": "Claims work is complete",
+                        "artifact_ids": [],
+                        "evidence": [],
+                    }
+                )
+            }
+        return {"content": "Done."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, _):
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "missing_deliverable"
+        assert not await storage.list_artifacts(run["run_id"])
+
+
+async def test_large_reader_response_is_paged_and_full_source_remains_available(
+    tmp_path, monkeypatch
+):
+    kr, work = assignment()
+    kr = kr.model_copy(update={"target_department": "research"})
+    work = work.model_copy(update={"role": "market_researcher"})
+    full_source = {"content": "A" * 75000 + "EXACT_SOURCE_END"}
+    artifact_id = None
+
+    def script(body, requests):
+        nonlocal artifact_id
+        if body.get("response_format"):
+            return {
+                "content": json.dumps(
+                    {
+                        "kr_id": kr.kr_id,
+                        "department": "research",
+                        "worker_role": work.role,
+                        "summary": "Read the full source through bounded pages",
+                        "artifact_ids": [],
+                        "evidence": [],
+                    }
+                )
+            }
+        tools = [item for item in body["messages"] if item["role"] == "tool"]
+        if not tools:
+            return {
+                "tool_calls": [
+                    tool_call("read_web_page", {"url": "https://example.com/public"}, "reader")
+                ]
+            }
+        if len(tools) == 1:
+            assert len(tools[0]["content"]) < 13000
+            result = json.loads(tools[0]["content"])
+            assert result["result"]["truncated"]
+            artifact_id = result["artifact_id"]
+            return {
+                "tool_calls": [
+                    tool_call(
+                        "read_artifact",
+                        {"artifact_id": artifact_id, "offset": 75000, "limit": 1000},
+                        "page",
+                    )
+                ]
+            }
+        page = json.loads(tools[-1]["content"])
+        assert "EXACT_SOURCE_END" in page["content"]
+        assert page["next_offset"] is None
+        return {"content": "The source was read without repeating the web request."}
+
+    async with services_with_provider(tmp_path, script) as (services, _, _, _, _):
+
+        async def invoke(*args):
+            return full_source
+
+        monkeypatch.setattr(services, "_invoke_mcp", invoke)
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert result.artifact_ids == (artifact_id,)
+        _, content = await services.artifacts.read(artifact_id, limit=None)
+        assert "EXACT_SOURCE_END" in content
+
+
+async def test_empty_file_or_log_cannot_satisfy_substantive_evidence(tmp_path):
+    kr, _ = assignment()
+    async with services_with_provider(
+        tmp_path, lambda body, requests: {"content": json.dumps(approve(kr.acceptance_criteria))}
+    ) as (services, _, _, _, _):
+        empty = await services.artifacts.save(
+            "empty.stderr.txt", "", kind="command_log", exit_code=0
+        )
+        deliverable = Deliverable(
+            kr_id=kr.kr_id,
+            department="engineering",
+            worker_role="backend_coder",
+            summary="Claims success",
+            artifact_ids=(empty["artifact_id"],),
+        )
+        result = await services.evaluate(deliverable, kr.acceptance_criteria, Constitution())
+        assert not result.deterministic_checks_passed
 
 
 async def test_real_worker_tool_checkpoint_survives_process_restart(tmp_path):

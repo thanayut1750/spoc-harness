@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from org_harness.config import Settings, configure_tracing
-from org_harness.models import ActivityEvent, ReviewDecision, RunCreate
+from org_harness.models import ActivityEvent, Deliverable, ReviewDecision, RunCreate
 from org_harness.storage import ConflictError, MemoryStorage, NotFoundError, create_storage
 
 
@@ -40,6 +40,54 @@ def public_run(run: dict) -> dict:
             and outcome.get("version", 1) == versions.get(kr_id, 1)
         }
     return run
+
+
+async def reviewed_run_view(storage: Any, run: dict) -> dict:
+    """Derive a review packet from recorded evidence without rewriting its interrupt."""
+    if not run.get("review"):
+        return public_run(run)
+    from org_harness.runtime import enrich_review_context
+
+    artifacts: list[dict] = []
+    for item in await storage.list_artifacts(run["run_id"]):
+        metadata = {key: value for key, value in item.items() if key != "path"}
+        if item.get("kind") == "deliverable" and item.get("path"):
+            # Legacy outcomes did not retain the worker deliverable on rejection.
+            # Read only the bounded, registered summary record, never source/log bodies.
+            try:
+                with Path(item["path"]).open("rb") as handle:
+                    body = handle.read(65537)
+                digest = item.get("sha256")
+                intact = not digest or hashlib.sha256(body).hexdigest() == digest
+                if len(body) <= 65536 and intact:
+                    metadata["deliverable"] = Deliverable.model_validate_json(body).model_dump(
+                        mode="json"
+                    )
+            except (OSError, ValueError):
+                pass
+        artifacts.append(metadata)
+
+    events: list[dict] = []
+    cursor = 0
+    history_truncated = False
+    for _ in range(20):
+        batch = await storage.events_after(cursor, run["run_id"], limit=500)
+        if not batch:
+            break
+        cursor = batch[-1]["seq"]
+        events.extend(event for event in batch if event.get("source", "harness") == "harness")
+        if len(batch) < 500:
+            break
+    else:
+        history_truncated = True
+    original = dict(run["review"])
+    enriched = enrich_review_context(original, run, artifacts=artifacts, events=events)
+    context = enriched.get("context", {})
+    if history_truncated:
+        context = {**context, "truncated": True}
+    # Original action policy and checkpoint interrupt identity remain authoritative.
+    run["review"] = {**original, "context": context}
+    return public_run(run)
 
 
 def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI:
@@ -133,11 +181,11 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
 
     @app.get("/api/runs")
     async def runs():
-        return [public_run(run) for run in await storage.list_runs()]
+        return [await reviewed_run_view(storage, run) for run in await storage.list_runs()]
 
     @app.get("/api/runs/{run_id}")
     async def run_detail(run_id: str):
-        return public_run(await storage.get_run(run_id))
+        return await reviewed_run_view(storage, await storage.get_run(run_id))
 
     @app.post("/api/runs/{run_id}/pause")
     async def pause(run_id: str, idempotency_key: str | None = Header(default=None)):

@@ -23,8 +23,10 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65535, validation_alias="SPOC_API_PORT")
     harness_test_mode: bool = False
     storage_backend: Literal["postgres", "memory"] = "postgres"
-    model_timeout: float = Field(default=180, gt=0)
-    model_max_tokens: int = Field(default=8192, ge=256)
+    model_timeout: float = Field(default=300, gt=0)
+    # Z.AI's output allowance includes thinking. 8K can expire before the first
+    # visible answer when max reasoning is enabled on document-heavy tasks.
+    model_max_tokens: int = Field(default=32768, ge=256)
     search_mcp_url: str = "https://api.z.ai/api/mcp/web_search_prime/mcp"
     reader_mcp_url: str = "https://api.z.ai/api/mcp/web_reader/mcp"
     langsmith_tracing: bool = False

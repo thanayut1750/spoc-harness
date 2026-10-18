@@ -9,14 +9,16 @@ deterministic even though planning, execution, and judging are model services.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Protocol, TypedDict
+from typing import Annotated, Any, Literal, Protocol, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send, interrupt
 
 from org_harness.models import (
+    AttemptRecord,
     Constitution,
     Deliverable,
     DepartmentOutcome,
@@ -92,6 +94,7 @@ class ExecutiveState(TypedDict, total=False):
     progress: Annotated[dict[str, str], merge_keyed]
     outcomes: Annotated[dict[str, JSON], merge_keyed]
     escalations: Annotated[dict[str, JSON], merge_keyed]
+    attempt_history: Annotated[dict[str, JSON], merge_keyed]
     epochs: dict[str, int]
     feedback: dict[str, str]
     auto_replans: int
@@ -113,6 +116,7 @@ class DepartmentState(TypedDict, total=False):
     work_index: int
     revisions: int
     accepted: list[JSON]
+    attempts: Annotated[dict[str, JSON], merge_keyed]
     worker_result: JSON
     deliverable: JSON
     evaluation: JSON
@@ -145,6 +149,7 @@ def initial_state(
         "progress": {},
         "outcomes": {},
         "escalations": {},
+        "attempt_history": {},
         "epochs": {},
         "feedback": {},
         "auto_replans": 0,
@@ -207,12 +212,21 @@ def gate_approved(
     """A judge's routing recommendation never overrides evidence or policy."""
     return (
         evaluation.passed_constitution
+        and not evaluation.constitution_violations
         and evaluation.passed_kr_criteria
         and evaluation.score >= 0.8
         and getattr(evaluation, "deterministic_checks_passed", True)
         and all(evaluation.criterion_results.get(criterion) is True for criterion in criteria)
         and bool(deliverable.summary.strip())
         and (any(item.strip() for item in deliverable.evidence) or bool(deliverable.artifact_ids))
+    )
+
+
+def is_constitution_violation(evaluation: Evaluation, constitution: Constitution) -> bool:
+    """Missing output is a quality failure; a policy violation requires a policy."""
+    return bool(evaluation.constitution_violations) or (
+        not evaluation.passed_constitution
+        and bool(constitution.prohibited_actions or constitution.compliance_rules)
     )
 
 
@@ -256,6 +270,7 @@ def department_context(state: ExecutiveState, kr: KeyResult) -> DepartmentState:
         "feedback": state.get("feedback", {}).get(kr.kr_id, "")[-12000:],
         "revisions": 0,
         "accepted": [],
+        "attempts": {},
         "work_index": 0,
     }
 
@@ -316,12 +331,72 @@ def _escalation(state: DepartmentState | WorkerState, kind: str, reason: str) ->
     )
 
 
+def _compact_evaluation(value: Evaluation | Mapping[str, Any] | None) -> Evaluation | None:
+    if value is None:
+        return None
+    parsed = Evaluation.model_validate(value)
+    return parsed.model_copy(
+        update={
+            "feedback": parsed.feedback[:2000],
+            "criterion_results": {
+                key[:600]: passed for key, passed in list(parsed.criterion_results.items())[:16]
+            },
+            "constitution_violations": tuple(
+                item[:600] for item in parsed.constitution_violations[:8]
+            ),
+        }
+    )
+
+
+def _attempt(
+    state: DepartmentState,
+    *,
+    stage: Literal["worker", "department"],
+    deliverable: Deliverable | None = None,
+    evaluation: Evaluation | None = None,
+    escalation: Escalation | None = None,
+    approved: bool = False,
+) -> AttemptRecord:
+    kr = KeyResult.model_validate(state["kr"])
+    work = (
+        WorkPackage.model_validate(state["work_packages"][state["work_index"]])
+        if stage == "worker"
+        else None
+    )
+    revision = state.get("revisions", 0)
+    package = work.work_package_id if work else "department"
+    return AttemptRecord(
+        attempt_id=f"{state['run_id']}:{kr.kr_id}:v{kr.version}:e{state['epoch']}:{stage}:{package}:a{revision}",
+        kr_id=kr.kr_id,
+        version=kr.version,
+        epoch=state["epoch"],
+        execution_attempt=revision,
+        stage=stage,
+        work_package_id=work.work_package_id if work else None,
+        role=work.role if work else f"{kr.target_department}_head",
+        task=(work.task if work else kr.description)[:2000],
+        acceptance_criteria=tuple(
+            item[:600]
+            for item in (work.acceptance_criteria if work else kr.acceptance_criteria)[:16]
+        ),
+        summary=deliverable.summary[:2000] if deliverable else "No deliverable was returned.",
+        artifact_ids=deliverable.artifact_ids[:32] if deliverable else (),
+        evidence=tuple(item[:600] for item in deliverable.evidence[:8]) if deliverable else (),
+        evaluation=_compact_evaluation(evaluation),
+        reason=(escalation.reason if escalation else evaluation.feedback if evaluation else "")[
+            :2000
+        ],
+        approved=approved,
+    )
+
+
 def _outcome(
     state: DepartmentState,
     *,
     escalation: Escalation | None = None,
     deliverable: Deliverable | None = None,
     evaluation: Evaluation | None = None,
+    attempt: AttemptRecord | None = None,
 ) -> JSON:
     kr = KeyResult.model_validate(state["kr"])
     return DepartmentOutcome(
@@ -332,16 +407,257 @@ def _outcome(
         escalation=escalation,
         deliverable=deliverable,
         evaluation=evaluation,
+        attempts=tuple(
+            AttemptRecord.model_validate(item)
+            for item in {
+                **state.get("attempts", {}),
+                **({attempt.attempt_id: attempt.model_dump(mode="json")} if attempt else {}),
+            }.values()
+        ),
     ).model_dump(mode="json")
 
 
-def _review_payload(kind: str, reason: str, kr_ids: list[str]) -> JSON:
+def _review_payload(
+    kind: str, reason: str, kr_ids: list[str], state: Mapping[str, Any] | None = None
+) -> JSON:
     actions = ["provide_context", "revise_kr", "abort"]
     if kind == "manual_pause":
         actions = ["continue", "abort"]
     elif kind == "unknown_operation":
         actions = ["retry_operation", "abort"]
-    return {"kind": kind, "reason": reason, "kr_ids": kr_ids, "allowed_actions": actions}
+    review = {"kind": kind, "reason": reason[:6000], "kr_ids": kr_ids, "allowed_actions": actions}
+    return enrich_review_context(review, state) if state is not None else review
+
+
+def enrich_review_context(
+    review: Mapping[str, Any],
+    state: Mapping[str, Any],
+    *,
+    artifacts: Sequence[Mapping[str, Any]] = (),
+    events: Sequence[Mapping[str, Any]] = (),
+) -> JSON:
+    """Build a bounded public review packet, including legacy-run evidence.
+
+    This pure projection never changes the saved interrupt or invents missing
+    history. Only typed deliverables, evaluations, and artifact metadata cross
+    this boundary; private model/tool transcripts are deliberately excluded.
+    """
+    result = dict(review)
+    constitution = Constitution.model_validate(state.get("constitution", {}))
+    krs = {
+        kr.kr_id: kr
+        for objective in state.get("objectives", [])
+        for kr in StrategicObjective.model_validate(objective).key_results
+    }
+    outcomes = state.get("outcomes", {})
+    progress = state.get("progress", {})
+    blocked_ids = [
+        key
+        for key in krs
+        if progress.get(key) in {"escalated", "failed"}
+        or (
+            outcomes.get(key, {}).get("status") in {"escalated", "failed"}
+            and (
+                key not in state.get("epochs", {})
+                or outcomes[key].get("epoch", 0) == state["epochs"][key]
+            )
+        )
+    ]
+    selected = blocked_ids or [key for key in review.get("kr_ids", []) if key in krs]
+    if not selected:
+        selected = [key for key in krs if progress.get(key) == "running"] or list(krs)
+    history = dict(state.get("attempt_history", {}))
+    for outcome in outcomes.values():
+        for attempt in outcome.get("attempts", []):
+            history[attempt["attempt_id"]] = attempt
+    for packet in (review.get("context") or {}).get("key_results", []):
+        for attempt in packet.get("attempts", []):
+            history.setdefault(attempt["attempt_id"], attempt)
+    key_results: list[JSON] = []
+    blockers: list[JSON] = []
+    for kr_id in selected[:9]:
+        kr = krs[kr_id]
+        outcome = outcomes.get(kr_id, {})
+        reason = (outcome.get("escalation") or {}).get("reason", "")
+        if not reason and kr_id in review.get("kr_ids", []):
+            reason = str(review.get("reason", ""))
+        attempts = [
+            AttemptRecord.model_validate(item).model_dump(mode="json")
+            for item in history.values()
+            if item.get("kr_id") == kr_id
+        ]
+        metadata = [item for item in artifacts if item.get("kr_id") == kr_id]
+        if not attempts:
+            for item in metadata:
+                raw = item.get("deliverable")
+                if not raw:
+                    continue
+                try:
+                    deliverable = Deliverable.model_validate(raw)
+                except ValueError:
+                    continue
+                attempts.append(
+                    AttemptRecord(
+                        attempt_id=f"legacy:{item['artifact_id']}",
+                        kr_id=kr_id,
+                        version=int(item.get("version") or 1),
+                        epoch=int(item.get("epoch", 0)),
+                        execution_attempt=int(item.get("attempt", 0)),
+                        stage="worker",
+                        role=deliverable.worker_role,
+                        summary=deliverable.summary[:2000],
+                        artifact_ids=deliverable.artifact_ids[:32],
+                        evidence=tuple(text[:600] for text in deliverable.evidence[:8]),
+                        reason="Recovered from a recorded deliverable artifact; complete attempt history is unavailable.",
+                    ).model_dump(mode="json")
+                )
+        latest_evaluation = _compact_evaluation(outcome.get("evaluation"))
+        for event in events:
+            if event.get("source") not in {None, "harness"} or event.get("kr_id") != kr_id:
+                continue
+            raw = event.get("data", {}).get("evaluation")
+            if raw:
+                try:
+                    latest_evaluation = _compact_evaluation(raw)
+                except ValueError:
+                    continue
+        if latest_evaluation is None:
+            latest_evaluation = next(
+                (
+                    _compact_evaluation(item["evaluation"])
+                    for item in reversed(attempts)
+                    if item.get("evaluation")
+                ),
+                None,
+            )
+        attempts.sort(key=lambda item: (item["version"], item["epoch"], item["execution_attempt"]))
+        current_epoch = state.get("epochs", {}).get(kr_id)
+        if current_epoch is None:
+            current_epoch = max(
+                [
+                    int(outcome.get("epoch", 0)) if outcome.get("version", 1) == kr.version else 0,
+                    *[
+                        int(item.get("epoch", 0))
+                        for item in metadata
+                        if item.get("version", 1) == kr.version
+                    ],
+                    *[item["epoch"] for item in attempts if item["version"] == kr.version],
+                ]
+            )
+        ids = list(
+            dict.fromkeys(
+                [
+                    *[value for attempt in attempts for value in attempt.get("artifact_ids", [])],
+                    *((outcome.get("deliverable") or {}).get("artifact_ids", [])),
+                    *[item["artifact_id"] for item in metadata if item.get("artifact_id")],
+                ]
+            )
+        )
+        key_results.append(
+            {
+                "kr_id": kr_id,
+                "version": kr.version,
+                "epoch": current_epoch,
+                "department": kr.target_department,
+                "description": kr.description[:2000],
+                "acceptance_criteria": [
+                    criterion[:800] for criterion in kr.acceptance_criteria[:16]
+                ],
+                "status": progress.get(kr_id, "pending"),
+                "reason": reason[:2000],
+                "evaluation": latest_evaluation.model_dump(mode="json")
+                if latest_evaluation
+                else None,
+                "attempts": attempts[-6:],
+                "artifact_ids": ids[:32],
+                "artifacts": [
+                    {
+                        key: item.get(key)
+                        for key in ("artifact_id", "name", "kind", "size", "epoch", "version")
+                    }
+                    for item in metadata[-16:]
+                ],
+                "history_complete": any(item.get("kr_id") == kr_id for item in history.values()),
+            }
+        )
+        if kr_id in blocked_ids:
+            blockers.append(
+                {
+                    "kr_id": kr_id,
+                    "kind": (outcome.get("escalation") or {}).get(
+                        "kind", review.get("kind", "blocked")
+                    ),
+                    "reason": reason[:2000],
+                    "classification": (
+                        "policy_violation"
+                        if latest_evaluation
+                        and is_constitution_violation(latest_evaluation, constitution)
+                        else "quality_or_execution_failure"
+                    ),
+                }
+            )
+    implications = {
+        "provide_context": "Add missing information and start a new execution epoch for the selected blocked KR; acceptance criteria and constitution stay unchanged.",
+        "revise_kr": "Create a new KR version and invalidate its approval and all transitive dependent approvals. Re-execute against the new criteria.",
+        "retry_operation": "Authorize retry of the interrupted host command. It may already have caused side effects; inspect recorded evidence before retrying.",
+        "continue": "Continue execution from the saved manual-pause boundary without revising the plan.",
+        "abort": "Cancel the run and retain its evidence and partial outcomes.",
+    }
+    context: JSON = {
+        "mission": str(state.get("user_request", ""))[:4000],
+        "constitution": {
+            "mission_statement": constitution.mission_statement[:1000],
+            "prohibited_actions": [item[:500] for item in constitution.prohibited_actions[:8]],
+            "compliance_rules": [item[:500] for item in constitution.compliance_rules[:8]],
+        },
+        "key_results": key_results,
+        "blockers": blockers,
+        "retry_summary": {
+            "automatic_replans_used": state.get("auto_replans"),
+            "automatic_replans_limit": 1,
+            "revision_limit": constitution.max_revision_loops,
+            "attempts_recorded": len(history) or sum(len(item["attempts"]) for item in key_results),
+        },
+        "action_implications": {
+            action: implications[action]
+            for action in review.get("allowed_actions", [])
+            if action in implications
+        },
+        "truncated": any(
+            len([item for item in history.values() if item.get("kr_id") == key]) > 6
+            for key in selected
+        ),
+    }
+    if review.get("operation"):
+        operation = review["operation"]
+        context["operation"] = {
+            key: str(operation.get(key, ""))[:2000]
+            for key in ("operation_id", "status", "command", "cwd")
+        }
+
+    def size() -> int:
+        return len(json.dumps(context, ensure_ascii=False).encode())
+
+    while size() > 65536 and any(len(item["attempts"]) > 1 for item in key_results):
+        max(key_results, key=lambda item: len(item["attempts"]))["attempts"].pop(0)
+        context["truncated"] = True
+    for width in (512, 256, 128, 64, 32):
+        if size() <= 65536:
+            break
+
+        def shorten(value: Any, key: str = "", limit: int = width) -> Any:
+            if isinstance(value, str):
+                return value if key in {"kr_id", "artifact_id"} else value[:limit]
+            if isinstance(value, list):
+                return [shorten(item, key) for item in value]
+            if isinstance(value, dict):
+                return {str(name)[:limit]: shorten(item, str(name)) for name, item in value.items()}
+            return value
+
+        context = shorten(context)
+        context["truncated"] = True
+    result["context"] = context
+    return result
 
 
 def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: Any = None):
@@ -458,7 +774,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "evaluation": evaluation.model_dump(mode="json"),
             "approved": gate_approved(deliverable, evaluation, work.acceptance_criteria),
         }
-        if not evaluation.passed_constitution:
+        if is_constitution_violation(
+            evaluation, Constitution.model_validate(state["constitution"])
+        ):
             await mark_halted(state, evaluation.feedback)
             update["escalation"] = _escalation(
                 state, "constitution_violation", evaluation.feedback
@@ -527,13 +845,28 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     async def run_worker(state: DepartmentState, config: RunnableConfig) -> JSON:
         work = WorkPackage.model_validate(state["work_packages"][state["work_index"]])
         result = await worker.ainvoke(worker_context(state, work), config)
+        attempt = _attempt(
+            state,
+            stage="worker",
+            deliverable=Deliverable.model_validate(result["deliverable"])
+            if result.get("deliverable")
+            else None,
+            evaluation=Evaluation.model_validate(result["evaluation"])
+            if result.get("evaluation")
+            else None,
+            escalation=Escalation.model_validate(result["escalation"])
+            if result.get("escalation")
+            else None,
+            approved=bool(result.get("approved")),
+        )
         # Do not copy worker transcript/private channels into department or executive state.
         return {
             "worker_result": {
                 key: result[key]
                 for key in ("deliverable", "evaluation", "escalation", "approved")
                 if key in result
-            }
+            },
+            "attempts": {attempt.attempt_id: attempt.model_dump(mode="json")},
         }
 
     async def collect_worker(state: DepartmentState) -> JSON:
@@ -541,7 +874,14 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         if result.get("escalation"):
             return {
                 "outcome": _outcome(
-                    state, escalation=Escalation.model_validate(result["escalation"])
+                    state,
+                    escalation=Escalation.model_validate(result["escalation"]),
+                    deliverable=Deliverable.model_validate(result["deliverable"])
+                    if result.get("deliverable")
+                    else None,
+                    evaluation=Evaluation.model_validate(result["evaluation"])
+                    if result.get("evaluation")
+                    else None,
                 ),
                 "route": "done",
             }
@@ -556,12 +896,33 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         evaluation = Evaluation.model_validate(result["evaluation"])
         return revision(state, evaluation.feedback, "worker")
 
-    def revision(state: DepartmentState, feedback: str, route: str) -> JSON:
+    def revision(
+        state: DepartmentState,
+        feedback: str,
+        route: str,
+        attempt: AttemptRecord | None = None,
+        deliverable: Deliverable | None = None,
+        evaluation: Evaluation | None = None,
+    ) -> JSON:
         constitution = Constitution.model_validate(state["constitution"])
         if state.get("revisions", 0) >= constitution.max_revision_loops:
             return {
                 "outcome": _outcome(
-                    state, escalation=_escalation(state, "revision_exhausted", feedback)
+                    state,
+                    escalation=_escalation(state, "revision_exhausted", feedback),
+                    attempt=attempt,
+                    deliverable=deliverable
+                    or (
+                        Deliverable.model_validate(state["worker_result"]["deliverable"])
+                        if state.get("worker_result", {}).get("deliverable")
+                        else None
+                    ),
+                    evaluation=evaluation
+                    or (
+                        Evaluation.model_validate(state["worker_result"]["evaluation"])
+                        if state.get("worker_result", {}).get("evaluation")
+                        else None
+                    ),
                 ),
                 "route": "done",
             }
@@ -569,6 +930,11 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "revisions": state.get("revisions", 0) + 1,
             "feedback": feedback[-12000:],
             "route": route,
+            **(
+                {"attempts": {attempt.attempt_id: attempt.model_dump(mode="json")}}
+                if attempt
+                else {}
+            ),
         }
 
     async def department_gate(state: DepartmentState) -> JSON:
@@ -603,13 +969,29 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kind = exc.kind if isinstance(exc, EscalationSignal) else "invalid_output"
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
+            escalation = _escalation(state, kind, str(exc))
+            attempt = _attempt(
+                state, stage="department", deliverable=combined, escalation=escalation
+            )
             return {
-                "outcome": _outcome(state, escalation=_escalation(state, kind, str(exc))),
+                "outcome": _outcome(
+                    state, escalation=escalation, deliverable=combined, attempt=attempt
+                ),
                 "route": "done",
             }
         approved = gate_approved(combined, evaluation, kr.acceptance_criteria)
-        if not evaluation.passed_constitution:
+        violation = is_constitution_violation(
+            evaluation, Constitution.model_validate(state["constitution"])
+        )
+        if violation:
             await mark_halted(state, evaluation.feedback)
+        attempt = _attempt(
+            state,
+            stage="department",
+            deliverable=combined,
+            evaluation=evaluation,
+            approved=approved,
+        )
         await services.emit(
             f"{kr.target_department}_gatekeeper",
             "completed" if approved else "error",
@@ -617,13 +999,14 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kr_id=kr.kr_id,
             evaluation=evaluation.model_dump(mode="json"),
         )
-        if not evaluation.passed_constitution:
+        if violation:
             return {
                 "outcome": _outcome(
                     state,
                     escalation=_escalation(state, "constitution_violation", evaluation.feedback),
                     deliverable=combined,
                     evaluation=evaluation,
+                    attempt=attempt,
                 ),
                 "route": "done",
             }
@@ -636,10 +1019,12 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 target_agent_id="executive",
             )
             return {
-                "outcome": _outcome(state, deliverable=combined, evaluation=evaluation),
+                "outcome": _outcome(
+                    state, deliverable=combined, evaluation=evaluation, attempt=attempt
+                ),
                 "route": "done",
             }
-        return revision(state, evaluation.feedback, "plan")
+        return revision(state, evaluation.feedback, "plan", attempt, combined, evaluation)
 
     department_builder = StateGraph(DepartmentState)
     department_builder.add_node("plan", plan_work)
@@ -676,7 +1061,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit("planner", "error", str(exc), kind=kind)
-            review = _review_payload(kind, str(exc), [])
+            review = _review_payload(kind, str(exc), [], state)
             review["allowed_actions"] = ["provide_context", "abort"]
             return {"review": review, "status": "awaiting_review", "route": "review"}
         krs = [kr for obj in objectives for kr in obj.key_results]
@@ -719,13 +1104,14 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                     "\n".join(reasons)
                     or "Execution was suspended after a constitution violation; inspect recorded evidence.",
                     blocked_ids,
+                    state,
                 ),
             }
         if control == "pause":
             return {
                 "status": "awaiting_review",
                 "route": "review",
-                "review": _review_payload("manual_pause", "Pause requested", []),
+                "review": _review_payload("manual_pause", "Pause requested", [], state),
             }
         outcomes = _current_outcomes(state)
         blocked = [o for o in outcomes.values() if o.status != "passed"]
@@ -749,7 +1135,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             return {
                 "status": "awaiting_review",
                 "route": "review",
-                "review": _review_payload(kind, reason, [o.kr_id for o in blocked]),
+                "review": _review_payload(kind, reason, [o.kr_id for o in blocked], state),
             }
         krs = _krs(state)
         passed = {key for key, value in outcomes.items() if value.status == "passed"}
@@ -806,6 +1192,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         update: JSON = {
             "outcomes": {outcome.kr_id: outcome.model_dump(mode="json")},
             "progress": {outcome.kr_id: outcome.status},
+            "attempt_history": {
+                item.attempt_id: item.model_dump(mode="json") for item in outcome.attempts
+            },
         }
         if outcome.escalation:
             update["escalations"] = {
@@ -867,7 +1256,10 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 "status": "running",
                 "route": "plan",
             }
-        ids = set((state["review"] or {}).get("kr_ids", []))
+        context = enrich_review_context(state["review"] or {}, state)["context"]
+        ids = {item["kr_id"] for item in context["blockers"]} or set(
+            (state["review"] or {}).get("kr_ids", [])
+        )
         if decision.get("kr_id"):
             ids = {decision["kr_id"]}
         update: JSON = {}

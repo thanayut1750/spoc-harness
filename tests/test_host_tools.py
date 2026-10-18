@@ -76,12 +76,48 @@ async def test_timeout_and_artifact_integrity(tmp_path):
         await artifacts.read(artifact["artifact_id"])
 
 
+async def test_silent_command_has_receipt_instead_of_empty_output_artifacts(tmp_path):
+    import json
+
+    storage, run, artifacts, host = await make_host(tmp_path)
+    result = await host.run_command("quiet", "true")
+    assert result["exit_code"] == 0
+    saved = await storage.list_artifacts(run["run_id"])
+    assert len(saved) == 1
+    assert saved[0]["kind"] == "command_result"
+    assert saved[0]["size"] > 0
+    _, content = await artifacts.read(saved[0]["artifact_id"])
+    assert json.loads(content)["command"] == "true"
+    assert json.loads(content)["exit_code"] == 0
+
+
 async def test_cached_operation_rejects_a_different_request(tmp_path):
     _, _, _, host = await make_host(tmp_path)
     await host.run_command("reused-id", "true")
     with pytest.raises(EscalationSignal) as error:
         await host.run_command("reused-id", "false")
     assert error.value.kind == "operation_conflict"
+
+
+async def test_reverting_a_file_keeps_the_final_snapshot_authoritative(tmp_path, monkeypatch):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    for call_id, content in [
+        ("first", "answer = 1\n"),
+        ("second", "answer = 42\n"),
+        ("revert", "answer = 1\n"),
+    ]:
+        await host.write_file(call_id, "answer.py", content)
+    list_artifacts = storage.list_artifacts
+
+    async def reversed_rows(run_id):
+        return list(reversed(await list_artifacts(run_id)))
+
+    monkeypatch.setattr(storage, "list_artifacts", reversed_rows)
+    current = await host.recorded_artifacts(current=True)
+    assert len(current) == 1
+    _, content = await artifacts.read(current[0]["artifact_id"])
+    assert content == (host.workspace / "answer.py").read_text() == "answer = 1\n"
+    assert len(await storage.list_artifacts(run["run_id"])) == 3
 
 
 async def test_reused_provider_ids_are_isolated_between_work_packages_and_attempts(tmp_path):

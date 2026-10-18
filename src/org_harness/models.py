@@ -96,6 +96,7 @@ class Evaluation(Contract):
     criterion_results: dict[str, bool] = Field(default_factory=dict)
     recommended_action: Literal["approve", "retry_worker", "escalate_to_exec"]
     deterministic_checks_passed: bool = True
+    constitution_violations: tuple[str, ...] = ()
 
 
 class Escalation(Contract):
@@ -106,6 +107,27 @@ class Escalation(Contract):
     resolved: bool = False
 
 
+class AttemptRecord(Contract):
+    """Public execution evidence retained for review without private transcripts."""
+
+    attempt_id: str
+    kr_id: str
+    version: int = Field(default=1, ge=1)
+    epoch: int = Field(default=0, ge=0)
+    execution_attempt: int = Field(default=0, ge=0)
+    stage: Literal["worker", "department"]
+    work_package_id: str | None = None
+    role: str
+    task: str = Field(default="", max_length=2000)
+    acceptance_criteria: tuple[str, ...] = ()
+    summary: str = Field(default="", max_length=2000)
+    artifact_ids: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    evaluation: Evaluation | None = None
+    reason: str = Field(default="", max_length=2000)
+    approved: bool = False
+
+
 class DepartmentOutcome(Contract):
     kr_id: str
     version: int = Field(default=1, ge=1)
@@ -114,6 +136,7 @@ class DepartmentOutcome(Contract):
     deliverable: Deliverable | None = None
     evaluation: Evaluation | None = None
     escalation: Escalation | None = None
+    attempts: tuple[AttemptRecord, ...] = ()
 
 
 class RunCreate(Contract):

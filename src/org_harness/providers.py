@@ -46,8 +46,8 @@ class ZaiChatModel(BaseChatModel):
     base_url: str = "https://api.z.ai/api/coding/paas/v4"
     api_key: SecretStr = Field(default=SecretStr(""), exclude=True)
     reasoning_effort: str = "max"
-    timeout: float = 180
-    max_tokens: int = 8192
+    timeout: float = 300
+    max_tokens: int = 32768
     client: Any = Field(default=None, exclude=True, repr=False)
     async_client: Any = Field(default=None, exclude=True, repr=False)
 

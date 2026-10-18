@@ -32,6 +32,7 @@ class Artifacts:
         version: int = 1,
         kind: str = "document",
         scope: str = "",
+        write_id: str = "",
         **extra: Any,
     ) -> dict:
         body = content.encode() if isinstance(content, str) else content
@@ -39,6 +40,7 @@ class Artifacts:
         artifact_id = hashlib.sha256(
             json.dumps(
                 [self.run_id, kr_id, version, department, epoch, scope, name, digest]
+                + ([write_id] if write_id else [])
             ).encode()
         ).hexdigest()[:32]
         try:
@@ -67,6 +69,7 @@ class Artifacts:
             "sha256": digest,
             "kind": kind,
             "scope": scope,
+            "write_id": write_id,
             "media_type": mimetypes.guess_type(name)[0] or "text/plain",
             **extra,
         }
@@ -128,6 +131,55 @@ class HostTools:
         ]
         return hashlib.sha256(json.dumps(identity).encode()).hexdigest()
 
+    async def recorded_artifacts(self, *, current: bool = False) -> list[dict]:
+        """Recover this exact assignment's evidence, including after checkpoint replay."""
+        recorded = [
+            item
+            for item in await self.storage.list_artifacts(self.run["run_id"])
+            if item.get("kr_id") == self.kr_id
+            and item.get("version", 1) == self.version
+            and item.get("epoch", 0) == self.epoch
+            and item.get("scope") == self.scope
+            and item.get("kind") != "deliverable"
+        ]
+        recorded.sort(key=lambda item: (item.get("created_at", ""), item["artifact_id"]))
+        if not current:
+            return recorded
+        # Immutable snapshots remain inspectable, but an earlier broken file or
+        # failed check must not override its corrected, later version.
+        sources: dict[str, str] = {}
+        commands: dict[tuple[str, str], str] = {}
+        checks: dict[tuple[str, str], str] = {}
+        for item in recorded:
+            if item.get("kind") == "source":
+                sources[item.get("original_path", item["name"])] = item["artifact_id"]
+            elif item.get("kind") == "command_result":
+                commands[(item.get("command", ""), item.get("cwd", ""))] = item.get(
+                    "operation_id", ""
+                )
+            elif item.get("kind") == "verification":
+                checks[(item.get("verification_tool", ""), item.get("original_path", ""))] = item[
+                    "artifact_id"
+                ]
+        return [
+            item
+            for item in recorded
+            if (
+                item.get("kind") != "source"
+                or sources[item.get("original_path", item["name"])] == item["artifact_id"]
+            )
+            and (
+                item.get("kind") not in {"command_log", "command_result"}
+                or item.get("operation_id")
+                == commands.get((item.get("command", ""), item.get("cwd", "")))
+            )
+            and (
+                item.get("kind") != "verification"
+                or checks[(item.get("verification_tool", ""), item.get("original_path", ""))]
+                == item["artifact_id"]
+            )
+        ]
+
     async def journal(
         self,
         call_id: str,
@@ -185,6 +237,7 @@ class HostTools:
                 version=self.version,
                 scope=self.scope,
                 kind="source",
+                write_id=self.operation_id(call_id, "write_file"),
                 original_path=str(target),
             )
             await self.emit(
@@ -257,6 +310,8 @@ class HostTools:
             elapsed = asyncio.get_running_loop().time() - started
             output_artifacts = []
             for suffix, log_path in (("stdout", stdout_path), ("stderr", stderr_path)):
+                if not log_path.stat().st_size:
+                    continue
                 artifact = await self.artifacts.save(
                     f"{log_id}.{suffix}.txt",
                     log_path.read_bytes(),
@@ -268,6 +323,8 @@ class HostTools:
                     kind="command_log",
                     exit_code=124 if timed_out else process.returncode,
                     command=command,
+                    cwd=str(self.workspace if not cwd else self.path(cwd)),
+                    operation_id=log_id,
                 )
                 output_artifacts.append(artifact["artifact_id"])
             result = {
@@ -279,6 +336,29 @@ class HostTools:
                 "duration_seconds": round(elapsed, 3),
                 "artifact_ids": output_artifacts,
             }
+            receipt = await self.artifacts.save(
+                f"{log_id}.command.json",
+                json.dumps(
+                    {
+                        "command": command,
+                        "cwd": str(self.workspace if not cwd else self.path(cwd)),
+                        **result,
+                    }
+                ),
+                kr_id=self.kr_id,
+                department=self.department,
+                epoch=self.epoch,
+                version=self.version,
+                scope=self.scope,
+                kind="command_result",
+                exit_code=result["exit_code"],
+                command=command,
+                cwd=str(self.workspace if not cwd else self.path(cwd)),
+                operation_id=log_id,
+            )
+            # Keep a receipt even for successful silent commands. Empty stdout
+            # and stderr remain raw operation logs rather than empty task files.
+            result["artifact_ids"] = [*output_artifacts, receipt["artifact_id"]]
             await self.emit(
                 self.role,
                 "executing",
@@ -325,7 +405,16 @@ class HostTools:
                 epoch=self.epoch,
                 version=self.version,
                 scope=self.scope,
-                kind="research",
+                kind="verification" if name == "syntax_check" else "research",
+                **(
+                    {
+                        "verification_tool": name,
+                        "original_path": str(self.path(result["path"])),
+                        "passed": result.get("passed", False),
+                    }
+                    if name == "syntax_check"
+                    else {}
+                ),
             )
             await self.emit(
                 self.role,
@@ -334,6 +423,17 @@ class HostTools:
                 kr_id=self.kr_id,
                 artifact_id=artifact["artifact_id"],
             )
-            return {"artifact_id": artifact["artifact_id"], "result": result}
+            encoded = json.dumps(result, ensure_ascii=False, default=str)
+            preview = (
+                result
+                if len(encoded) <= 12000
+                else {
+                    "preview": encoded[:12000],
+                    "truncated": True,
+                    "total_characters": len(encoded),
+                    "read_more": "Use read_artifact with offset and limit for the full stored source.",
+                }
+            )
+            return {"artifact_id": artifact["artifact_id"], "result": preview}
 
         return await self.journal(call_id, name, request, recorded)

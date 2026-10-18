@@ -96,7 +96,12 @@ class Worker:
     async def execute(self, run: dict) -> None:
         from langgraph.types import Command
 
-        from org_harness.runtime import build_graph, initial_state, runtime_config
+        from org_harness.runtime import (
+            build_graph,
+            enrich_review_context,
+            initial_state,
+            runtime_config,
+        )
 
         run_id = run["run_id"]
         services = None
@@ -107,14 +112,25 @@ class Worker:
                 await self.storage.update_run(
                     run_id,
                     status="review",
-                    review={
-                        "interrupt_id": f"operation:{operation['operation_id']}",
-                        "kind": "unknown_operation",
-                        "reason": "A host command was interrupted; its outcome is unknown.",
-                        "operation_id": operation["operation_id"],
-                        "kr_ids": [],
-                        "allowed_actions": ["retry_operation", "abort"],
-                    },
+                    review=enrich_review_context(
+                        {
+                            "interrupt_id": f"operation:{operation['operation_id']}",
+                            "kind": "unknown_operation",
+                            "reason": "A host command was interrupted; its outcome is unknown.",
+                            "operation_id": operation["operation_id"],
+                            "kr_ids": [],
+                            "allowed_actions": ["retry_operation", "abort"],
+                            "operation": {
+                                "operation_id": operation["operation_id"],
+                                "status": operation.get("status", "pending"),
+                                "command": str(operation.get("request", {}).get("command", ""))[
+                                    :2000
+                                ],
+                                "cwd": str(operation.get("request", {}).get("cwd", ""))[:1000],
+                            },
+                        },
+                        run,
+                    ),
                 )
                 await self.storage.emit(
                     {
@@ -157,7 +173,15 @@ class Worker:
             async for values in graph.astream(graph_input, config, stream_mode="values"):
                 projection = {
                     key: values[key]
-                    for key in ("objectives", "progress", "outcomes", "epochs", "report")
+                    for key in (
+                        "objectives",
+                        "progress",
+                        "outcomes",
+                        "epochs",
+                        "report",
+                        "attempt_history",
+                        "auto_replans",
+                    )
                     if key in values
                 }
                 if projection:
@@ -166,13 +190,23 @@ class Worker:
             values = dict(snapshot.values)
             fields = {
                 key: values[key]
-                for key in ("objectives", "progress", "outcomes", "report", "review")
+                for key in (
+                    "objectives",
+                    "progress",
+                    "outcomes",
+                    "report",
+                    "review",
+                    "epochs",
+                    "attempt_history",
+                    "auto_replans",
+                )
                 if key in values
             }
             interrupts = tuple(getattr(snapshot, "interrupts", ()))
             if interrupts:
                 review = dict(fields.get("review") or interrupts[0].value or {})
                 review["interrupt_id"] = interrupts[0].id
+                review = enrich_review_context(review, {**run, **values})
                 fields.update(
                     review=review,
                     status="paused" if review.get("kind") == "manual_pause" else "review",

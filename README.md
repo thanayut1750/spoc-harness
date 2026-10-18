@@ -55,6 +55,8 @@ The office shows the objective/KR hierarchy on the left, actual agent activity i
 
 Ordinary blockers receive one automatic executive replan per run. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
 
+The review panel includes the mission, blocked KR and acceptance criteria, gate feedback, recorded attempts, evidence files, and the effect of each available action. Pending dependent KRs appear separately. Older runs recover the available summaries and evidence without rewriting their saved interrupt; unavailable history is labeled explicitly.
+
 ## Execution and persistence
 
 - The root `StateGraph` plans and validates 1–3 objectives containing at most nine KRs. It dispatches dependency-ready work with at most one KR per department and two work packages active overall.
@@ -66,9 +68,17 @@ Ordinary blockers receive one automatic executive replan per run. Constitution v
 
 The Z.AI adapter preserves provider reasoning fields within private model history for tool-roundtrip correctness. Office events expose activity, outputs, and evidence rather than raw provider reasoning. Structured responses use JSON-object mode and Pydantic validation, with one schema repair attempt. Transient model requests have bounded retries and count toward the global call budget.
 
+An empty or truncated worker response receives one continuation within its existing private context and call budget. If it remains incomplete, the worker reports an execution failure instead of creating an empty submission. Tool records supply the artifact manifest even when the model omits IDs from its final answer. Large research responses are stored in full and shown to workers in bounded pages. Missing output is a quality failure; an observed prohibited action or explicit compliance breach triggers constitution review.
+
+Files are grouped as task outputs, sources, verification logs, and submission metadata. A command always records its exit status, duration, command, and output references in a receipt. Only nonempty stdout/stderr become downloadable output artifacts, so a successful silent command does not generate empty task files.
+
+Immutable earlier file versions and failed checks remain available for inspection. Submission evidence uses current file revisions and final checks, so a corrected file does not remain rejected because of an obsolete broken snapshot.
+
 Research uses Z.AI Search and Reader MCP tools with the configured key. Access depends on the key's tool entitlement; unavailable tools report a blocker rather than returning sample results. `spoc doctor --live` makes real provider requests and consumes provider quota.
 
 Default configurable limits: 100 model calls and 200 tool calls per run, 12 model calls per worker invocation, and a 300-second command timeout. The example healthcare/privacy and dollar-budget policies from the initial proposal are not hardcoded. Configure a constitution appropriate to each objective.
+
+`MODEL_MAX_TOKENS` defaults to 32768 and `MODEL_TIMEOUT` to 300 seconds. The token allowance includes provider thinking and visible output; an 8192-token cap can end a long reasoning turn before any answer is produced. Existing explicit environment settings still take precedence.
 
 ## Deterministic demonstration
 
