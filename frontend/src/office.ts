@@ -1,4 +1,4 @@
-import type { Activity, ActivityEvent, AgentActivity } from "./types";
+import type { Activity, ActivityEvent, AgentActivity, Run } from "./types";
 export interface Role {
   id: string;
   name: string;
@@ -118,6 +118,50 @@ export const activeActivities = new Set<Activity>([
   "executing",
   "reviewing",
 ]);
+export const terminalStatuses = new Set([
+  "completed",
+  "succeeded",
+  "success",
+  "failed",
+  "cancelled",
+  "aborted",
+]);
+export function displayActivity(
+  agent: AgentActivity,
+  run: Pick<Run, "status"> | undefined,
+): AgentActivity {
+  if (
+    (agent.source && agent.source !== "harness") ||
+    !activeActivities.has(agent.activity) ||
+    run?.status === "running"
+  )
+    return agent;
+  const activity: Activity = !run
+    ? "waiting"
+    : run.status === "failed"
+      ? "error"
+      : ["completed", "succeeded", "success"].includes(run.status)
+        ? "completed"
+        : ["cancelled", "aborted"].includes(run.status)
+          ? "idle"
+          : "waiting";
+  const status = run
+    ? `Run ${run.status.replaceAll("_", " ")}.`
+    : "Waiting for the run’s current status.";
+  return {
+    ...agent,
+    activity,
+    summary: `${status} Last recorded activity: ${activityLabels[agent.activity]}${agent.summary ? ` — ${agent.summary}` : "."}`,
+  };
+}
+export function routingSummary(triage: Run["triage"]): string {
+  if (!triage) return "Routing is chosen for each mission";
+  const departments = [...new Set(triage.departments)].map(pretty).join(" + ");
+  const team = departments || "No departments assigned";
+  if (triage.mode === "FAST_TRACK") return `${team} only · One worker`;
+  if (triage.mode === "DEPARTMENTAL") return `${team} only · Department team`;
+  return `${team} · ${pretty(triage.mode.toLowerCase())}`;
+}
 export function pretty(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

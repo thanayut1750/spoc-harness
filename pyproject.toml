@@ -13,6 +13,7 @@ dependencies = [
   "langchain-core>=1.6.12,<2",
   "langgraph>=1.2.16,<2",
   "langgraph-checkpoint-postgres>=3.2,<4",
+  "langchain-typesafe==0.0.1a3",
   "langsmith>=0.14.11,<1",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.6,<3",

@@ -62,7 +62,7 @@ def approve(criteria):
 
 
 @asynccontextmanager
-async def services_with_provider(tmp_path, script, *, limits=None):
+async def services_with_provider(tmp_path, script, *, limits=None, agent_model_configs=None):
     storage = MemoryStorage()
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -71,9 +71,15 @@ async def services_with_provider(tmp_path, script, *, limits=None):
             "user_request": "Implement and verify",
             "workspace_path": str(workspace),
             **({"limits": limits} if limits else {}),
+            **({"agent_model_configs": agent_model_configs} if agent_model_configs else {}),
         }
     )
-    settings = Settings(_env_file=None, data_dir=tmp_path / "data", harness_test_mode=False)
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="fixture-key",
+        data_dir=tmp_path / "data",
+        harness_test_mode=False,
+    )
     services = AgentServices(settings, storage, run)
     requests = []
 
@@ -760,3 +766,327 @@ async def test_real_worker_tool_checkpoint_survives_process_restart(tmp_path):
         # an empty conversation. The executive remains free of message history.
         assert any(message["role"] == "tool" for message in requests[1]["messages"])
         assert "messages" not in result
+
+
+@pytest.mark.parametrize(
+    "role", ["market_researcher", "data_analyst", "system_architect", "backend_coder"]
+)
+async def test_all_worker_roles_have_bounded_timeout_and_cancel_private_execution(
+    tmp_path, monkeypatch, role
+):
+    import asyncio
+
+    kr, work = assignment()
+    department = "research" if role in {"market_researcher", "data_analyst"} else "engineering"
+    kr = kr.model_copy(update={"target_department": department})
+    work = work.model_copy(update={"role": role})
+    cancelled = asyncio.Event()
+
+    async with services_with_provider(tmp_path, lambda *_: {}, limits={"worker_timeout": 0.02}) as (
+        services,
+        storage,
+        run,
+        requests,
+        _,
+    ):
+
+        async def blocked(*args):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        monkeypatch.setattr(services, "_execute_worker", blocked)
+        with pytest.raises(EscalationSignal) as error:
+            await asyncio.wait_for(services.execute(work, kr, Constitution(), [], "", 0), timeout=1)
+        assert error.value.kind == "worker_timeout"
+        assert cancelled.is_set()
+        assert requests == []
+        assert not await storage.list_artifacts(run["run_id"])
+
+
+async def test_optional_timeout_returns_partial_evidence_without_approving_a_deliverable(
+    tmp_path, monkeypatch
+):
+    import asyncio
+
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": False})
+    async with services_with_provider(tmp_path, lambda *_: {}, limits={"worker_timeout": 0.03}) as (
+        services,
+        storage,
+        run,
+        requests,
+        _,
+    ):
+
+        async def partial(work, kr, constitution, inputs, feedback, epoch, host):
+            await host.write_file(
+                "partial", "partial-notes.md", "Some observations; investigation incomplete.\n"
+            )
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(services, "_execute_worker", partial)
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert result.fallback and result.confidence_score == 0
+        assert "incomplete" in result.summary
+        assert len(result.artifact_ids) == 1
+        evidence = await storage.list_artifacts(run["run_id"])
+        assert all(item["kind"] != "deliverable" for item in evidence)
+        evaluation = await services.evaluate(result, kr.acceptance_criteria, Constitution())
+        assert not evaluation.deterministic_checks_passed
+        assert not gate_approved(result, evaluation, kr.acceptance_criteria)
+        assert requests == []
+
+
+@pytest.mark.parametrize(
+    "kind", ["blocked", "missing_resource", "provider_error", "incomplete_worker_output"]
+)
+async def test_optional_ordinary_attention_returns_to_lead_as_incomplete(
+    tmp_path, monkeypatch, kind
+):
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": False})
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, _, _, _, _):
+
+        async def attention(*args):
+            raise EscalationSignal(kind, "Optional investigation could not finish")
+
+        monkeypatch.setattr(services, "_execute_worker", attention)
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert result.fallback
+        assert result.artifact_ids == ()
+        assert kind in result.evidence[0]
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "constitution_violation",
+        "policy_violation",
+        "cancelled",
+        "suspended",
+        "unknown_operation",
+        "operation_conflict",
+        "limit_exceeded",
+        "critical_blocker",
+    ],
+)
+async def test_optional_work_cannot_swallow_protected_failures(tmp_path, monkeypatch, kind):
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": False})
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, _, _, _, _):
+
+        async def failure(*args):
+            raise EscalationSignal(kind, "Protected failure")
+
+        monkeypatch.setattr(services, "_execute_worker", failure)
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == kind
+
+
+async def test_optional_timeout_during_host_command_requires_side_effect_review(
+    tmp_path, monkeypatch
+):
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": False})
+    async with services_with_provider(tmp_path, lambda *_: {}, limits={"worker_timeout": 0.08}) as (
+        services,
+        storage,
+        run,
+        _,
+        workspace,
+    ):
+
+        async def command(work, kr, constitution, inputs, feedback, epoch, host):
+            return await host.run_command("uncertain", "printf begun > started.txt; sleep 30")
+
+        monkeypatch.setattr(services, "_execute_worker", command)
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "unknown_operation"
+        # Cancellation may happen while the shell is still starting. Both an
+        # observed side effect and an unconfirmed start require the same review.
+        started = workspace / "started.txt"
+        if started.exists():
+            assert started.read_text() == "begun"
+        pending = await storage.uncertain_operations(run["run_id"])
+        assert len(pending) == 1
+        assert pending[0]["status"] == "pending"
+
+
+async def test_optional_timeout_does_not_misclassify_another_workers_command(tmp_path, monkeypatch):
+    import asyncio
+
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": False})
+    async with services_with_provider(tmp_path, lambda *_: {}, limits={"worker_timeout": 0.02}) as (
+        services,
+        storage,
+        run,
+        _,
+        _,
+    ):
+        await storage.begin_operation(
+            run["run_id"], "another-worker", "command", {"command": "other task"}
+        )
+
+        async def blocked(*args):
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(services, "_execute_worker", blocked)
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert result.fallback
+        assert len(await storage.uncertain_operations(run["run_id"])) == 1
+
+
+async def test_worker_uses_resolved_run_model_selection_without_exposing_credentials(tmp_path):
+    storage = MemoryStorage()
+    chosen = {
+        "provider": "openai_compatible",
+        "model": "local-worker-model",
+        "reasoning_effort": "low",
+    }
+    run = await storage.create_run({"user_request": "model selection", "model_config": chosen})
+    settings = Settings(
+        _env_file=None,
+        compatible_base_url="https://compatible.invalid/v1",
+        compatible_api_key="server-only-fixture",
+        data_dir=tmp_path,
+    )
+    services = AgentServices(settings, storage, run)
+    try:
+        assert services.model.model == chosen["model"]
+        assert services.model.reasoning_effort == "low"
+        assert services.model.base_url == "https://compatible.invalid/v1"
+        assert services.model.api_key.get_secret_value() == "server-only-fixture"
+        assert "server-only-fixture" not in json.dumps(await storage.get_run(run["run_id"]))
+    finally:
+        await services.close()
+
+
+async def test_triage_delegates_to_configured_decision_router(tmp_path, monkeypatch):
+    from org_harness import triage
+    from org_harness.models import TriageDecision
+
+    expected = TriageDecision(
+        mode="FAST_TRACK",
+        departments=("engineering",),
+        worker_role="backend_coder",
+        confidence=0.9,
+        source="fallback",
+        reason="Local deterministic fixture",
+        max_revisions=2,
+    )
+    seen = []
+
+    class Router:
+        def __init__(self, settings):
+            self.settings = settings
+
+        async def classify(self, request, constitution):
+            seen.append((request, constitution))
+            return expected
+
+    monkeypatch.setattr(triage, "TriageRouter", Router)
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, _, _, requests, _):
+        constitution = Constitution()
+        result = await services.triage("Implement a local check", constitution)
+        assert result == expected
+        assert seen == [("Implement a local check", constitution)]
+        assert requests == []
+
+
+async def test_deterministic_report_is_published_without_a_model_call(tmp_path):
+    async with services_with_provider(tmp_path, lambda *_: {}) as (
+        services,
+        storage,
+        run,
+        requests,
+        _,
+    ):
+        await services.publish_report(
+            "# Lead report\nIncomplete optional work was excluded from approval.\n"
+        )
+        artifacts = await storage.list_artifacts(run["run_id"])
+        assert len(artifacts) == 1 and artifacts[0]["kind"] == "report"
+        assert requests == []
+
+
+async def test_worker_and_reviewer_model_overrides_are_forwarded_and_cached(tmp_path):
+    kr, work = assignment()
+    ids = []
+    selections = {
+        "backend_coder": {
+            "provider": "configured",
+            "model": "worker-selected",
+            "reasoning_effort": "low",
+        },
+        "engineering_gatekeeper": {
+            "provider": "configured",
+            "model": "review-selected",
+            "reasoning_effort": "high",
+        },
+    }
+
+    def script(body, requests):
+        if body.get("response_format"):
+            payload = json.loads(body["messages"][-1]["content"])
+            if "worker_result" not in payload:
+                return {"content": json.dumps(approve(kr.acceptance_criteria))}
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Created the selected worker output",
+                    artifact_ids=tuple(ids),
+                ).model_dump_json()
+            }
+        tools = [message for message in body["messages"] if message["role"] == "tool"]
+        if not tools:
+            return {
+                "tool_calls": [
+                    tool_call("write_file", {"path": "selected.py", "content": "answer = 42\n"})
+                ]
+            }
+        ids[:] = [json.loads(tools[-1]["content"])["artifact_id"]]
+        return {"content": "Saved selected.py"}
+
+    async with services_with_provider(tmp_path, script, agent_model_configs=selections) as (
+        services,
+        _,
+        _,
+        requests,
+        _,
+    ):
+        worker_model = services.model_for("backend_coder")
+        reviewer_model = services.model_for("engineering_gatekeeper")
+        assert services.model_for("backend_coder") is worker_model
+        assert services.model_for("planner") is services.model
+        worker_model.async_client = services.model.async_client
+        reviewer_model.async_client = services.model.async_client
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        await services.evaluate(result, kr.acceptance_criteria, Constitution())
+        assert [item["model"] for item in requests] == ["worker-selected"] * 3 + ["review-selected"]
+        assert [item["reasoning_effort"] for item in requests] == ["low"] * 3 + ["high"]
+
+
+async def test_closing_services_closes_each_distinct_selected_model_once(tmp_path):
+    closed = []
+
+    class SelectedModel:
+        def __init__(self, name):
+            self.name = name
+
+        async def aclose(self):
+            closed.append(self.name)
+
+    async with services_with_provider(tmp_path, lambda *_: {}) as (services, _, _, _, _):
+        await services.model.aclose()
+        default = SelectedModel("default")
+        override = SelectedModel("override")
+        services.model = default
+        services._role_models = {"alias": default, "reviewer": override}
+    assert sorted(closed) == ["default", "override"]

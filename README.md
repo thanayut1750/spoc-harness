@@ -53,7 +53,7 @@ Use `spoc run --workspace /absolute/project/path` to select an existing project.
 
 The office shows the objective/KR hierarchy on the left, actual agent activity in department rooms, and selected-agent details on the right. Select a character to inspect its work, evidence, tool logs, and gate feedback. Human guidance is consumed at the next applicable agent boundary. Pause waits for a safe graph boundary; cancel also terminates active host commands.
 
-Ordinary blockers receive one automatic executive replan per run. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
+Ordinary blockers in the full workflow receive one automatic executive replan per run. Fast-track and departmental work stop for review after their bounded retry allowance. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
 
 The review panel starts with a short explanation and plain choices: retry the task, change its requirements, or stop the run. A normal retry preserves the current requirements and recorded feedback; extra instructions are optional. Rule violations and clarification requests require written guidance. The primary button names the action it will take.
 
@@ -61,9 +61,10 @@ Expand **Review evidence and history** for the mission, blocked KR and acceptanc
 
 ## Execution and persistence
 
-- The root `StateGraph` plans and validates 1–3 objectives containing at most nine KRs. It dispatches dependency-ready work with at most one KR per department and two work packages active overall.
+- A checkpointed `TriageRouter` classifies the request with TypeSafe Jev before planning. `FAST_TRACK` uses one specialist with no strategic or tactical planning calls. `DEPARTMENTAL` uses one department lead and subgraph. Both use one final semantic KR review per attempt and at most one rework, with no automatic executive replan. Pure engineering work does not start Research. `FULL_PYRAMID` retains both departments and strategic decomposition. Missing credentials, uncertain decisions, or an eight-second classifier timeout retain the full workflow.
+- The full workflow plans and validates 1–3 objectives containing at most nine KRs. It dispatches dependency-ready work with at most one KR per department and two work packages active overall.
 - Research and Engineering subgraphs plan bounded specialist assignments. Workers use LangChain `create_agent` with role-scoped tools. Only validated dependency artifacts and bounded summaries cross graph boundaries; parent transcripts never become worker history.
-- Tactical and department gates check evidence, constitution compliance, every criterion, and a minimum score of 0.8. Worker confidence cannot approve a KR. Two shared rework cycles are available after the initial attempt.
+- Gates check evidence, constitution compliance, every criterion, and a minimum score of 0.8. Worker confidence cannot approve a KR. Full-pyramid work uses the constitution's rework limit (two by default); optimized modes cap that limit at one. Their worker handoff performs structural validation, leaving the semantic assessment to the final KR gate.
 - Postgres stores application state, jobs, event projections, checkpoints, and artifact metadata. Local disk holds immutable artifact contents and full command logs.
 - Completed tool operations are reused on replay. If a host command was running when execution was interrupted, its result is treated as unknown and reviewed before retry. No claim of exactly-once arbitrary shell execution is made.
 - A global worker lock and renewable leases prevent overlapping runs. Only one run executes at a time; departments can work concurrently within it.
@@ -78,7 +79,15 @@ Immutable earlier file versions and failed checks remain available for inspectio
 
 Research uses Z.AI Search and Reader MCP tools with the configured key. Access depends on the key's tool entitlement; unavailable tools report a blocker rather than returning sample results. `spoc doctor --live` makes real provider requests and consumes provider quota.
 
-Default configurable limits: 100 model calls and 200 tool calls per run, 12 model calls per worker invocation, and a 300-second command timeout. The example healthcare/privacy and dollar-budget policies from the initial proposal are not hardcoded. Configure a constitution appropriate to each objective.
+Default configurable limits: 100 model calls and 200 tool calls per run, 12 model calls per worker invocation, a 60-second timeout covering each worker invocation and output extraction, and a 300-second command timeout. Tactical packages are critical by default. A lead may mark an enrichment step optional (`critical=false`); a timeout or ordinary blocker then returns an explicitly incomplete fallback with partial evidence, allowing other work to continue. Fallbacks cannot approve work or waive acceptance criteria. Policy violations, cancellation, budgets, and host commands with unknown side effects still stop for review. The example healthcare/privacy and dollar-budget policies from the initial proposal are not hardcoded. Configure a constitution appropriate to each objective.
+
+### Model settings and Regenesis
+
+Open **Settings → Model** to configure a provider, model ID, and reasoning effort for all agents or a particular agent. Provider connections and credentials come from server environment variables; the UI never accepts or exposes API keys. The configured endpoint uses existing `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MAIN_MODEL`. Optional separate connections use `ZAI_API_KEY`, `SPOC_OPENAI_API_KEY`, or the `SPOC_COMPATIBLE_*` variables in `.env.example`. Use tool-capable models and reasoning options supported by the selected model. Native OpenAI uses Chat Completions; models requiring Responses tool calling need a different adapter.
+
+Saved selections are copied into each new run. Existing runs retain their original selection, including agent overrides. Per-run API overrides use `model_config` and `agent_model_configs`. Jev remains a separate decision model configured with `TYPESAFE_API_KEY` and `TYPESAFE_MODEL`.
+
+**Settings → Regenesis** resets the application to its startup defaults after typing `REGENESIS`. The callable API is `POST /api/regenesis` with `{"confirmation":"REGENESIS"}`; the CLI equivalent is `uv run spoc regenesis --confirm REGENESIS`. It cancels unfinished runs, waits for exclusive worker ownership, removes managed artifact/workspace directories, and clears application records, events, operation journals, settings, LangGraph checkpoints and store data. The database schema remains usable. `.env`, application code, database infrastructure and user-selected external workspaces remain intact; arbitrary host command effects outside managed directories cannot be undone. Use a database dedicated to this harness because its LangGraph checkpoint/store tables are reset too. Browser state and event cursors reload after reset.
 
 `MODEL_MAX_TOKENS` defaults to 32768 and `MODEL_TIMEOUT` to 300 seconds. The token allowance includes provider thinking and visible output; an 8192-token cap can end a long reasoning turn before any answer is produced. Existing explicit environment settings still take precedence.
 
@@ -108,6 +117,9 @@ Activity values are `idle`, `planning`, `reading`, `writing`, `executing`, `revi
 | `GET /api/runs`, `GET /api/runs/{id}` | Run history and current progress |
 | `POST /api/runs/{id}/pause`, `/resume`, `/cancel` | Lifecycle commands |
 | `POST /api/runs/{id}/notes` | Queue targeted human guidance |
+| `GET /api/settings`, `PUT /api/settings/model` | Read public provider settings and save model defaults |
+| `PUT`, `DELETE /api/settings/agents/{agent_id}` | Set an agent override or return it to the default |
+| `POST /api/regenesis` | Confirmed reset of all harness-managed data |
 | `GET /api/office`, `GET /api/events?after=CURSOR` | Snapshot and SSE event replay |
 | `GET /api/runs/{id}/artifacts`, `GET /api/artifacts/{id}` | Evidence and files |
 | `POST /api/integrations/events` | External display activity |

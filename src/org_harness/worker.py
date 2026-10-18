@@ -52,6 +52,8 @@ class Worker:
         self.graph_factory = graph_factory
         self.checkpointer = checkpointer
         self.store = store
+        if hasattr(self.storage, "register_runtime_resources") and checkpointer is not None:
+            self.storage.register_runtime_resources(checkpointer, store)
 
     async def run_once(self) -> bool:
         async with self.storage.worker_lock() as lock_session:
@@ -181,6 +183,10 @@ class Worker:
                         "report",
                         "attempt_history",
                         "auto_replans",
+                        "triage",
+                        "execution_mode",
+                        "active_departments",
+                        "revision_limit",
                     )
                     if key in values
                 }
@@ -199,6 +205,10 @@ class Worker:
                     "epochs",
                     "attempt_history",
                     "auto_replans",
+                    "triage",
+                    "execution_mode",
+                    "active_departments",
+                    "revision_limit",
                 )
                 if key in values
             }
@@ -279,6 +289,8 @@ class Worker:
                         self.store = await stack.enter_async_context(
                             AsyncPostgresStore.from_conn_string(url)
                         )
+                if hasattr(self.storage, "register_runtime_resources"):
+                    self.storage.register_runtime_resources(self.checkpointer, self.store)
                 while True:
                     if not await self.run_once():
                         await asyncio.sleep(1)

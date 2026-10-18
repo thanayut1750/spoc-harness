@@ -8,7 +8,11 @@ import {
   projectEvent,
 } from "./office";
 import type { ActivityEvent, AgentActivity } from "./types";
-export function useOffice(onEvent: (event: ActivityEvent) => void) {
+export function useOffice(
+  onEvent: (event: ActivityEvent) => void,
+  resetVersion = 0,
+  onReset?: () => void,
+) {
   const [agents, setAgents] =
     useState<Record<string, AgentActivity>>(initialAgents);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
@@ -17,7 +21,12 @@ export function useOffice(onEvent: (event: ActivityEvent) => void) {
   >("connecting");
   const [error, setError] = useState("");
   const cursor = useRef(0);
+  const generation = useRef<string | undefined>(undefined);
   const eventCallback = useRef(onEvent);
+  const resetCallback = useRef(onReset);
+  useEffect(() => {
+    resetCallback.current = onReset;
+  }, [onReset]);
   useEffect(() => {
     eventCallback.current = onEvent;
   }, [onEvent]);
@@ -32,34 +41,78 @@ export function useOffice(onEvent: (event: ActivityEvent) => void) {
   }, []);
   useEffect(() => {
     let disposed = false;
+    cursor.current = 0;
+    generation.current = undefined;
+    setAgents(initialAgents());
+    setEvents([]);
+    setConnection("connecting");
+    setError("");
     let stream: EventSource | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    async function connect(snapshot = false) {
+    let hasSnapshot = false;
+    async function connect() {
       try {
-        if (snapshot) {
-          const state = await api.office();
-          if (disposed) return;
-          cursor.current = state.cursor;
-          setAgents({
-            ...initialAgents(),
-            ...Object.fromEntries(
-              state.agents.map((raw) => {
-                const agent = normalizeAgent(raw);
-                return [agent.agent_id, agent];
-              }),
-            ),
-          });
-        }
+        const state = await api.office();
         if (disposed) return;
-        stream = new EventSource(`/api/events?after=${cursor.current}`);
+        const changed =
+          hasSnapshot &&
+          ((generation.current !== undefined &&
+            state.generation !== undefined &&
+            generation.current !== state.generation) ||
+            ((generation.current === undefined ||
+              state.generation === undefined) &&
+              state.cursor < cursor.current));
+        generation.current = state.generation;
+        // A reconnect snapshot updates the desks; SSE still replays missed history.
+        if (!hasSnapshot || changed) cursor.current = state.cursor;
+        hasSnapshot = true;
+        if (changed) {
+          setEvents([]);
+          if (resetCallback.current) {
+            resetCallback.current();
+            return;
+          }
+        }
+        setAgents((current) => ({
+          ...initialAgents(),
+          ...Object.fromEntries(
+            state.agents.map((raw) => {
+              const agent = normalizeAgent(raw);
+              const newer = !changed && current[agent.agent_id];
+              return [
+                agent.agent_id,
+                newer && (newer.seq ?? -1) > (agent.seq ?? -1) ? newer : agent,
+              ];
+            }),
+          ),
+        }));
+        const query = new URLSearchParams({ after: String(cursor.current) });
+        if (generation.current) query.set("generation", generation.current);
+        stream = new EventSource(`/api/events?${query}`);
         stream.onopen = () => {
           if (!disposed) {
             setConnection("live");
             setError("");
           }
         };
-        stream.onmessage = receive;
-        stream.addEventListener("activity", receive as EventListener);
+        const receiveCurrent = (event: MessageEvent<string>) => {
+          if (!disposed) receive(event);
+        };
+        stream.onmessage = receiveCurrent;
+        stream.addEventListener("activity", receiveCurrent as EventListener);
+        stream.addEventListener("reset", () => {
+          if (disposed) return;
+          stream?.close();
+          clearTimeout(retry);
+          cursor.current = 0;
+          generation.current = undefined;
+          hasSnapshot = false;
+          setAgents(initialAgents());
+          setEvents([]);
+          setConnection("connecting");
+          if (resetCallback.current) resetCallback.current();
+          else void connect();
+        });
         stream.onerror = () => {
           stream?.close();
           if (!disposed) {
@@ -74,16 +127,16 @@ export function useOffice(onEvent: (event: ActivityEvent) => void) {
           setError(
             failure instanceof Error ? failure.message : "Office unavailable",
           );
-          retry = setTimeout(() => void connect(true), 3000);
+          retry = setTimeout(() => void connect(), 3000);
         }
       }
     }
-    void connect(true);
+    void connect();
     return () => {
       disposed = true;
       stream?.close();
       clearTimeout(retry);
     };
-  }, [receive]);
+  }, [receive, resetVersion]);
   return { agents, events, connection, error };
 }

@@ -4,6 +4,9 @@ import type {
   ResumeInput,
   Run,
   RunInput,
+  ModelConfig,
+  WorkspaceSettings,
+  RegenesisResult,
 } from "./types";
 async function request<T>(
   path: string,
@@ -45,7 +48,27 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 export const api = {
-  office: () => request<{ agents: AgentActivity[]; cursor: number }>("/office"),
+  settings: () => request<WorkspaceSettings>("/settings"),
+  saveModel: (config: ModelConfig) =>
+    request<WorkspaceSettings>("/settings/model", config, "PUT"),
+  saveAgentModel: (agentId: string, config: ModelConfig) =>
+    request<WorkspaceSettings>(
+      `/settings/agents/${encodeURIComponent(agentId)}`,
+      config,
+      "PUT",
+    ),
+  removeAgentModel: (agentId: string) =>
+    request<WorkspaceSettings>(
+      `/settings/agents/${encodeURIComponent(agentId)}`,
+      undefined,
+      "DELETE",
+    ),
+  regenesis: (confirmation: string) =>
+    request<RegenesisResult>("/regenesis", { confirmation }),
+  office: () =>
+    request<{ agents: AgentActivity[]; cursor: number; generation?: string }>(
+      "/office",
+    ),
   runs: async () => {
     const data = await request<Run[] | { runs: Run[] }>("/runs");
     return Array.isArray(data) ? data : data.runs;

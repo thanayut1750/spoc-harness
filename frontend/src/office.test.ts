@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   appendEvent,
+  activeActivities,
+  displayActivity,
   initialAgents,
   normalizeAgent,
   parseActivityEvent,
   projectEvent,
+  routingSummary,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -47,6 +50,59 @@ describe("office projection", () => {
         event(2, { activity: "idle", timestamp: "2026-10-18T09:59:00Z" }),
       ),
     ).toBe(current);
+  });
+  it("stops terminal run activity without changing its recorded evidence", () => {
+    const recorded = event(3, {
+      run_id: "finished-run",
+      data: { stdout: "Acceptance tests passed" },
+    });
+    const displayed = displayActivity(recorded, { status: "succeeded" });
+    expect(displayed.activity).toBe("completed");
+    expect(activeActivities.has(displayed.activity)).toBe(false);
+    expect(displayed.summary).toContain("Run succeeded.");
+    expect(displayed.summary).toContain("Executing — Running tests");
+    expect(displayed.data).toBe(recorded.data);
+    expect(displayed.run_id).toBe("finished-run");
+    expect(recorded.activity).toBe("executing");
+    expect(recorded.summary).toBe("Running tests");
+  });
+  it("shows failure, cancellation, and paused work as inactive", () => {
+    expect(displayActivity(event(), { status: "failed" }).activity).toBe(
+      "error",
+    );
+    expect(displayActivity(event(), { status: "cancelled" }).activity).toBe(
+      "idle",
+    );
+    for (const status of ["paused", "review", "queued"]) {
+      expect(displayActivity(event(), { status }).activity).toBe("waiting");
+    }
+    expect(displayActivity(event(), undefined).activity).toBe("waiting");
+    const running = event();
+    expect(displayActivity(running, { status: "running" })).toBe(running);
+  });
+  it("keeps external webhook activity independent of harness run status", () => {
+    const external = normalizeAgent(event(4, { source: "custom-office" }));
+    expect(displayActivity(external, { status: "succeeded" })).toBe(external);
+    expect(displayActivity(external, undefined)).toBe(external);
+  });
+  it("describes only the departments and team selected by triage", () => {
+    const triage = { departments: ["engineering"], reason: "Local code fix" };
+    expect(routingSummary({ ...triage, mode: "FAST_TRACK" })).toBe(
+      "Engineering only · One worker",
+    );
+    expect(routingSummary({ ...triage, mode: "DEPARTMENTAL" })).toBe(
+      "Engineering only · Department team",
+    );
+    expect(
+      routingSummary({
+        ...triage,
+        departments: ["research", "engineering"],
+        mode: "FULL_PYRAMID",
+      }),
+    ).toBe("Research + Engineering · Full Pyramid");
+    expect(routingSummary(undefined)).toBe(
+      "Routing is chosen for each mission",
+    );
   });
   it("deduplicates deliveries and retains a bounded sequence-ordered timeline", () => {
     let events: ActivityEvent[] = [];

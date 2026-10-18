@@ -120,6 +120,57 @@ class MemoryStorage:
         self.artifacts: dict[str, dict] = {}
         self.operations: dict[str, dict] = {}
         self.jobs: dict[str, dict] = {}
+        self.settings: dict[str, dict] = {}
+        self.reset_generation = "initial"
+        self.runtime_resources: list[tuple[Any, Any]] = []
+
+    def register_runtime_resources(self, checkpointer: Any, store: Any) -> None:
+        if (checkpointer, store) not in self.runtime_resources:
+            self.runtime_resources.append((checkpointer, store))
+
+    async def get_setting(self, key: str) -> dict | None:
+        async with self.lock:
+            return copy.deepcopy(self.settings.get(key))
+
+    async def save_setting(self, key: str, value: dict) -> None:
+        async with self.lock:
+            self.settings[key] = copy.deepcopy(value)
+
+    async def delete_setting(self, key: str) -> None:
+        async with self.lock:
+            self.settings.pop(key, None)
+
+    async def get_reset_generation(self) -> str:
+        return self.reset_generation
+
+    async def reset_data(self) -> int:
+        """Caller holds the worker guard, so no graph can repopulate erased state."""
+        async with self.lock:
+            run_ids = list(self.runs)
+            for saver, store in self.runtime_resources:
+                if saver is not None:
+                    for run_id in run_ids:
+                        await saver.adelete_thread(run_id)
+                if store is not None:
+                    for namespace in await store.alist_namespaces(limit=10000):
+                        while items := await store.asearch(namespace, limit=100):
+                            for item in items:
+                                await store.adelete(item.namespace, item.key)
+            for collection in (
+                self.runs,
+                self.events,
+                self.projection,
+                self.event_ids,
+                self.commands,
+                self.notes,
+                self.artifacts,
+                self.operations,
+                self.jobs,
+                self.settings,
+            ):
+                collection.clear()
+            self.reset_generation = str(uuid4())
+            return len(run_ids)
 
     @asynccontextmanager
     async def worker_lock(self):
@@ -150,9 +201,15 @@ class MemoryStorage:
         if key:
             self.commands[key] = (fingerprint(value), copy.deepcopy(result))
 
-    async def create_run(self, payload: dict, idempotency_key: str | None = None) -> dict:
+    async def create_run(
+        self,
+        payload: dict,
+        idempotency_key: str | None = None,
+        *,
+        request_payload: dict | None = None,
+    ) -> dict:
         async with self.lock:
-            value = {"create_run": payload}
+            value = {"create_run": request_payload if request_payload is not None else payload}
             cached = self._cached(idempotency_key, value)
             if cached:
                 return cached
@@ -273,6 +330,7 @@ class MemoryStorage:
             return {
                 "agents": copy.deepcopy(list(self.projection.values())),
                 "cursor": len(self.events),
+                "generation": self.reset_generation,
             }
 
     async def register_artifact(self, metadata: dict) -> dict:
@@ -391,8 +449,10 @@ CREATE TABLE IF NOT EXISTS harness_commands (key text PRIMARY KEY, digest text N
 CREATE TABLE IF NOT EXISTS harness_notes (note_id text PRIMARY KEY, run_id text NOT NULL REFERENCES harness_runs(run_id), agent_id text, consumed boolean NOT NULL DEFAULT false, data jsonb NOT NULL);
 CREATE TABLE IF NOT EXISTS harness_artifacts (artifact_id text PRIMARY KEY, run_id text NOT NULL REFERENCES harness_runs(run_id), data jsonb NOT NULL);
 CREATE TABLE IF NOT EXISTS harness_operations (operation_id text PRIMARY KEY, run_id text NOT NULL REFERENCES harness_runs(run_id), data jsonb NOT NULL);
+CREATE TABLE IF NOT EXISTS harness_settings (key text PRIMARY KEY, data jsonb NOT NULL);
 CREATE INDEX IF NOT EXISTS harness_events_run_seq ON harness_events(run_id,seq);
 INSERT INTO harness_migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
+INSERT INTO harness_migrations(version) VALUES (2) ON CONFLICT DO NOTHING;
 """
 
 
@@ -443,11 +503,75 @@ class PostgresStorage:
         try:
             async with self.pool.connection() as conn:
                 row = await (
-                    await conn.execute("SELECT version FROM harness_migrations WHERE version=1")
+                    await conn.execute("SELECT version FROM harness_migrations WHERE version=2")
                 ).fetchone()
                 return bool(row)
         except Exception:
             return False
+
+    async def get_setting(self, key: str) -> dict | None:
+        async with self.pool.connection() as conn:
+            row = await (
+                await conn.execute("SELECT data FROM harness_settings WHERE key=%s", (key,))
+            ).fetchone()
+            return row["data"] if row else None
+
+    async def save_setting(self, key: str, value: dict) -> None:
+        async with self.pool.connection() as conn:
+            await conn.execute(
+                "INSERT INTO harness_settings(key,data) VALUES (%s,%s) ON CONFLICT(key) DO UPDATE SET data=excluded.data",
+                (key, self._json(value)),
+            )
+
+    async def delete_setting(self, key: str) -> None:
+        async with self.pool.connection() as conn:
+            await conn.execute("DELETE FROM harness_settings WHERE key=%s", (key,))
+
+    async def get_reset_generation(self) -> str:
+        value = await self.get_setting("reset_generation")
+        return value["value"] if value else "initial"
+
+    async def reset_data(self) -> int:
+        from psycopg import sql
+
+        async with self.pool.connection() as conn, conn.transaction():
+            count = await (
+                await conn.execute("SELECT count(*) AS count FROM harness_runs")
+            ).fetchone()
+            assert count is not None
+            # These tables belong to the dedicated harness database. Preserve
+            # schema/migration versions, including LangGraph's migration history.
+            names = [
+                "harness_jobs",
+                "harness_notes",
+                "harness_artifacts",
+                "harness_operations",
+                "harness_runs",
+                "harness_events",
+                "harness_projection",
+                "harness_commands",
+                "harness_settings",
+                "checkpoint_writes",
+                "checkpoint_blobs",
+                "checkpoints",
+                "store",
+                "store_vectors",
+            ]
+            existing = []
+            for name in names:
+                row = await (
+                    await conn.execute("SELECT to_regclass(%s) AS name", (name,))
+                ).fetchone()
+                if row and row["name"]:
+                    existing.append(sql.Identifier(name))
+            await conn.execute(
+                sql.SQL("TRUNCATE {} RESTART IDENTITY").format(sql.SQL(", ").join(existing))
+            )
+            await conn.execute(
+                "INSERT INTO harness_settings(key,data) VALUES ('reset_generation', %s)",
+                (self._json({"value": str(uuid4())}),),
+            )
+            return count["count"]
 
     @staticmethod
     def _json(value: Any):
@@ -476,9 +600,15 @@ class PostgresStorage:
                 (key, fingerprint(value), self._json(result)),
             )
 
-    async def create_run(self, payload: dict, idempotency_key: str | None = None) -> dict:
+    async def create_run(
+        self,
+        payload: dict,
+        idempotency_key: str | None = None,
+        *,
+        request_payload: dict | None = None,
+    ) -> dict:
         async with self.pool.connection() as conn, conn.transaction():
-            value = {"create_run": payload}
+            value = {"create_run": request_payload if request_payload is not None else payload}
             cached = await self._cached(conn, idempotency_key, value)
             if cached:
                 return cached
@@ -645,9 +775,13 @@ class PostgresStorage:
                 await conn.execute("SELECT COALESCE(MAX(seq),0) AS cursor FROM harness_events")
             ).fetchone()
             assert cursor is not None  # Aggregate SELECT returns a row even with no events.
+            generation = await (
+                await conn.execute("SELECT data FROM harness_settings WHERE key='reset_generation'")
+            ).fetchone()
             return {
                 "agents": [{"schema_version": 1, **row["data"]} for row in rows],
                 "cursor": cursor["cursor"],
+                "generation": generation["data"]["value"] if generation else "initial",
             }
 
     async def register_artifact(self, metadata: dict) -> dict:

@@ -17,6 +17,9 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from openai import AsyncOpenAI, OpenAI
 from pydantic import Field, SecretStr
 
+from org_harness.config import Settings
+from org_harness.models import ModelSelection
+
 
 def encode_message(message: BaseMessage) -> dict[str, Any]:
     role = {"human": "user", "ai": "assistant", "system": "system", "tool": "tool"}.get(
@@ -48,12 +51,13 @@ class ZaiChatModel(BaseChatModel):
     reasoning_effort: str = "max"
     timeout: float = 300
     max_tokens: int = 32768
+    protocol: str = "zai"
     client: Any = Field(default=None, exclude=True, repr=False)
     async_client: Any = Field(default=None, exclude=True, repr=False)
 
     @property
     def _llm_type(self) -> str:
-        return "zai-chat"
+        return "zai-chat" if self.protocol == "zai" else f"{self.protocol}-chat"
 
     @property
     def _identifying_params(self) -> dict[str, Any]:
@@ -61,17 +65,29 @@ class ZaiChatModel(BaseChatModel):
 
     def _request(self, messages: list[BaseMessage], **kwargs: Any) -> dict[str, Any]:
         allowed = {"tools", "tool_choice", "response_format", "temperature", "top_p"}
-        request = {
+        encoded = [encode_message(message) for message in messages]
+        if self.protocol != "zai":
+            for message in encoded:
+                message.pop("reasoning_content", None)
+        request: dict[str, Any] = {
             "model": self.model,
-            "messages": [encode_message(message) for message in messages],
-            "max_tokens": self.max_tokens,
-            "temperature": 1,
-            "top_p": 0.95,
-            "extra_body": {
+            "messages": encoded,
+        }
+        if self.protocol == "zai":
+            request.update(max_tokens=self.max_tokens, temperature=1, top_p=0.95)
+            request["extra_body"] = {
                 "reasoning_effort": self.reasoning_effort,
                 "thinking": {"type": "enabled", "clear_thinking": False},
-            },
-        }
+            }
+            if self.reasoning_effort == "none":
+                request["extra_body"] = {"thinking": {"type": "disabled"}}
+        elif self.protocol == "openai":
+            request["max_completion_tokens"] = self.max_tokens
+            request["reasoning_effort"] = self.reasoning_effort
+        else:
+            request["max_tokens"] = self.max_tokens
+            if self.reasoning_effort != "none":
+                request["extra_body"] = {"reasoning_effort": self.reasoning_effort}
         request.update({key: value for key, value in kwargs.items() if key in allowed})
         return request
 
@@ -168,3 +184,31 @@ class ZaiChatModel(BaseChatModel):
             await self.async_client.close()
         if self.client is not None:
             self.client.close()
+
+
+def create_model(settings: Settings, selection: dict | None = None) -> ZaiChatModel:
+    from urllib.parse import urlsplit
+
+    chosen = (
+        ModelSelection.model_validate(selection)
+        if selection
+        else settings.default_model_selection()
+    )
+    settings.validate_model_selection(chosen)
+    base_url, key, zai = settings.provider_connection(chosen.provider)
+    protocol = (
+        "zai"
+        if zai
+        else "openai"
+        if urlsplit(base_url).hostname == "api.openai.com"
+        else "compatible"
+    )
+    return ZaiChatModel(
+        model=chosen.model,
+        base_url=base_url,
+        api_key=key,
+        reasoning_effort=chosen.reasoning_effort,
+        timeout=settings.model_timeout,
+        max_tokens=settings.model_max_tokens,
+        protocol=protocol,
+    )

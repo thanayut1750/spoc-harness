@@ -16,6 +16,7 @@ from org_harness.models import (
     Evaluation,
     KeyResult,
     StrategicObjective,
+    TriageDecision,
     WorkPackage,
 )
 from org_harness.runtime import (
@@ -62,6 +63,8 @@ class Services:
         self.packages = None
         self.resolved_operations = 0
         self.governance_halt = None
+        self.synthesis_calls = 0
+        self.published_reports = []
 
     async def plan(self, request, constitution):
         self.planning_calls += 1
@@ -113,8 +116,12 @@ class Services:
         return evaluation(criteria)
 
     async def synthesize(self, request, objectives, outcomes):
+        self.synthesis_calls += 1
         assert all(o.status == "passed" for o in outcomes)
         return "The mission was completed with approved evidence."
+
+    async def publish_report(self, report):
+        self.published_reports.append(report)
 
     async def emit(self, *args, **kwargs):
         self.events.append((args, kwargs))
@@ -138,6 +145,25 @@ class Services:
 
     async def resolve_review(self, decision):
         self.governance_halt = None
+
+
+class TriagedServices(Services):
+    def __init__(self, mode="FAST_TRACK", department="engineering", *key_results):
+        super().__init__(*key_results)
+        self.triage_calls = 0
+        self.decision = TriageDecision(
+            mode=mode,
+            departments=(department,) if mode != "FULL_PYRAMID" else ("research", "engineering"),
+            worker_role="market_researcher" if department == "research" else "backend_coder",
+            confidence=0.95,
+            source="jev",
+            reason="Scripted typed triage",
+            max_revisions=1 if mode != "FULL_PYRAMID" else 2,
+        )
+
+    async def triage(self, request, constitution):
+        self.triage_calls += 1
+        return self.decision
 
 
 def evaluation(criteria, **updates):
@@ -211,6 +237,9 @@ async def test_parallel_departments_wait_for_approved_dependencies_and_isolate_c
         "accepted",
         "attempts",
         "work_index",
+        "execution_mode",
+        "revision_limit",
+        "direct_worker_role",
     }
 
 
@@ -843,3 +872,162 @@ def test_legacy_review_surfaces_available_evidence_without_inventing_history():
     assert "private" not in json.dumps(context)
     state["epochs"] = {"first": 7}
     assert enrich_review_context(review, state)["context"]["key_results"][0]["epoch"] == 7
+
+
+async def test_fast_track_executes_one_actual_worker_and_one_review_without_planning_models():
+    services = TriagedServices()
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert result["execution_mode"] == "FAST_TRACK"
+    assert result["active_departments"] == ["engineering"]
+    assert result["triage"]["source"] == "jev"
+    assert services.triage_calls == 1
+    assert services.planning_calls == services.synthesis_calls == 0
+    assert not services.tactical_calls
+    assert len(services.executions) == len(services.evaluations) == 1
+    assert services.executions[0][0].role == "backend_coder"
+    assert len(services.published_reports) == 1
+    assert services.published_reports[0] == result["report"]
+    assert "artifact-direct-1-v1-e0" in result["report"]
+    assert not any(
+        event[0][0] in {"planner", "research_head", "market_researcher", "data_analyst"}
+        for event in services.events
+    )
+
+
+async def test_departmental_uses_only_selected_subgraph_and_one_final_semantic_review():
+    services = TriagedServices("DEPARTMENTAL")
+    services.packages = lambda key_result: [
+        WorkPackage(
+            work_package_id=role,
+            kr_id=key_result.kr_id,
+            role=role,
+            task=f"Complete {role}",
+            acceptance_criteria=(f"{role} finished",),
+        )
+        for role in ("system_architect", "backend_coder")
+    ]
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert result["active_departments"] == ["engineering"]
+    assert services.planning_calls == services.synthesis_calls == 0
+    assert services.tactical_calls == {"direct-1": 1}
+    assert len(services.executions) == 2
+    assert len(services.evaluations) == 1
+    assert services.max_active == 1
+    assert {value[1].target_department for value in services.executions} == {"engineering"}
+
+
+async def test_full_pyramid_retains_cross_department_planners_and_gates():
+    services = TriagedServices(
+        "FULL_PYRAMID", "engineering", kr("market"), kr("code", "engineering")
+    )
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert result["active_departments"] == ["research", "engineering"]
+    assert services.planning_calls == services.synthesis_calls == 1
+    assert sum(services.tactical_calls.values()) == 2
+    assert len(services.executions) == 2
+    assert len(services.evaluations) == 4
+
+
+@pytest.mark.parametrize("mode", ["FAST_TRACK", "DEPARTMENTAL"])
+async def test_low_modes_allow_one_rework_without_executive_replan_reopening_limit(mode):
+    services = TriagedServices(mode)
+    services.judge = lambda deliverable, criteria: evaluation(
+        criteria, score=0.1, feedback="Fix missing proof"
+    )
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    assert result["revision_limit"] == 1
+    assert result["auto_replans"] == 0
+    assert len(services.executions) == len(services.evaluations) == 2
+    assert [item[0].execution_attempt for item in services.executions] == [0, 1]
+    assert result["review"]["context"]["retry_summary"]["automatic_replans_limit"] == 0
+    assert result["review"]["context"]["retry_summary"]["revision_limit"] == 1
+
+
+async def test_checkpoint_resume_keeps_persisted_mode_without_reclassifying():
+    services = TriagedServices()
+    services.command = "pause"
+    saver = InMemorySaver()
+    _, paused = await invoke(services, checkpointer=saver)
+    assert paused["status"] == "awaiting_review"
+    assert services.triage_calls == 1
+    services.command = None
+    restored = build_graph(services, checkpointer=saver)
+    result = await restored.ainvoke(Command(resume={"action": "continue"}), runtime_config("test"))
+    assert result["status"] == "completed"
+    assert services.triage_calls == 1
+    assert result["execution_mode"] == "FAST_TRACK"
+    assert len(services.executions) == len(services.evaluations) == 1
+
+
+async def test_optional_fallback_returns_to_lead_without_blocking_or_counting_partial_proof():
+    services = TriagedServices("DEPARTMENTAL")
+    services.packages = lambda key_result: [
+        WorkPackage(
+            work_package_id="optional" if not critical else "mandatory",
+            kr_id=key_result.kr_id,
+            role="system_architect" if not critical else "backend_coder",
+            task="Produce work",
+            acceptance_criteria=("Finished",),
+            critical=critical,
+        )
+        for critical in (False, True)
+    ]
+    execute = services.execute
+
+    async def with_optional_fallback(work, key_result, constitution, inputs, feedback, epoch):
+        result = await execute(work, key_result, constitution, inputs, feedback, epoch)
+        if not work.critical:
+            return result.model_copy(
+                update={
+                    "fallback": True,
+                    "confidence_score": 0,
+                    "summary": "Incomplete optional design after timeout",
+                    "artifact_ids": ("unverified-partial-note",),
+                }
+            )
+        return result
+
+    services.execute = with_optional_fallback
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert len(services.executions) == 2
+    assert len(services.evaluations) == 1
+    combined = services.evaluations[0][0]
+    assert not combined.fallback
+    assert "unverified-partial-note" not in combined.artifact_ids
+    assert "Incomplete optional design" in combined.summary
+    assert "Incomplete optional work" in result["report"]
+    attempts = result["outcomes"]["direct-1"]["attempts"]
+    optional = next(item for item in attempts if item["work_package_id"] == "optional")
+    assert not optional["approved"]
+    assert optional["evaluation"] is None
+    assert optional["artifact_ids"] == ["unverified-partial-note"]
+
+
+async def test_optional_fallback_alone_cannot_satisfy_mandatory_kr_gate():
+    services = TriagedServices("DEPARTMENTAL")
+    services.packages = lambda key_result: [
+        WorkPackage(
+            work_package_id="optional",
+            kr_id=key_result.kr_id,
+            role="backend_coder",
+            task="Optional work",
+            acceptance_criteria=("Finished",),
+            critical=False,
+        )
+    ]
+    execute = services.execute
+
+    async def fallback_only(*args):
+        return (await execute(*args)).model_copy(update={"fallback": True, "confidence_score": 0})
+
+    services.execute = fallback_only
+    _, result = await invoke(services)
+    assert result["status"] == "awaiting_review"
+    assert len(services.evaluations) == 2
+    assert all(item[0].fallback for item in services.evaluations)
+    assert not any(outcome["status"] == "passed" for outcome in result["outcomes"].values())

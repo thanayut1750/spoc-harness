@@ -127,6 +127,9 @@ export interface Run {
   status: string;
   user_request: string;
   created_at?: string;
+  model_config?: ModelConfig;
+  agent_model_configs?: Record<string, ModelConfig>;
+  triage?: { mode: string; departments: string[]; reason: string };
   epochs?: Record<string, number>;
   objectives?: Objective[];
   constitution?: {
@@ -153,6 +156,8 @@ export interface Artifact {
 }
 export interface RunInput {
   user_request: string;
+  model_config?: ModelConfig;
+  agent_model_configs?: Record<string, ModelConfig>;
   workspace_path?: string;
   constitution?: {
     mission_statement: string;
@@ -170,4 +175,29 @@ export interface ResumeInput {
   kr_id?: string;
   description?: string;
   acceptance_criteria?: string[];
+}
+export interface ModelConfig {
+  provider: string;
+  model: string;
+  reasoning_effort: string;
+}
+export interface ProviderConfig {
+  id: string;
+  label: string;
+  configured: boolean;
+  default_model: string;
+  reasoning_efforts: string[];
+}
+export interface WorkspaceSettings {
+  defaults: ModelConfig;
+  model_config: ModelConfig;
+  agent_model_configs?: Record<string, ModelConfig>;
+  providers: ProviderConfig[];
+  triage: { model: string; configured: boolean };
+  worker_timeout: number;
+}
+export interface RegenesisResult {
+  status: "reset";
+  settings: WorkspaceSettings;
+  removed_runs: number;
 }

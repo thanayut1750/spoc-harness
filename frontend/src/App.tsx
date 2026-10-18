@@ -46,12 +46,19 @@ import {
   reviewOperation,
 } from "./review";
 import { OfficeCanvas } from "./OfficeCanvas";
+import { ModelPicker } from "./ModelPicker";
+import { WorkspaceSettings } from "./WorkspaceSettings";
+import type { SettingsSection } from "./WorkspaceSettings";
+import { validModelConfig } from "./modelSettings";
 import {
   activeActivities,
   activityLabels,
+  displayActivity,
   pretty,
   progressStatus,
   roleFor,
+  routingSummary,
+  terminalStatuses,
 } from "./office";
 import { useOffice } from "./useOffice";
 import type {
@@ -62,16 +69,11 @@ import type {
   ReviewAction,
   Run,
   RunInput,
+  ModelConfig,
+  RegenesisResult,
+  WorkspaceSettings as SettingsData,
 } from "./types";
 
-const terminalStatuses = new Set([
-  "completed",
-  "succeeded",
-  "success",
-  "failed",
-  "cancelled",
-  "aborted",
-]);
 const statusTone = (status: string) =>
   ["completed", "succeeded", "passed", "success"].includes(status)
     ? "success"
@@ -158,17 +160,25 @@ function Modal({
   );
 }
 function MissionModal({
+  settings,
   onClose,
   onSubmit,
   busy,
   error,
 }: {
+  settings: SettingsData | null;
   onClose: () => void;
   onSubmit: (input: RunInput) => void;
   busy: boolean;
   error: string;
 }) {
   const [request, setRequest] = useState("");
+  const [modelConfig, setModelConfig] = useState<ModelConfig | undefined>(
+    settings?.model_config,
+  );
+  useEffect(() => {
+    if (!modelConfig && settings) setModelConfig({ ...settings.model_config });
+  }, [settings, modelConfig]);
   const [workspace, setWorkspace] = useState("");
   const [mission, setMission] = useState("");
   const [prohibited, setProhibited] = useState("");
@@ -177,6 +187,9 @@ function MissionModal({
     event.preventDefault();
     onSubmit({
       user_request: request.trim(),
+      ...(modelConfig
+        ? { model_config: { ...modelConfig, model: modelConfig.model.trim() } }
+        : {}),
       ...(workspace.trim() ? { workspace_path: workspace.trim() } : {}),
       ...(mission.trim() || prohibited.trim() || rules.trim()
         ? {
@@ -228,6 +241,42 @@ function MissionModal({
             directory.
           </small>
         </label>
+        {settings && modelConfig ? (
+          <details className="mission-model-settings">
+            <summary>
+              <Settings2 size={14} />
+              <span>
+                <strong>{modelConfig.model}</strong>
+                <small>
+                  {settings.providers.find(
+                    (provider) => provider.id === modelConfig.provider,
+                  )?.label ?? modelConfig.provider}{" "}
+                  · {modelConfig.reasoning_effort} reasoning
+                  {Object.keys(settings.agent_model_configs ?? {}).length
+                    ? ` · ${Object.keys(settings.agent_model_configs ?? {}).length} agent overrides`
+                    : ""}
+                </small>
+              </span>
+              <span className="change-model-label">Change model</span>
+              <ChevronDown size={13} />
+            </summary>
+            <p className="model-snapshot-note">
+              This selection is saved with the mission. Later default changes
+              apply to new missions.
+            </p>
+            <ModelPicker
+              settings={settings}
+              value={modelConfig}
+              onChange={setModelConfig}
+              disabled={busy}
+            />
+          </details>
+        ) : (
+          <p className="model-snapshot-note">
+            The server’s saved model configuration will be captured when this
+            mission is created.
+          </p>
+        )}
         <details className="constitution-options">
           <summary>
             <ShieldCheck size={15} /> Constitution & boundaries{" "}
@@ -273,7 +322,13 @@ function MissionModal({
           </span>
           <button
             className="primary-button"
-            disabled={busy || request.trim().length < 3}
+            disabled={
+              busy ||
+              request.trim().length < 3 ||
+              (!!settings &&
+                !!modelConfig &&
+                !validModelConfig(settings, modelConfig))
+            }
           >
             {busy ? (
               <LoaderCircle className="spin" size={16} />
@@ -582,44 +637,6 @@ function ReviewModal({
     </Modal>
   );
 }
-function IntegrationsModal({ onClose }: { onClose: () => void }) {
-  return (
-    <Modal
-      title="Bring another agent to the office"
-      subtitle="Project activity from your own tools into the connected workspace."
-      onClose={onClose}
-    >
-      <div className="integration-endpoint">
-        <span>POST</span>
-        <code>/api/integrations/events</code>
-      </div>
-      <p className="form-help">
-        Send a source-scoped event ID for deduplication. External events update
-        a character’s activity; they cannot control internal runs or approve
-        work.
-      </p>
-      <pre className="code-block">
-        {JSON.stringify(
-          {
-            event_id: "agent-event-001",
-            source: "my-integration",
-            agent_id: "design-agent",
-            activity: "writing",
-            summary: "Preparing design notes",
-            timestamp: new Date().toISOString(),
-            data: {},
-          },
-          null,
-          2,
-        )}
-      </pre>
-      <p className="form-help">
-        Activities: idle, planning, reading, writing, executing, reviewing,
-        waiting, completed, error. Credentials stay server-side.
-      </p>
-    </Modal>
-  );
-}
 function Pyramid({ run }: { run: Run | null }) {
   const results = run?.objectives?.flatMap((o) => o.key_results) ?? [];
   const passed = results.filter((r) =>
@@ -733,7 +750,7 @@ function Pyramid({ run }: { run: Run | null }) {
       )}
       <div className="sidebar-note">
         <span className="small-dot" />
-        Two departments · Two concurrent work packages
+        {routingSummary(run?.triage)}
       </div>
     </>
   );
@@ -987,37 +1004,49 @@ export default function App() {
   const [selected, setSelected] = useState("executive");
   const [view, setView] = useState<"office" | "list">("office");
   const [modal, setModal] = useState<
-    "mission" | "review" | "integrations" | "report" | null
+    "mission" | "review" | "settings" | "report" | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
   const [filter, setFilter] = useState("");
   const [department, setDepartment] = useState("all");
+  const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("model");
+  const [officeVersion, setOfficeVersion] = useState(0);
+  const dataEpoch = useRef(0);
   const selectedRun = useRef(runId);
   useEffect(() => {
     selectedRun.current = runId;
   }, [runId]);
   const refreshRuns = useCallback(async () => {
+    const epoch = dataEpoch.current;
     try {
       const items = await api.runs();
+      if (epoch !== dataEpoch.current) return;
       setRuns(items);
       setRunId((current) => current || items[0]?.run_id || "");
     } catch (failure) {
+      if (epoch !== dataEpoch.current) return;
       setError(failure instanceof Error ? failure.message : "Cannot load runs");
     }
   }, []);
   const refreshDetail = useCallback(async (id: string) => {
+    const epoch = dataEpoch.current;
     try {
       const [detail, files] = await Promise.all([
         api.run(id),
         api.artifacts(id),
       ]);
-      if (selectedRun.current === id) {
+      if (epoch === dataEpoch.current && selectedRun.current === id) {
         setRun(detail);
         setArtifacts(files);
       }
     } catch (failure) {
+      if (epoch !== dataEpoch.current) return;
       setError(
         failure instanceof Error ? failure.message : "Cannot load mission",
       );
@@ -1035,7 +1064,58 @@ export default function App() {
     },
     [refreshDetail, refreshRuns],
   );
-  const office = useOffice(onEvent);
+  const reloadSettings = useCallback(async () => {
+    const epoch = dataEpoch.current;
+    setSettingsLoading(true);
+    setSettingsError("");
+    try {
+      const result = await api.settings();
+      if (epoch === dataEpoch.current) setSettings(result);
+    } catch (failure) {
+      if (epoch === dataEpoch.current)
+        setSettingsError(
+          failure instanceof Error
+            ? failure.message
+            : "Settings are unavailable",
+        );
+    } finally {
+      if (epoch === dataEpoch.current) setSettingsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    void reloadSettings();
+  }, [reloadSettings]);
+  const clearClientData = useCallback(() => {
+    dataEpoch.current += 1;
+    clearTimeout(debounce.current);
+    selectedRun.current = "";
+    setRunId("");
+    setRun(null);
+    setRuns([]);
+    setArtifacts([]);
+    setSelected("executive");
+    setView("office");
+    setFilter("");
+    setDepartment("all");
+    setError("");
+    setModalError("");
+    setModal((current) => (current === "settings" ? current : null));
+    setOfficeVersion((version) => version + 1);
+  }, []);
+  const onOfficeReset = useCallback(() => {
+    clearClientData();
+    void reloadSettings();
+    void refreshRuns();
+  }, [clearClientData, reloadSettings, refreshRuns]);
+  const office = useOffice(onEvent, officeVersion, onOfficeReset);
+  async function regenesis(confirmation: string): Promise<RegenesisResult> {
+    const result = await api.regenesis(confirmation);
+    clearClientData();
+    setSettings(result.settings);
+    setSettingsError("");
+    setSettingsLoading(false);
+    return result;
+  }
   useEffect(() => {
     void refreshRuns();
     const timer = setInterval(() => void refreshRuns(), 10000);
@@ -1052,7 +1132,12 @@ export default function App() {
     const timer = setInterval(() => void refreshDetail(runId), 5000);
     return () => clearInterval(timer);
   }, [runId, refreshDetail]);
-  const allAgents = Object.values(office.agents);
+  const activityRuns = new Map(runs.map((item) => [item.run_id, item]));
+  if (run && !terminalStatuses.has(activityRuns.get(run.run_id)?.status ?? ""))
+    activityRuns.set(run.run_id, run);
+  const allAgents = Object.values(office.agents).map((agent) =>
+    displayActivity(agent, activityRuns.get(agent.run_id ?? "")),
+  );
   const agents = allAgents.filter(
     (agent) =>
       (department === "all" ||
@@ -1065,7 +1150,8 @@ export default function App() {
   const active = allAgents.filter((agent) =>
     activeActivities.has(agent.activity),
   ).length;
-  const selectedAgent = office.agents[selected] ?? allAgents[0];
+  const selectedAgent =
+    allAgents.find((agent) => agent.agent_id === selected) ?? allAgents[0];
   const events = office.events.filter(
     (event) => !runId || event.run_id === runId || !event.run_id,
   );
@@ -1140,8 +1226,11 @@ export default function App() {
           </span>
           <button
             className="icon-button"
-            aria-label="Integration settings"
-            onClick={() => setModal("integrations")}
+            aria-label="Workspace settings"
+            onClick={() => {
+              setSettingsSection("model");
+              setModal("settings");
+            }}
           >
             <Settings2 size={17} />
           </button>
@@ -1165,7 +1254,10 @@ export default function App() {
           <Pyramid run={run} />
           <button
             className="integration-card"
-            onClick={() => setModal("integrations")}
+            onClick={() => {
+              setSettingsSection("connections");
+              setModal("settings");
+            }}
           >
             <Webhook size={18} />
             <span>
@@ -1253,6 +1345,57 @@ export default function App() {
               </button>
             </div>
           </div>
+          {run && (run.model_config || run.triage) && (
+            <details className="run-configuration">
+              <summary>
+                <Settings2 size={12} />
+                {run.model_config && (
+                  <span>
+                    {run.model_config.model}
+                    <small>{run.model_config.reasoning_effort} reasoning</small>
+                  </span>
+                )}
+                {run.triage && (
+                  <span className="triage-mode">
+                    Team: {pretty(run.triage.mode)}
+                  </span>
+                )}
+                <ChevronDown size={12} />
+              </summary>
+              <div>
+                {run.model_config && (
+                  <p>
+                    Model snapshot: {run.model_config.provider} /{" "}
+                    {run.model_config.model} ·{" "}
+                    {run.model_config.reasoning_effort}
+                  </p>
+                )}
+                {Object.entries(run.agent_model_configs ?? {}).length > 0 && (
+                  <div className="run-agent-overrides">
+                    <p>Saved agent overrides</p>
+                    {Object.entries(run.agent_model_configs ?? {}).map(
+                      ([agent, config]) => (
+                        <p key={agent}>
+                          {roleFor(agent).name}: {config.model} ·{" "}
+                          {config.reasoning_effort}
+                        </p>
+                      ),
+                    )}
+                  </div>
+                )}
+                {run.triage && (
+                  <>
+                    <p>{run.triage.reason}</p>
+                    <p>
+                      Departments:{" "}
+                      {run.triage.departments.map(pretty).join(", ") ||
+                        "No departments assigned"}
+                    </p>
+                  </>
+                )}
+              </div>
+            </details>
+          )}
           <details className="mobile-strategy">
             <summary>
               <Layers3 size={14} /> Strategic pyramid <ChevronDown size={13} />
@@ -1466,7 +1609,7 @@ export default function App() {
         <aside className="inspector" aria-label="Selected agent">
           {selectedAgent && (
             <Inspector
-              key={selectedAgent.agent_id}
+              key={`${officeVersion}:${selectedAgent.agent_id}`}
               agent={selectedAgent}
               events={office.events}
               artifacts={artifacts}
@@ -1484,6 +1627,7 @@ export default function App() {
       </div>
       {modal === "mission" && (
         <MissionModal
+          settings={settings}
           onClose={() => setModal(null)}
           onSubmit={(input) => void create(input)}
           busy={busy}
@@ -1503,8 +1647,24 @@ export default function App() {
           error={modalError}
         />
       )}{" "}
-      {modal === "integrations" && (
-        <IntegrationsModal onClose={() => setModal(null)} />
+      {modal === "settings" && (
+        <Modal
+          title="Workspace settings"
+          subtitle="Choose how new missions run and manage this local harness."
+          onClose={() => setModal(null)}
+          wide
+          className="settings-modal"
+        >
+          <WorkspaceSettings
+            settings={settings}
+            loading={settingsLoading}
+            loadError={settingsError}
+            initialSection={settingsSection}
+            onSaved={setSettings}
+            onRegenesis={regenesis}
+            onReload={() => void reloadSettings()}
+          />
+        </Modal>
       )}{" "}
       {modal === "report" && run && (
         <Modal

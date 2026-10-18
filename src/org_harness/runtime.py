@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal, Protocol, TypedDict
+from typing import Annotated, Any, Literal, Protocol, TypedDict, cast
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -21,15 +21,19 @@ from org_harness.models import (
     AttemptRecord,
     Constitution,
     Deliverable,
+    Department,
     DepartmentOutcome,
     Escalation,
     EscalationSignal,
     Evaluation,
     KeyResult,
     ReviewDecision,
+    Role,
     StrategicObjective,
+    TriageDecision,
     WorkPackage,
 )
+from org_harness.triage import conservative_triage
 
 JSON = dict[str, Any]
 ROLES = {
@@ -103,6 +107,10 @@ class ExecutiveState(TypedDict, total=False):
     report: str
     status: str
     route: str
+    triage: JSON
+    execution_mode: str
+    active_departments: list[str]
+    revision_limit: int
 
 
 class DepartmentState(TypedDict, total=False):
@@ -122,6 +130,9 @@ class DepartmentState(TypedDict, total=False):
     evaluation: JSON
     outcome: JSON
     route: str
+    execution_mode: str
+    revision_limit: int
+    direct_worker_role: str
 
 
 class WorkerState(TypedDict, total=False):
@@ -136,6 +147,7 @@ class WorkerState(TypedDict, total=False):
     evaluation: JSON
     escalation: JSON
     approved: bool
+    execution_mode: str
 
 
 def initial_state(
@@ -213,6 +225,7 @@ def gate_approved(
     return (
         evaluation.passed_constitution
         and not evaluation.constitution_violations
+        and not deliverable.fallback
         and evaluation.passed_kr_criteria
         and evaluation.score >= 0.8
         and getattr(evaluation, "deterministic_checks_passed", True)
@@ -271,6 +284,11 @@ def department_context(state: ExecutiveState, kr: KeyResult) -> DepartmentState:
         "revisions": 0,
         "accepted": [],
         "attempts": {},
+        "execution_mode": state.get("execution_mode", "FULL_PYRAMID"),
+        "revision_limit": state.get(
+            "revision_limit", Constitution.model_validate(state["constitution"]).max_revision_loops
+        ),
+        "direct_worker_role": state.get("triage", {}).get("worker_role", "backend_coder"),
         "work_index": 0,
     }
 
@@ -288,6 +306,7 @@ def worker_context(state: DepartmentState, work: WorkPackage) -> WorkerState:
         "epoch": state["epoch"],
         "inputs": state.get("inputs", []) + state.get("accepted", []),
         "feedback": state.get("feedback", "")[-12000:],
+        "execution_mode": state.get("execution_mode", "FULL_PYRAMID"),
     }
 
 
@@ -383,9 +402,15 @@ def _attempt(
         artifact_ids=deliverable.artifact_ids[:32] if deliverable else (),
         evidence=tuple(item[:600] for item in deliverable.evidence[:8]) if deliverable else (),
         evaluation=_compact_evaluation(evaluation),
-        reason=(escalation.reason if escalation else evaluation.feedback if evaluation else "")[
-            :2000
-        ],
+        reason=(
+            escalation.reason
+            if escalation
+            else evaluation.feedback
+            if evaluation
+            else "Optional assignment incomplete; lead continued without approving it."
+            if deliverable and deliverable.fallback
+            else ""
+        )[:2000],
         approved=approved,
     )
 
@@ -614,8 +639,10 @@ def enrich_review_context(
         "blockers": blockers,
         "retry_summary": {
             "automatic_replans_used": state.get("auto_replans"),
-            "automatic_replans_limit": 1,
-            "revision_limit": constitution.max_revision_loops,
+            "automatic_replans_limit": 1
+            if state.get("execution_mode", "FULL_PYRAMID") == "FULL_PYRAMID"
+            else 0,
+            "revision_limit": state.get("revision_limit", constitution.max_revision_loops),
             "attempts_recorded": len(history) or sum(len(item["attempts"]) for item in key_results),
         },
         "action_implications": {
@@ -627,6 +654,8 @@ def enrich_review_context(
             len([item for item in history.values() if item.get("kr_id") == key]) > 6
             for key in selected
         ),
+        "execution_mode": state.get("execution_mode", "FULL_PYRAMID"),
+        "active_departments": state.get("active_departments", ["research", "engineering"]),
     }
     if review.get("operation"):
         operation = review["operation"]
@@ -693,7 +722,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         notes = await services.notes(work.role)
         feedback = "\n".join([state.get("feedback", ""), *notes])[-12000:]
         await services.emit(
-            f"{kr.target_department}_head",
+            "triage_router"
+            if state.get("execution_mode") == "FAST_TRACK"
+            else f"{kr.target_department}_head",
             "planning",
             f"Assign {work.work_package_id[:128]}",
             kr_id=kr.kr_id,
@@ -731,13 +762,28 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 ).model_dump(mode="json"),
                 "approved": False,
             }
+        if result.fallback and work.critical:
+            return {
+                "deliverable": result.model_dump(mode="json"),
+                "approved": False,
+                "escalation": _escalation(
+                    state,
+                    "invalid_output",
+                    "A mandatory assignment returned an incomplete fallback.",
+                ).model_dump(mode="json"),
+            }
         await services.emit(
             work.role,
-            "completed",
-            "Specialist deliverable submitted",
+            "waiting" if result.fallback else "completed",
+            "Optional assignment incomplete; returned to department lead"
+            if result.fallback
+            else "Specialist deliverable submitted",
             kr_id=kr.kr_id,
             artifact_ids=list(result.artifact_ids),
-            target_agent_id=f"{kr.target_department}_gatekeeper",
+            target_agent_id=f"{kr.target_department}_head"
+            if result.fallback
+            else f"{kr.target_department}_gatekeeper",
+            fallback=result.fallback,
         )
         return {"deliverable": result.model_dump(mode="json")}
 
@@ -748,6 +794,32 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             return {"escalation": escalation.model_dump(mode="json"), "approved": False}
         work = WorkPackage.model_validate(state["work"])
         deliverable = Deliverable.model_validate(state["deliverable"])
+        if deliverable.fallback:
+            # Optional fallback is evidence for the lead, not successful work.
+            # The complete KR still has to pass every mandatory acceptance gate.
+            return {"approved": False}
+        if state.get("execution_mode") in {"FAST_TRACK", "DEPARTMENTAL"}:
+            valid = bool(deliverable.summary.strip()) and bool(
+                deliverable.artifact_ids or any(item.strip() for item in deliverable.evidence)
+            )
+            if valid:
+                await services.emit(
+                    f"{deliverable.department}_gatekeeper",
+                    "waiting",
+                    "Deliverable received; final KR review follows",
+                    kr_id=deliverable.kr_id,
+                )
+                return {"approved": True}
+            evaluation = Evaluation(
+                passed_constitution=True,
+                passed_kr_criteria=False,
+                score=0,
+                feedback="The worker did not supply a substantive summary and recorded evidence.",
+                criterion_results=dict.fromkeys(work.acceptance_criteria, False),
+                recommended_action="retry_worker",
+                deterministic_checks_passed=False,
+            )
+            return {"approved": False, "evaluation": evaluation.model_dump(mode="json")}
         await services.emit(
             f"{deliverable.department}_gatekeeper",
             "reviewing",
@@ -787,7 +859,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             f"Work package {work.work_package_id}: "
             + ("approved" if update["approved"] else "rejected"),
             kr_id=deliverable.kr_id,
-            evaluation=evaluation.model_dump(mode="json"),
+            evaluation=(_compact_evaluation(evaluation) or evaluation).model_dump(mode="json"),
         )
         return update
 
@@ -803,6 +875,20 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         if escalation := await boundary(state):
             return {"outcome": _outcome(state, escalation=escalation), "route": "done"}
         kr = KeyResult.model_validate(state["kr"])
+        if state.get("execution_mode") == "FAST_TRACK":
+            package = WorkPackage(
+                work_package_id=f"{kr.kr_id}-direct",
+                kr_id=kr.kr_id,
+                role=cast(Role, state["direct_worker_role"]),
+                task=kr.description,
+                acceptance_criteria=kr.acceptance_criteria,
+            )
+            return {
+                "work_packages": [package.model_dump(mode="json")],
+                "work_index": 0,
+                "accepted": [],
+                "route": "worker",
+            }
         notes = await services.notes(f"{kr.target_department}_head")
         feedback = "\n".join([state.get("feedback", ""), *notes])[-12000:]
         await services.emit(
@@ -885,7 +971,10 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 ),
                 "route": "done",
             }
-        if result.get("approved"):
+        if result.get("approved") or (
+            result.get("deliverable", {}).get("fallback")
+            and not state["work_packages"][state["work_index"]].get("critical", True)
+        ):
             accepted = [*state.get("accepted", []), result["deliverable"]]
             index = state["work_index"] + 1
             return {
@@ -905,7 +994,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         evaluation: Evaluation | None = None,
     ) -> JSON:
         constitution = Constitution.model_validate(state["constitution"])
-        if state.get("revisions", 0) >= constitution.max_revision_loops:
+        if state.get("revisions", 0) >= state.get(
+            "revision_limit", constitution.max_revision_loops
+        ):
             return {
                 "outcome": _outcome(
                     state,
@@ -947,9 +1038,18 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             department=kr.target_department,
             worker_role=f"{kr.target_department}_head",
             summary="\n\n".join(item.summary for item in accepted),
-            artifact_ids=tuple(dict.fromkeys(a for item in accepted for a in item.artifact_ids)),
-            evidence=tuple(dict.fromkeys(e for item in accepted for e in item.evidence)),
-            confidence_score=min(item.confidence_score for item in accepted),
+            artifact_ids=tuple(
+                dict.fromkeys(
+                    a for item in accepted if not item.fallback for a in item.artifact_ids
+                )
+            ),
+            evidence=tuple(
+                dict.fromkeys(e for item in accepted if not item.fallback for e in item.evidence)
+            ),
+            confidence_score=min(
+                (item.confidence_score for item in accepted if not item.fallback), default=0
+            ),
+            fallback=all(item.fallback for item in accepted),
         )
         await services.emit(
             f"{kr.target_department}_gatekeeper",
@@ -997,7 +1097,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "completed" if approved else "error",
             f"Complete KR {kr.kr_id}: " + ("approved" if approved else "rejected"),
             kr_id=kr.kr_id,
-            evaluation=evaluation.model_dump(mode="json"),
+            evaluation=(_compact_evaluation(evaluation) or evaluation).model_dump(mode="json"),
         )
         if violation:
             return {
@@ -1012,7 +1112,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             }
         if approved:
             await services.emit(
-                f"{kr.target_department}_head",
+                f"{kr.target_department}_gatekeeper"
+                if state.get("execution_mode") == "FAST_TRACK"
+                else f"{kr.target_department}_head",
                 "completed",
                 f"KR {kr.kr_id} passed",
                 kr_id=kr.kr_id,
@@ -1044,11 +1146,101 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     )
     department = department_builder.compile(checkpointer=None)
 
+    async def triage(state: ExecutiveState) -> JSON:
+        if await services.control() == "cancel":
+            return {"status": "cancelled", "route": "finish"}
+        constitution = Constitution.model_validate(state["constitution"])
+        if state.get("triage"):
+            decision = TriageDecision.model_validate(state["triage"])
+        elif state.get("objectives"):
+            decision = conservative_triage(
+                constitution,
+                "Existing strategic plan retained without reclassification.",
+                source="legacy",
+            )
+        else:
+            await services.emit("triage_router", "planning", "Select execution workflow")
+            classify = getattr(services, "triage", None)
+            try:
+                decision = (
+                    TriageDecision.model_validate(
+                        await asyncio.wait_for(
+                            classify(state["user_request"], constitution),
+                            timeout=8,
+                        )
+                    )
+                    if classify
+                    else conservative_triage(
+                        constitution, "Legacy services retain the full workflow.", source="legacy"
+                    )
+                )
+            except Exception as exc:
+                decision = conservative_triage(
+                    constitution,
+                    f"Triage unavailable ({type(exc).__name__}); full workflow retained.",
+                )
+        if decision.mode != "FULL_PYRAMID" and len(set(decision.departments)) != 1:
+            decision = conservative_triage(
+                constitution, "Multi-department request requires the full workflow."
+            )
+        departments = (
+            ("research", "engineering") if decision.mode == "FULL_PYRAMID" else decision.departments
+        )
+        role = decision.worker_role
+        if decision.mode != "FULL_PYRAMID" and role not in ROLES[departments[0]]:
+            role = "backend_coder" if departments[0] == "engineering" else "market_researcher"
+        limit = min(
+            decision.max_revisions,
+            constitution.max_revision_loops,
+            1 if decision.mode != "FULL_PYRAMID" else constitution.max_revision_loops,
+        )
+        decision = decision.model_copy(
+            update={"departments": departments, "worker_role": role, "max_revisions": limit}
+        )
+        await services.emit(
+            "triage_router",
+            "completed",
+            f"Selected {decision.mode}",
+            execution_mode=decision.mode,
+            active_departments=list(departments),
+            confidence=decision.confidence,
+            source=decision.source,
+        )
+        return {
+            "triage": decision.model_dump(mode="json"),
+            "execution_mode": decision.mode,
+            "active_departments": list(departments),
+            "revision_limit": limit,
+            "route": "plan",
+        }
+
     async def plan(state: ExecutiveState) -> JSON:
         if state.get("objectives"):
-            return {}
+            return {"route": "coordinate"}
         if await services.control() == "cancel":
             return {"status": "cancelled", "route": "finish", "review": None}
+        if state.get("execution_mode") in {"FAST_TRACK", "DEPARTMENTAL"}:
+            key_result = KeyResult(
+                kr_id="direct-1",
+                description=state["user_request"],
+                target_department=cast(Department, state["active_departments"][0]),
+                acceptance_criteria=(
+                    "Complete every requirement in the user's request: " + state["user_request"],
+                    "Provide recorded artifacts or verification evidence demonstrating the requested result.",
+                ),
+            )
+            objective = StrategicObjective(
+                objective_id="objective-direct",
+                title="Deliver requested result",
+                key_results=(key_result,),
+            )
+            return {
+                "objectives": [objective.model_dump(mode="json")],
+                "epochs": {key_result.kr_id: 0},
+                "progress": {key_result.kr_id: "pending"},
+                "auto_replans": state.get("auto_replans", 0),
+                "route": "coordinate",
+            }
         await services.emit("planner", "planning", "Create Strategic Pyramid")
         notes = await services.notes("planner")
         request = "\n".join([state["user_request"], *notes])
@@ -1122,7 +1314,12 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             cancelled = next((e for e in escalations if e.kind == "cancelled"), None)
             if cancelled:
                 return {"status": "cancelled", "route": "finish", "review": None}
-            if not violation and not unknown and state.get("auto_replans", 0) == 0:
+            if (
+                not violation
+                and not unknown
+                and state.get("auto_replans", 0) == 0
+                and state.get("execution_mode", "FULL_PYRAMID") == "FULL_PYRAMID"
+            ):
                 return {"route": "replan"}
             kind = (
                 "constitution_violation"
@@ -1157,14 +1354,18 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 "report": "No runnable key results; dependency scheduling cannot advance.",
             }
         halt(state["run_id"]).clear()
-        await services.emit("executive", "planning", f"Dispatch {len(selected)} ready key results")
+        mode = state.get("execution_mode", "FULL_PYRAMID")
+        coordinator = "executive" if mode == "FULL_PYRAMID" else "triage_router"
+        await services.emit(coordinator, "planning", f"Dispatch {len(selected)} ready key results")
         for kr in selected:
             await services.emit(
-                "executive",
+                coordinator,
                 "planning",
                 f"Dispatch KR {kr.kr_id}",
                 kr_id=kr.kr_id,
-                target_agent_id=f"{kr.target_department}_head",
+                target_agent_id=state.get("triage", {}).get("worker_role", "backend_coder")
+                if mode == "FAST_TRACK"
+                else f"{kr.target_department}_head",
             )
         notes = await services.notes("executive")
         dispatches = [department_context(state, kr) for kr in selected]
@@ -1308,9 +1509,30 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         status = state.get("status", "failed")
         objectives = [StrategicObjective.model_validate(o) for o in state.get("objectives", [])]
         report = state.get("report", "")
+        publish = None
         if status == "completed":
             try:
-                report = await services.synthesize(state["user_request"], objectives, outcomes)
+                if state.get("execution_mode", "FULL_PYRAMID") == "FULL_PYRAMID":
+                    report = await services.synthesize(state["user_request"], objectives, outcomes)
+                else:
+                    lines = ["# Execution report", "", f"Workflow: {state['execution_mode']}", ""]
+                    for outcome in outcomes:
+                        if outcome.deliverable:
+                            lines.append(outcome.deliverable.summary)
+                            lines.extend(
+                                f"- [Artifact {artifact_id}](/api/artifacts/{artifact_id})"
+                                for artifact_id in outcome.deliverable.artifact_ids
+                            )
+                        caveats = [
+                            item
+                            for item in outcome.attempts
+                            if not item.approved and item.evaluation is None and item.reason
+                        ]
+                        if caveats:
+                            lines.extend(["", "Incomplete optional work:"])
+                            lines.extend(f"- {item.role}: {item.summary}" for item in caveats)
+                    report = "\n".join(lines)
+                    publish = getattr(services, "publish_report", None)
             except EscalationSignal as exc:
                 status = "failed"
                 report = f"Final report synthesis failed ({exc.kind}): {exc.reason}"
@@ -1322,6 +1544,12 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 for o in outcomes
             )
             report = f"{report}\n\nApproval evidence\n{ledger}"
+            if publish and status == "completed":
+                try:
+                    await publish(report)
+                except EscalationSignal as exc:
+                    status = "failed"
+                    report = f"Report publication failed ({exc.kind}): {exc.reason}\n\n{report}"
         elif not report:
             report = (
                 f"Run {status}. {sum(o.status == 'passed' for o in outcomes)} key results passed."
@@ -1332,13 +1560,17 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         return {"report": report, "status": status}
 
     builder = StateGraph(ExecutiveState)
+    builder.add_node("triage", triage)
     builder.add_node("plan", plan)
     builder.add_node("coordinate", coordinate)
     builder.add_node("department", run_department)
     builder.add_node("replan", replan)
     builder.add_node("review", human_review)
     builder.add_node("finish", finish)
-    builder.add_edge(START, "plan")
+    builder.add_edge(START, "triage")
+    builder.add_conditional_edges(
+        "triage", lambda state: state["route"], {"plan": "plan", "finish": "finish"}
+    )
     builder.add_conditional_edges(
         "plan",
         lambda state: state.get("route", "coordinate"),

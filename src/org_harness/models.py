@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Department = Literal["research", "engineering"]
+ExecutionMode = Literal["FAST_TRACK", "DEPARTMENTAL", "FULL_PYRAMID"]
 Activity = Literal[
     "idle",
     "planning",
@@ -17,6 +18,18 @@ Activity = Literal[
     "error",
 ]
 Role = Literal["market_researcher", "data_analyst", "system_architect", "backend_coder"]
+ConfigurableAgent = Literal[
+    "planner",
+    "executive",
+    "research_head",
+    "engineering_head",
+    "research_gatekeeper",
+    "engineering_gatekeeper",
+    "market_researcher",
+    "data_analyst",
+    "system_architect",
+    "backend_coder",
+]
 
 
 class Contract(BaseModel):
@@ -37,6 +50,23 @@ class RunLimits(Contract):
     max_tool_calls: int = Field(default=200, ge=1, le=100000)
     worker_model_calls: int = Field(default=12, ge=1, le=100)
     command_timeout: int = Field(default=300, ge=1, le=86400)
+    worker_timeout: float = Field(default=60, ge=0.01, le=600)
+
+
+class ModelSelection(Contract):
+    provider: Literal["configured", "zai", "openai", "openai_compatible"] = "configured"
+    model: str = Field(min_length=1, max_length=200, pattern=r"^[^\s\x00-\x1f]+$")
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] = "medium"
+
+
+class TriageDecision(Contract):
+    mode: ExecutionMode
+    departments: tuple[Department, ...] = Field(min_length=1, max_length=2)
+    worker_role: Role
+    confidence: float = Field(ge=0, le=1)
+    source: Literal["jev", "fallback", "legacy"]
+    reason: str
+    max_revisions: int = Field(ge=0, le=10)
 
 
 class KeyResult(Contract):
@@ -65,6 +95,7 @@ class WorkPackage(Contract):
     task: str = Field(min_length=1)
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
     execution_attempt: int = Field(default=0, ge=0)
+    critical: bool = True
 
 
 class TacticalPlan(Contract):
@@ -86,6 +117,7 @@ class Deliverable(Contract):
     artifact_ids: tuple[str, ...] = ()
     evidence: tuple[str, ...] = ()
     confidence_score: float = Field(default=0.5, ge=0, le=1)
+    fallback: bool = False
 
 
 class Evaluation(Contract):
@@ -144,6 +176,8 @@ class RunCreate(Contract):
     workspace_path: str | None = None
     constitution: Constitution = Field(default_factory=Constitution)
     limits: RunLimits = Field(default_factory=RunLimits)
+    model_config_selection: ModelSelection | None = Field(default=None, alias="model_config")
+    agent_model_configs: dict[ConfigurableAgent, ModelSelection] | None = None
 
 
 class ReviewDecision(Contract):

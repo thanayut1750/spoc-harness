@@ -31,9 +31,10 @@ from org_harness.models import (
     StrategicObjective,
     StrategicPlan,
     TacticalPlan,
+    TriageDecision,
     WorkPackage,
 )
-from org_harness.providers import ZaiChatModel
+from org_harness.providers import ZaiChatModel, create_model
 from org_harness.storage import BudgetExceeded, NotFoundError
 from org_harness.tools import Artifacts, HostTools
 
@@ -114,27 +115,56 @@ class WorkerPolicy(AgentMiddleware):
         return None
 
 
+class WorkerHostTools(HostTools):
+    """Identify this worker's host commands when cancellation leaves uncertain effects."""
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.command_operations: set[str] = set()
+
+    async def run_command(
+        self,
+        call_id: str,
+        command: str,
+        cwd: str | None = None,
+        timeout: int | None = None,
+    ) -> dict:
+        self.command_operations.add(self.operation_id(call_id, "run_command"))
+        return await super().run_command(call_id, command, cwd, timeout)
+
+
 class AgentServices:
     def __init__(self, settings: Settings, storage: Any, run: dict):
         self.settings, self.storage, self.run = settings, storage, run
         self.run_id = run["run_id"]
         self.limits = RunLimits.model_validate(run.get("limits", {}))
         self.artifacts = Artifacts(storage, settings.data_dir, self.run_id)
-        self.model = ZaiChatModel(
-            model=settings.main_model,
-            base_url=settings.openai_base_url,
-            api_key=settings.openai_api_key,
-            reasoning_effort=settings.reasoning_effort,
-            timeout=settings.model_timeout,
-            max_tokens=settings.model_max_tokens,
-        )
+        self.model = create_model(settings, run.get("model_config"))
+        self._role_models: dict[str, ZaiChatModel] = {}
         self._contexts = AsyncExitStack()
         self._mcp: dict[str, Any] = {}
         self._mcp_lock = asyncio.Lock()
 
+    def model_for(self, agent_id: str | None = None) -> ZaiChatModel:
+        """Resolve only public saved selections; server settings hold credentials."""
+        overrides = self.run.get("agent_model_configs", {})
+        if not agent_id or not overrides.get(agent_id):
+            return self.model
+        if agent_id not in self._role_models:
+            self._role_models[agent_id] = create_model(self.settings, overrides[agent_id])
+        return self._role_models[agent_id]
+
     async def close(self) -> None:
-        await self._contexts.aclose()
-        await self.model.aclose()
+        models = {id(model): model for model in [self.model, *self._role_models.values()]}
+        try:
+            await self._contexts.aclose()
+        finally:
+            results = await asyncio.gather(
+                *(model.aclose() for model in models.values()), return_exceptions=True
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
 
     async def emit(self, agent_id: str, activity: str, summary: str, **data: Any) -> None:
         kr_id = data.pop("kr_id", None)
@@ -203,7 +233,10 @@ class AgentServices:
                 await asyncio.sleep(0.5 * 2**attempt)
         raise AssertionError("Unreachable")
 
-    async def structured(self, schema: type[T], instruction: str, payload: Any) -> T:
+    async def structured(
+        self, schema: type[T], instruction: str, payload: Any, *, agent_id: str | None = None
+    ) -> T:
+        model = self.model_for(agent_id)
         messages = [
             SystemMessage(
                 content=(
@@ -216,7 +249,7 @@ class AgentServices:
         ]
         for attempt in range(2):
             answer = await self.model_request(
-                lambda: self.model.ainvoke(messages, response_format={"type": "json_object"})
+                lambda: model.ainvoke(messages, response_format={"type": "json_object"})
             )
             try:
                 if answer.response_metadata.get("finish_reason") == "length":
@@ -238,6 +271,11 @@ class AgentServices:
                     ]
                 )
         raise AssertionError("Unreachable")
+
+    async def triage(self, user_request: str, constitution: Constitution) -> TriageDecision:
+        from org_harness.triage import TriageRouter
+
+        return await TriageRouter(self.settings).classify(user_request, constitution)
 
     async def plan(self, user_request: str, constitution: Constitution) -> list[StrategicObjective]:
         if self.settings.harness_test_mode:
@@ -275,6 +313,7 @@ class AgentServices:
             "Acceptance criteria must be practical to verify with the available local tools. "
             "The constitution is immutable. Do not promise work outside the user's objective.",
             {"user_request": user_request, "constitution": constitution.model_dump()},
+            agent_id="planner",
         )
         return list(result.objectives)
 
@@ -304,6 +343,8 @@ class AgentServices:
             "Avoid separate specification work unless it materially helps the objective. "
             f"Permitted roles: {', '.join(roles)}. Each assignment needs measurable tactical acceptance criteria. "
             "Do not add stricter numerical targets or unrelated requirements beyond the KR. "
+            "Mark critical=false only for genuinely optional supporting work whose absence must not "
+            "waive any mandatory KR criterion; required work remains critical=true. "
             "Do not change the KR or constitution. Use feedback to correct rejected work.",
             {
                 "kr": kr.model_dump(),
@@ -311,6 +352,7 @@ class AgentServices:
                 "approved_inputs": [item.model_dump() for item in inputs],
                 "feedback": feedback,
             },
+            agent_id=f"{kr.target_department}_head",
         )
         return list(result.work_packages)
 
@@ -389,7 +431,7 @@ class AgentServices:
         feedback: str,
         epoch: int,
     ) -> Deliverable:
-        host = HostTools(
+        host = WorkerHostTools(
             self.storage,
             self.artifacts,
             self.run,
@@ -402,6 +444,97 @@ class AgentServices:
             work_package_id=work.work_package_id,
             attempt=work.execution_attempt,
         )
+        try:
+            return await asyncio.wait_for(
+                self._execute_worker(work, kr, constitution, inputs, feedback, epoch, host),
+                timeout=self.limits.worker_timeout,
+            )
+        except TimeoutError as exc:
+            signal = EscalationSignal(
+                "worker_timeout",
+                f"{work.role} exceeded its {self.limits.worker_timeout:g}-second work limit. "
+                "The assignment remains incomplete.",
+            )
+            return await self._worker_failure(work, kr, host, signal, cause=exc)
+        except EscalationSignal as exc:
+            return await self._worker_failure(work, kr, host, exc)
+
+    async def _worker_failure(
+        self,
+        work: WorkPackage,
+        kr: KeyResult,
+        host: WorkerHostTools,
+        signal: EscalationSignal,
+        *,
+        cause: BaseException | None = None,
+    ) -> Deliverable:
+        current = await self.control()
+        if current == "cancel":
+            raise EscalationSignal("cancelled", "Run was cancelled") from cause
+        if current == "suspend":
+            raise EscalationSignal(
+                "suspended", "Execution suspended for constitution review"
+            ) from cause
+        protected = {
+            "constitution_violation",
+            "policy_violation",
+            "cancelled",
+            "suspended",
+            "unknown_operation",
+            "operation_conflict",
+            "limit_exceeded",
+            "critical_blocker",
+        }
+        if signal.kind in protected:
+            raise signal from cause
+        for operation_id in host.command_operations:
+            operation = await self.storage.get_operation(operation_id)
+            if operation and operation["status"] == "pending":
+                raise EscalationSignal(
+                    "unknown_operation",
+                    f"Interrupted host command {operation_id} may already have caused side effects; "
+                    "review is required before retrying it.",
+                ) from cause
+        if work.critical:
+            raise signal from cause
+        artifacts = await host.recorded_artifacts(current=True)
+        summary = (
+            f"Optional assignment {work.work_package_id} is incomplete: {signal.reason} "
+            "The Lead may continue with other work; this fallback does not satisfy or change "
+            "any acceptance criterion. Partial artifacts are evidence of progress only."
+        )
+        await self.emit(
+            work.role,
+            "waiting",
+            "Optional work returned incomplete to the Lead",
+            kr_id=kr.kr_id,
+            fallback=True,
+            reason=signal.reason,
+            kind=signal.kind,
+            work_package_id=work.work_package_id,
+            artifact_ids=[item["artifact_id"] for item in artifacts],
+        )
+        return Deliverable(
+            kr_id=kr.kr_id,
+            department=kr.target_department,
+            worker_role=work.role,
+            summary=summary,
+            artifact_ids=tuple(item["artifact_id"] for item in artifacts),
+            evidence=(f"Incomplete optional work: {signal.kind}; no completion was claimed.",),
+            confidence_score=0,
+            fallback=True,
+        )
+
+    async def _execute_worker(
+        self,
+        work: WorkPackage,
+        kr: KeyResult,
+        constitution: Constitution,
+        inputs: list[Deliverable],
+        feedback: str,
+        epoch: int,
+        host: WorkerHostTools,
+    ) -> Deliverable:
         if self.settings.harness_test_mode:
             return await self._fixture_execute(work, kr, host)
 
@@ -539,7 +672,7 @@ class AgentServices:
             f"Constitution: {constitution.model_dump_json()}\n"
             f"Assigned KR: {kr.model_dump_json()}\nTactical assignment: {work.model_dump_json()}\n"
             f"Working directory: {host.workspace}\n"
-            f"Approved inputs: {json.dumps([item.model_dump() for item in inputs])}\n"
+            f"Prior outputs (fallback=true means incomplete and unapproved): {json.dumps([item.model_dump() for item in inputs])}\n"
             f"Prior rejection feedback: {feedback}\n"
             "Execute the assignment using your tools. Read dependency artifacts when needed. "
             "Produce the requested task output files using write_file, incrementally in small complete files. "
@@ -558,7 +691,7 @@ class AgentServices:
             ),
         ]
         agent = create_agent(
-            self.model,
+            self.model_for(work.role),
             available,
             system_prompt=prompt,
             name=work.role,
@@ -620,6 +753,7 @@ class AgentServices:
                 "worker_result": final,
                 "recorded_tool_artifacts": manifest,
             },
+            agent_id=work.role,
         )
         if (
             deliverable.kr_id != kr.kr_id
@@ -711,6 +845,16 @@ class AgentServices:
     async def evaluate(
         self, deliverable: Deliverable, criteria: tuple[str, ...], constitution: Constitution
     ) -> Evaluation:
+        if deliverable.fallback:
+            return Evaluation(
+                passed_constitution=True,
+                passed_kr_criteria=False,
+                score=0,
+                feedback="This is an incomplete optional fallback, not an approved deliverable.",
+                criterion_results=dict.fromkeys(criteria, False),
+                recommended_action="retry_worker",
+                deterministic_checks_passed=False,
+            )
         evidence = []
         evidence_scopes: set[tuple[int, int, str]] = set()
         deterministic = bool(deliverable.artifact_ids)
@@ -799,8 +943,13 @@ class AgentServices:
                 "recorded_check_history": check_history,
                 "human_guidance": await self.notes(f"{deliverable.department}_gatekeeper"),
             },
+            agent_id=f"{deliverable.department}_gatekeeper",
         )
         return result.model_copy(update={"deterministic_checks_passed": deterministic})
+
+    async def publish_report(self, report: str) -> None:
+        """Store a deterministic Lead report without making another model call."""
+        await self.artifacts.save("executive-report.md", report, kind="report")
 
     async def synthesize(
         self,
@@ -820,6 +969,7 @@ class AgentServices:
                     "objectives": [o.model_dump() for o in objectives],
                     "approved_outcomes": [o.model_dump() for o in outcomes],
                 },
+                agent_id="executive",
             )
             narrative = result.report
         by_kr = {outcome.kr_id: outcome for outcome in outcomes}

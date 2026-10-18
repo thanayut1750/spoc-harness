@@ -249,6 +249,18 @@ def cancel(run_id: str):
 
 
 @app.command()
+def regenesis(
+    confirm: Annotated[
+        str, typer.Option(help="Type REGENESIS to erase all managed harness state.")
+    ],
+):
+    """Erase harness runs, evidence, checkpoints and settings; keep external workspaces."""
+    if confirm != "REGENESIS":
+        raise typer.BadParameter("Type REGENESIS to confirm erasing harness data")
+    display(request("POST", "/api/regenesis", body={"confirmation": confirm}))
+
+
+@app.command()
 def resume(
     run_id: str,
     action: str = "continue",

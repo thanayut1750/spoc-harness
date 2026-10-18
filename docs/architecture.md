@@ -5,7 +5,12 @@ flowchart TD
     UI[React / Canvas office] --> API[FastAPI commands and snapshots]
     API --> DB[(Postgres application records and jobs)]
     DB --> Worker[Leased host worker]
-    Worker --> Plan[Strategic planner and plan validation]
+    Worker --> Triage[Checkpointed TypeSafe Jev triage]
+    Triage -->|FAST_TRACK| Direct[One KR and one worker]
+    Triage -->|DEPARTMENTAL| Single[One KR and one department]
+    Triage -->|FULL_PYRAMID or unavailable| Plan[Strategic planner and plan validation]
+    Direct --> Schedule
+    Single --> Schedule
     Plan --> Schedule[Deterministic KR scheduler]
     Schedule -->|dependency-ready / at most two| Dept[Private department subgraph]
     Dept --> Head[Department tactical plan]
@@ -40,7 +45,11 @@ The worker owns one execution lease and a session advisory lock. Application job
 
 The model supplies structured assessment and evidence references. Python decides routing. Approval requires constitution compliance, every required criterion, score at least 0.8, substantive stored artifacts, integrity checks, valid Python syntax where applicable, and successful referenced command/syntax checks. A worker's confidence or a suggested `approve` action is insufficient.
 
-Two rework cycles are shared by worker and department gates in a KR epoch. An ordinary escalation can consume the run's single automatic replan. Constitution violations persist a governance halt and require review. Human context starts another epoch; a KR revision also changes its definition version and invalidates transitive dependent approvals.
+Full-pyramid work shares the configured rework cycles between worker and department gates in a KR epoch, and an ordinary escalation can consume the run's single automatic replan. Fast-track and departmental work cap rework at one and do not automatically replan; worker handoffs use structural checks and the whole KR receives one semantic review per attempt. Fast-track bypasses both planning models and executive narrative synthesis. Its report is generated from approved outcomes and evidence. Constitution violations persist a governance halt and require review. Human context starts another epoch; a KR revision also changes its definition version and invalidates transitive dependent approvals.
+
+Worker invocation and deliverable extraction share a 60-second `asyncio.wait_for` deadline. Explicitly optional packages can return incomplete fallback evidence to the lead; final approval still requires the mandatory work and all KR criteria. A pending host command remains an unknown-side-effect blocker rather than an optional fallback.
+
+Public model selections are immutable run snapshots; per-agent overrides select server-owned provider connections. Credentials never enter persisted selections. Regenesis serializes API mutations, cancels unfinished work, acquires the same worker guard as execution, then erases managed disk directories and database/checkpoint/store contents. This excludes external user workspaces and preserves migration schemas and server credentials.
 
 ## Office projection
 

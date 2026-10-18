@@ -1,7 +1,45 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type { Artifact, Run } from "../src/types";
+import type { Artifact, Run, WorkspaceSettings } from "../src/types";
 const runId = "run-fixture";
+const defaultSettings: WorkspaceSettings = {
+  defaults: {
+    provider: "configured",
+    model: "glm-5.3-flash",
+    reasoning_effort: "max",
+  },
+  model_config: {
+    provider: "configured",
+    model: "glm-5.3-flash",
+    reasoning_effort: "max",
+  },
+  providers: [
+    {
+      id: "configured",
+      label: "Environment provider",
+      configured: true,
+      default_model: "glm-5.3-flash",
+      reasoning_efforts: ["low", "high", "max"],
+    },
+    {
+      id: "zai",
+      label: "Z.AI",
+      configured: true,
+      default_model: "glm-5.3-flash",
+      reasoning_efforts: ["low", "high", "max"],
+    },
+    {
+      id: "openai",
+      label: "OpenAI",
+      configured: false,
+      default_model: "openai-model",
+      reasoning_efforts: ["low", "high"],
+    },
+  ],
+  triage: { model: "jev-1.13.0", configured: true },
+  worker_timeout: 60,
+  agent_model_configs: {},
+};
 const initialRun: Run = {
   run_id: runId,
   status: "running",
@@ -48,7 +86,13 @@ async function fixture(
     },
   ],
 ) {
-  let run: Run = { ...initialRun, ...overrides };
+  let run: Run = {
+    ...initialRun,
+    model_config: defaultSettings.defaults,
+    ...overrides,
+  };
+  let settings = structuredClone(defaultSettings);
+  let didReset = false;
   const requests: { path: string; body: Record<string, unknown> }[] = [];
   await page.addInitScript(() => {
     const streams: EventSource[] = [];
@@ -68,6 +112,10 @@ async function fixture(
     Object.defineProperty(window, "EventSource", { value: FixtureSource });
     Object.assign(window, {
       __officeStreams: streams,
+      __officeReset: () =>
+        streams
+          .at(-1)
+          ?.dispatchEvent(new MessageEvent("reset", { data: "{}" })),
       __officeEmit: (data: unknown) => {
         streams
           .at(-1)
@@ -80,6 +128,46 @@ async function fixture(
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     const method = route.request().method();
+    if (path === "/api/settings" && method === "GET")
+      return route.fulfill({ json: settings });
+    if (path === "/api/settings/model" && method === "PUT") {
+      const body = route.request().postDataJSON();
+      requests.push({ path, body });
+      settings = { ...settings, model_config: body };
+      return route.fulfill({ json: settings });
+    }
+    if (path.startsWith("/api/settings/agents/")) {
+      const agentId = decodeURIComponent(path.split("/").at(-1)!);
+      const overrides = { ...settings.agent_model_configs };
+      if (method === "PUT") {
+        const body = route.request().postDataJSON();
+        requests.push({ path, body });
+        overrides[agentId] = body;
+      } else if (method === "DELETE") {
+        requests.push({ path, body: {} });
+        delete overrides[agentId];
+      }
+      settings = { ...settings, agent_model_configs: overrides };
+      return route.fulfill({ json: settings });
+    }
+    if (path === "/api/regenesis" && method === "POST") {
+      const body = route.request().postDataJSON();
+      requests.push({ path, body });
+      if (body.confirmation !== "REGENESIS")
+        return route.fulfill({
+          status: 422,
+          json: { detail: "Type REGENESIS" },
+        });
+      didReset = true;
+      settings = structuredClone(defaultSettings);
+      return route.fulfill({
+        json: { status: "reset", removed_runs: 1, settings },
+      });
+    }
+    if (path === "/api/office" && didReset)
+      return route.fulfill({
+        json: { agents: [], cursor: 0, generation: "fixture-reset" },
+      });
     if (path === "/api/office")
       return route.fulfill({
         json: {
@@ -98,14 +186,21 @@ async function fixture(
             },
           ],
           cursor: 10,
+          generation: "fixture-generation",
         },
       });
     if (path === "/api/runs" && method === "GET")
-      return route.fulfill({ json: [run] });
+      return route.fulfill({ json: didReset ? [] : [run] });
     if (path === "/api/runs" && method === "POST") {
       const body = route.request().postDataJSON();
       requests.push({ path, body });
-      run = { ...run, user_request: body.user_request, status: "queued" };
+      didReset = false;
+      run = {
+        ...run,
+        user_request: body.user_request,
+        status: "queued",
+        model_config: body.model_config ?? settings.model_config,
+      };
       return route.fulfill({
         status: 201,
         json: { run_id: runId, status: "queued" },
@@ -214,6 +309,89 @@ test("creates a mission with constitution and sends targeted guidance", async ({
     agent_id: "executive",
     content: "Prefer a minimal Python interface",
   });
+});
+test("terminal runs stop working while external activity and historical evidence remain available", async ({
+  page,
+}) => {
+  await fixture(page, { status: "succeeded" });
+  await expect(page.locator(".office-metrics")).toContainText("0 working");
+  await page
+    .getByRole("button", { name: "Backend coder: Completed. Inspect agent" })
+    .click();
+  await expect(
+    page.getByText(
+      "Run succeeded. Last recorded activity: Executing — Running acceptance tests",
+    ),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    emit({
+      event_id: "historical-research",
+      seq: 11,
+      source: "harness",
+      agent_id: "research_head",
+      activity: "planning",
+      summary: "Preparing a source comparison",
+      run_id: "run-fixture",
+      data: { output: "Recorded source comparison" },
+      timestamp: "2026-10-18T10:00:02Z",
+    });
+    emit({
+      event_id: "external-research",
+      seq: 12,
+      source: "custom-office",
+      agent_id: "research_head",
+      activity: "reading",
+      summary: "Reading an independent integration feed",
+      run_id: "run-fixture",
+      timestamp: "2026-10-18T10:00:03Z",
+    });
+  });
+  await expect(page.locator(".office-metrics")).toContainText("1 working");
+  await expect(
+    page.getByRole("button", { name: "Research Head: Reading. Inspect agent" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Research lead: Completed. Inspect agent" })
+    .click();
+  await expect(page.getByText("Recorded source comparison")).toBeVisible();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    page.getByRole("tabpanel").getByText("Planning", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tabpanel").getByText("Preparing a source comparison", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+test("an engineering fast track shows one worker and leaves Research idle", async ({
+  page,
+}) => {
+  await fixture(page, {
+    triage: {
+      mode: "FAST_TRACK",
+      departments: ["engineering"],
+      reason: "One local engineering change is needed.",
+    },
+  });
+  await expect(page.locator(".office-metrics")).toContainText("1 working");
+  await expect(
+    page.getByRole("button", { name: "Research lead: Idle. Inspect agent" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Market researcher: Idle. Inspect agent",
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".sidebar-note").first()).toHaveText(
+    "Engineering only · One worker",
+  );
+  await expect(page.locator(".sidebar-note").first()).not.toContainText(
+    "Research",
+  );
 });
 test("pauses, resumes from a durable boundary, and cancels a run", async ({
   page,
@@ -545,4 +723,446 @@ test("policy review requires written guidance and keeps its action visible on mo
     path: "test-results/review-compact-mobile.png",
     fullPage: true,
   });
+});
+
+test("saves configured provider choices and snapshots model selection into new missions", async ({
+  page,
+}) => {
+  const requests = await fixture(page, {
+    model_config: defaultSettings.defaults,
+    triage: {
+      mode: "DEPARTMENTAL",
+      departments: ["engineering"],
+      reason: "Only a local code change is needed.",
+    },
+  });
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("option", {
+      name: "OpenAI · Not configured",
+      exact: true,
+    }),
+  ).toHaveJSProperty("disabled", true);
+  await dialog
+    .getByRole("combobox", { name: "Provider", exact: true })
+    .selectOption("zai");
+  await dialog
+    .getByRole("textbox", { name: "Model", exact: true })
+    .fill("custom-glm-model");
+  await dialog
+    .getByRole("combobox", { name: "Reasoning", exact: true })
+    .selectOption("high");
+  await page.screenshot({
+    path: "test-results/model-settings.png",
+    fullPage: true,
+  });
+  await dialog
+    .getByRole("button", { name: "Save model settings", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("Saved. New missions will use this model."),
+  ).toBeVisible();
+  expect(
+    requests.find((request) => request.path === "/api/settings/model")?.body,
+  ).toEqual({
+    provider: "zai",
+    model: "custom-glm-model",
+    reasoning_effort: "high",
+  });
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page.locator(".run-configuration>summary").click();
+  await expect(
+    page.getByText("Model snapshot: configured / glm-5.3-flash · max"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Only a local code change is needed."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "New mission", exact: true }).click();
+  await expect(
+    page.getByRole("dialog").getByText("custom-glm-model", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("What should the organization accomplish?")
+    .fill("Build one well-tested local script");
+  await page
+    .getByRole("button", { name: "Launch mission", exact: true })
+    .click();
+  expect(
+    requests.find((request) => request.path === "/api/runs")?.body.model_config,
+  ).toEqual({
+    provider: "zai",
+    model: "custom-glm-model",
+    reasoning_effort: "high",
+  });
+});
+test("Regenesis requires exact typed confirmation and resets the client from a fresh stream snapshot", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (value: unknown) => void }
+    ).__officeEmit({
+      event_id: "before-reset",
+      seq: 11,
+      source: "custom",
+      agent_id: "old-agent",
+      activity: "writing",
+      summary: "Old activity before reset",
+      timestamp: "2026-10-18T10:00:02Z",
+    });
+  });
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "Regenesis", exact: true }).click();
+  const reset = dialog.getByRole("button", {
+    name: "Reset all harness data",
+    exact: true,
+  });
+  await expect(reset).toBeDisabled();
+  await expect(
+    dialog.getByText(/External workspaces you selected are kept/),
+  ).toBeVisible();
+  await dialog.getByLabel("Type REGENESIS to confirm").fill("regenesis");
+  await expect(reset).toBeDisabled();
+  expect(requests.some((request) => request.path === "/api/regenesis")).toBe(
+    false,
+  );
+  await page.screenshot({
+    path: "test-results/regenesis-confirmation.png",
+    fullPage: true,
+  });
+  await dialog.getByLabel("Type REGENESIS to confirm").fill("REGENESIS");
+  await reset.click();
+  await expect(
+    dialog.getByText(/Regenesis complete. 1 run was removed/),
+  ).toBeVisible();
+  expect(
+    requests.find((request) => request.path === "/api/regenesis")?.body,
+  ).toEqual({ confirmation: "REGENESIS" });
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue("");
+  await expect(
+    page.getByRole("button", { name: "Executive: Idle. Inspect agent" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Old Agent/ })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __officeStreams: EventSource[] }
+          ).__officeStreams.at(-1)?.url,
+      ),
+    )
+    .toContain("after=0");
+  await expect(
+    page.getByRole("heading", { name: "Activity stream 0" }),
+  ).toBeVisible();
+});
+test("another client reset event clears stale run data and reopens the stream at zero", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.route("**/api/office", (route) =>
+    route.fulfill({ json: { agents: [], cursor: 0 } }),
+  );
+  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.evaluate(() => {
+    (window as unknown as { __officeReset: () => void }).__officeReset();
+  });
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue("");
+  await expect(
+    page.getByRole("button", { name: "Backend coder: Idle. Inspect agent" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __officeStreams: EventSource[] }
+          ).__officeStreams.at(-1)?.url,
+      ),
+    )
+    .toContain("after=0");
+  expect(requests.some((request) => request.path === "/api/regenesis")).toBe(
+    false,
+  );
+});
+
+test("same-generation reconnect replays missed activity from the last received sequence", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/office", (route) =>
+    route.fulfill({
+      json: {
+        agents: [
+          {
+            event_id: "persisted-12",
+            seq: 12,
+            source: "harness",
+            agent_id: "backend_coder",
+            activity: "writing",
+            summary: "Writing the final acceptance report",
+            run_id: runId,
+            timestamp: "2026-10-18T10:00:04Z",
+          },
+        ],
+        cursor: 12,
+        generation: "fixture-generation",
+      },
+    }),
+  );
+  await page.evaluate(() => {
+    (window as unknown as { __officeStreams: EventSource[] }).__officeStreams
+      .at(-1)
+      ?.onerror?.(new Event("error"));
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __officeStreams: EventSource[] })
+            .__officeStreams.length,
+      ),
+    )
+    .toBe(2);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as { __officeStreams: EventSource[] }
+        ).__officeStreams.at(-1)?.url,
+    ),
+  ).toBe("/api/events?after=10&generation=fixture-generation");
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    for (const seq of [11, 12])
+      emit({
+        event_id: `persisted-${seq}`,
+        seq,
+        source: "harness",
+        agent_id: "backend_coder",
+        activity: seq === 11 ? "reading" : "writing",
+        summary:
+          seq === 11
+            ? "Read acceptance results while disconnected"
+            : "Writing the final acceptance report",
+        run_id: "run-fixture",
+        timestamp: `2026-10-18T10:00:0${seq - 8}Z`,
+      });
+  });
+  await expect(
+    page.getByText("Read acceptance results while disconnected"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Writing the final acceptance report"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Activity stream 2" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Backend coder: Writing. Inspect agent" }),
+  ).toBeVisible();
+});
+test("reconnecting after an offline reset replaces stale missions and accepts the new generation’s first event", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "offline-old-event",
+      seq: 11,
+      source: "custom-office",
+      agent_id: "old-agent",
+      activity: "writing",
+      summary: "Old generation activity",
+      timestamp: "2026-10-18T10:00:02Z",
+    });
+  });
+  await expect(page.getByText("Old generation activity")).toBeVisible();
+  await page.route("**/api/office", (route) =>
+    route.fulfill({
+      json: { agents: [], cursor: 0, generation: "after-offline-reset" },
+    }),
+  );
+  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  let reloadedSettings = false;
+  await page.route("**/api/settings", (route) => {
+    reloadedSettings = true;
+    return route.fulfill({ json: defaultSettings });
+  });
+  await page.evaluate(() => {
+    const streams = (window as unknown as { __officeStreams: EventSource[] })
+      .__officeStreams;
+    streams.at(-1)?.onerror?.(new Event("error"));
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __officeStreams: EventSource[] }
+          ).__officeStreams.at(-1)?.url,
+      ),
+    )
+    .toBe("/api/events?after=0&generation=after-offline-reset");
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue("");
+  await expect(page.getByText("Old generation activity")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Old Agent/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Activity stream 0" }),
+  ).toBeVisible();
+  expect(reloadedSettings).toBe(true);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "new-generation-first-event",
+      seq: 1,
+      source: "custom-office",
+      agent_id: "new-agent",
+      activity: "reading",
+      summary: "First activity after offline reset",
+      timestamp: "2026-10-18T10:01:00Z",
+    });
+  });
+  await expect(
+    page.getByText("First activity after offline reset"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New Agent: Reading. Inspect agent" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Activity stream 1" }),
+  ).toBeVisible();
+});
+test("a regressed snapshot also detects a reset when the generation token is unavailable", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/office", (route) =>
+    route.fulfill({ json: { agents: [], cursor: 0 } }),
+  );
+  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.evaluate(() => {
+    (window as unknown as { __officeStreams: EventSource[] }).__officeStreams
+      .at(-1)
+      ?.onerror?.(new Event("error"));
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __officeStreams: EventSource[] }
+          ).__officeStreams.at(-1)?.url,
+      ),
+    )
+    .toBe("/api/events?after=0");
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue("");
+  await expect(
+    page.getByRole("button", { name: "Backend coder: Idle. Inspect agent" }),
+  ).toBeVisible();
+});
+test("per-agent model overrides can be saved and returned to the inherited default", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("system_architect");
+  await expect(
+    dialog.getByText(/This agent inherits the default model/),
+  ).toBeVisible();
+  await dialog
+    .getByRole("textbox", { name: "Model", exact: true })
+    .fill("architect-model");
+  await dialog
+    .getByRole("combobox", { name: "Reasoning", exact: true })
+    .selectOption("high");
+  await dialog
+    .getByRole("button", { name: "Save agent model", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Use default model", exact: true }),
+  ).toBeVisible();
+  expect(
+    requests.find(
+      (request) => request.path === "/api/settings/agents/system_architect",
+    )?.body,
+  ).toEqual({
+    provider: "configured",
+    model: "architect-model",
+    reasoning_effort: "high",
+  });
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("all");
+  await expect(
+    dialog.getByRole("textbox", { name: "Model", exact: true }),
+  ).toHaveValue("glm-5.3-flash");
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("system_architect");
+  await dialog
+    .getByRole("button", { name: "Use default model", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("The agent now inherits the default model.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("textbox", { name: "Model", exact: true }),
+  ).toHaveValue("glm-5.3-flash");
+});
+
+test("a rejected Regenesis leaves existing mission data intact", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/regenesis", (route) =>
+    route.fulfill({
+      status: 409,
+      json: {
+        detail: "Workers are still stopping. Try again after they stop.",
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "Regenesis", exact: true }).click();
+  await dialog.getByLabel("Type REGENESIS to confirm").fill("REGENESIS");
+  await dialog
+    .getByRole("button", { name: "Reset all harness data", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Workers are still stopping. Try again after they stop.",
+  );
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue(runId);
+  await expect(
+    page.getByRole("button", {
+      name: "Backend coder: Executing. Inspect agent",
+    }),
+  ).toBeVisible();
 });

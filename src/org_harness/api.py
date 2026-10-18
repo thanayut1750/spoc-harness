@@ -15,7 +15,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from org_harness.config import Settings, configure_tracing
-from org_harness.models import ActivityEvent, Deliverable, ReviewDecision, RunCreate
+from org_harness.models import (
+    ActivityEvent,
+    ConfigurableAgent,
+    Deliverable,
+    ModelSelection,
+    ReviewDecision,
+    RunCreate,
+)
 from org_harness.storage import ConflictError, MemoryStorage, NotFoundError, create_storage
 
 
@@ -23,6 +30,11 @@ class NoteCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     agent_id: str | None = Field(default=None, max_length=100)
     content: str = Field(min_length=1, max_length=20000)
+
+
+class RegenesisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirmation: str
 
 
 def public_run(run: dict) -> dict:
@@ -104,6 +116,8 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     app = FastAPI(title="SPOC Harness", version="0.1.0", lifespan=lifespan)
     app.state.storage = storage
     app.state.settings = settings
+    mutations = asyncio.Lock()
+    app.state.reset_generation = 0
 
     @app.exception_handler(NotFoundError)
     async def missing(_: Request, exc: NotFoundError):
@@ -122,6 +136,9 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             and origin != f"{request.url.scheme}://{request.headers.get('host')}"
         ):
             return JSONResponse(status_code=403, content={"detail": "Use the same-origin API"})
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            async with mutations:
+                return await call_next(request)
         return await call_next(request)
 
     async def activity(run_id: str, kind: str, key: str | None = None) -> None:
@@ -159,13 +176,41 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
 
     @app.post("/api/runs", status_code=202)
     async def submit(body: RunCreate, idempotency_key: str | None = Header(default=None)):
-        payload = body.model_dump(mode="json")
+        payload = body.model_dump(mode="json", by_alias=True, exclude_none=True)
+        request_payload = dict(payload)
+        selected = body.model_config_selection
+        if selected is None:
+            saved = await storage.get_setting("model_config")
+            selected = (
+                ModelSelection.model_validate(saved)
+                if saved
+                else settings.default_model_selection()
+            )
+        try:
+            settings.validate_model_selection(selected)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        payload["model_config"] = selected.model_dump(mode="json")
+        agent_models = body.agent_model_configs
+        if agent_models is None:
+            agent_models = {
+                name: ModelSelection.model_validate(value)
+                for name, value in (await storage.get_setting("agent_model_configs") or {}).items()
+            }
+        try:
+            for selection in agent_models.values():
+                settings.validate_model_selection(selection)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        payload["agent_model_configs"] = {
+            name: value.model_dump(mode="json") for name, value in agent_models.items()
+        }
         if body.workspace_path:
             workspace = Path(body.workspace_path).expanduser().resolve()
             if not workspace.is_dir():
                 raise HTTPException(422, "Workspace must be an existing directory")
             payload["workspace_path"] = str(workspace)
-        run = await storage.create_run(payload, idempotency_key)
+        run = await storage.create_run(payload, idempotency_key, request_payload=request_payload)
         await storage.emit(
             {
                 "event_id": f"run:{run['run_id']}:created",
@@ -178,6 +223,53 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             }
         )
         return {"run_id": run["run_id"], "status": run["status"]}
+
+    @app.get("/api/settings")
+    async def get_settings():
+        return settings.public_settings(
+            await storage.get_setting("model_config"),
+            await storage.get_setting("agent_model_configs"),
+        )
+
+    @app.put("/api/settings/model")
+    async def save_model(body: ModelSelection):
+        try:
+            settings.validate_model_selection(body)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        await storage.save_setting("model_config", body.model_dump(mode="json"))
+        return await get_settings()
+
+    @app.put("/api/settings/agents/{agent_id}")
+    async def save_agent_model(agent_id: ConfigurableAgent, body: ModelSelection):
+        try:
+            settings.validate_model_selection(body)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        selections = await storage.get_setting("agent_model_configs") or {}
+        selections[agent_id] = body.model_dump(mode="json")
+        await storage.save_setting("agent_model_configs", selections)
+        return await get_settings()
+
+    @app.delete("/api/settings/agents/{agent_id}")
+    async def inherit_agent_model(agent_id: ConfigurableAgent):
+        selections = await storage.get_setting("agent_model_configs") or {}
+        selections.pop(agent_id, None)
+        if selections:
+            await storage.save_setting("agent_model_configs", selections)
+        else:
+            await storage.delete_setting("agent_model_configs")
+        return await get_settings()
+
+    @app.post("/api/regenesis")
+    async def reset(body: RegenesisRequest):
+        if body.confirmation != "REGENESIS":
+            raise HTTPException(422, "Type REGENESIS to confirm erasing harness data")
+        from org_harness.reset import regenesis
+
+        result = await regenesis(settings, storage)
+        app.state.reset_generation += 1
+        return result
 
     @app.get("/api/runs")
     async def runs():
@@ -239,8 +331,12 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
         after: int = Query(default=0, ge=0),
         run_id: str | None = None,
         last_event_id: str | None = Header(default=None),
+        generation: str | None = None,
     ):
         cursor = after
+        local_generation = app.state.reset_generation
+        stream_generation = await storage.get_reset_generation()
+        stale_generation = generation is not None and generation != stream_generation
         if last_event_id:
             try:
                 cursor = max(cursor, int(last_event_id))
@@ -251,7 +347,16 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             nonlocal cursor
             idle = 0
             yield "retry: 1500\n\n"
+            if stale_generation:
+                yield "event: reset\ndata: {}\n\n"
+                return
             while not await request.is_disconnected():
+                if (
+                    local_generation != app.state.reset_generation
+                    or stream_generation != await storage.get_reset_generation()
+                ):
+                    yield "event: reset\ndata: {}\n\n"
+                    return
                 batch = await storage.events_after(cursor, run_id)
                 if batch:
                     for event in batch:
