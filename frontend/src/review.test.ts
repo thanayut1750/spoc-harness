@@ -207,4 +207,32 @@ describe("compact decision semantics", () => {
       }),
     ).toEqual({ command: "python validate.py", cwd: "/tmp/work" });
   });
+  it("explains worker timeouts without claiming retry changes the deadline or run allowance", () => {
+    const reason =
+      "backend_coder exceeded its 60-second work limit before finishing.";
+    const timeout = reviewPresentation({
+      ...run,
+      review: { ...run.review!, kind: "blocked", reason },
+    });
+    expect(timeout).toMatchObject({
+      summary: "The worker reached its time limit before finishing.",
+      workerTimeout: true,
+      requiresGuidance: false,
+    });
+    expect(timeout.warning).toContain(reason);
+    expect(timeout.warning).toContain(
+      "Retry can reuse saved sources; the per-worker limit and run allowance stay unchanged.",
+    );
+    expect(
+      reviewPresentation({
+        ...run,
+        review: {
+          ...run.review!,
+          kind: "blocked",
+          reason: "Execution stopped.",
+          source_kind: "worker_timeout",
+        },
+      }).workerTimeout,
+    ).toBe(true);
+  });
 });

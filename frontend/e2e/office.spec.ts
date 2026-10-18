@@ -905,6 +905,35 @@ test("ordinary source review offers a compact retry and preserves the exact feed
     "Additional instructions:\nUse https://example.org/source as an alternative source.",
   );
 });
+test("worker timeout review explains the deadline and does not recommend a blind retry", async ({
+  page,
+}) => {
+  const reason =
+    "backend_coder exceeded its 60-second work limit before finishing.";
+  const requests = await fixture(page, {
+    status: "review",
+    review: {
+      interrupt_id: "timeout-interrupt",
+      kind: "blocked",
+      reason,
+      allowed_actions: ["provide_context", "revise_kr", "abort"],
+    },
+  });
+  await page.getByRole("button", { name: "Review and resume mission" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".review-brief")).toContainText(
+    "The worker reached its time limit before finishing.",
+  );
+  await expect(dialog.locator(".review-brief")).toContainText(reason);
+  await expect(dialog.locator(".review-brief")).toContainText(
+    "Retry can reuse saved sources; the per-worker limit and run allowance stay unchanged.",
+  );
+  await expect(dialog.getByText("Recommended", { exact: true })).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Retry task", exact: true }),
+  ).toBeEnabled();
+  expect(requests).toHaveLength(0);
+});
 test("policy review requires written guidance and keeps its action visible on mobile", async ({
   page,
 }) => {

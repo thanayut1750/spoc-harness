@@ -481,6 +481,7 @@ function ReviewModal({
                     {option === recommended &&
                       !presentation.unknownOperation &&
                       !presentation.sourceUnavailable &&
+                      !presentation.workerTimeout &&
                       !presentation.usageLimit && <small>Recommended</small>}
                   </span>
                   <span className="review-choice-description">

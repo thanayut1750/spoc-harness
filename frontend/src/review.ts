@@ -222,6 +222,7 @@ export function reviewPresentation(run: Run): {
   unknownOperation: boolean;
   policyIssue: boolean;
   usageLimit?: boolean;
+  workerTimeout?: boolean;
 } {
   const kind = run.review?.kind ?? "";
   const reason = reviewReason(run);
@@ -298,6 +299,23 @@ export function reviewPresentation(run: Run): {
       usageLimit: true,
       warning:
         "Retrying does not reset this run’s usage allowance. Review the limit or stop the run before spending more calls.",
+      requiresGuidance: false,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  if (
+    kind === "worker_timeout" ||
+    run.review?.source_kind === "worker_timeout" ||
+    run.review?.context?.blockers?.some(
+      (blocker) => blocker.kind === "worker_timeout",
+    ) ||
+    /\bwork limit\b|\bworker.{0,30}timed out\b/i.test(reason)
+  )
+    return {
+      summary: "The worker reached its time limit before finishing.",
+      workerTimeout: true,
+      warning: `${reason.length > 240 ? `${reason.slice(0, 237)}…` : reason} Retry can reuse saved sources; the per-worker limit and run allowance stay unchanged.`,
       requiresGuidance: false,
       sourceUnavailable: false,
       unknownOperation: false,
