@@ -12,6 +12,7 @@ from langgraph.store.memory import InMemoryStore
 from pydantic import SecretStr
 from typing_extensions import TypedDict
 
+from org_harness.agent_services import AgentServices
 from org_harness.api import create_app
 from org_harness.config import Settings
 from org_harness.providers import create_model
@@ -62,6 +63,36 @@ async def test_model_settings_saved_and_snapshotted_without_secrets(api):
     ] == "run-only"
     assert "super-secret" not in json.dumps((await client.get("/api/settings")).json())
     assert "super-secret" not in json.dumps(run)
+
+
+async def test_default_worker_deadline_matches_schema_settings_and_run_snapshot(api):
+    client, storage, settings = api
+    public = (await client.get("/api/settings")).json()
+    schema = (await client.get("/openapi.json")).json()
+    assert public["worker_timeout"] == 180
+    assert (
+        schema["components"]["schemas"]["RunLimits"]["properties"]["worker_timeout"]["default"]
+        == 180
+    )
+    response = await client.post("/api/runs", json={"user_request": "Use the default deadline"})
+    assert response.status_code == 202
+    default_run = await storage.get_run(response.json()["run_id"])
+    assert default_run["limits"]["worker_timeout"] == 180
+
+    response = await client.post(
+        "/api/runs",
+        json={"user_request": "Keep a specific deadline", "limits": {"worker_timeout": 60}},
+    )
+    assert response.status_code == 202
+    explicit_run = await storage.get_run(response.json()["run_id"])
+    assert explicit_run["limits"]["worker_timeout"] == 60
+    services = AgentServices(settings, storage, explicit_run)
+    try:
+        assert services.limits.worker_timeout == 60
+    finally:
+        await services.close()
+    assert (await storage.get_run(default_run["run_id"]))["limits"]["worker_timeout"] == 180
+    assert (await storage.get_run(explicit_run["run_id"]))["limits"]["worker_timeout"] == 60
 
 
 async def test_unconfigured_provider_is_rejected_without_modifying_settings(tmp_path):

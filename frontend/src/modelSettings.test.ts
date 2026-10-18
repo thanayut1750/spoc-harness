@@ -40,7 +40,7 @@ const settings: WorkspaceSettings = {
     },
   ],
   triage: { model: "jev-1.13.0", configured: true },
-  worker_timeout: 60,
+  worker_timeout: 180,
 };
 describe("model selection", () => {
   it("does not switch into an unconfigured provider or accept its model configuration", () => {

@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from org_harness.models import ModelSelection
+from org_harness.models import ModelSelection, RunLimits
 
 
 class Settings(BaseSettings):
@@ -141,7 +141,7 @@ class Settings(BaseSettings):
                 "model": self.typesafe_model,
                 "configured": bool(self.typesafe_api_key.get_secret_value()),
             },
-            "worker_timeout": 60,
+            "worker_timeout": RunLimits().worker_timeout,
         }
 
 
