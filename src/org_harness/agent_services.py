@@ -15,6 +15,8 @@ from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededE
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import ToolException
+from langgraph.errors import GraphRecursionError
+from langgraph.graph import END, START
 from openai import APIConnectionError, APIResponseValidationError, APIStatusError, APITimeoutError
 from pydantic import BaseModel, Field, ValidationError
 
@@ -759,13 +761,24 @@ class AgentServices:
             name=work.role,
             middleware=middleware,
         )
+        # Middleware hooks are separate graph steps, not model calls. Size the
+        # safety bound from the actual graph so every allowed model turn can
+        # finish, with one extra traversal for the explicit model-limit check.
+        graph_nodes = len(agent.get_graph().nodes.keys() - {START, END})
+        step_limit = graph_nodes * (self.limits.worker_model_calls + 1) + 2
         try:
             result = await agent.ainvoke(
                 {"messages": [HumanMessage(content=work.task)]},
-                config={"recursion_limit": self.limits.worker_model_calls * 4 + 10},
+                config={"recursion_limit": step_limit},
             )
         except EscalationSignal:
             raise
+        except GraphRecursionError as exc:
+            raise EscalationSignal(
+                "worker_step_limit",
+                "Worker reached its graph step limit before finishing. "
+                "Recorded tool evidence was preserved; the assignment remains incomplete.",
+            ) from exc
         except (ModelCallLimitExceededError, BudgetExceeded) as exc:
             raise EscalationSignal(
                 "limit_exceeded", "Worker exhausted its execution budget"

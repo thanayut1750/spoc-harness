@@ -9,6 +9,7 @@ from langchain_core.tools import ToolException, tool
 from langgraph.checkpoint.memory import InMemorySaver
 from openai import AsyncOpenAI
 
+from org_harness import agent_services
 from org_harness.agent_services import AgentServices
 from org_harness.config import Settings
 from org_harness.models import (
@@ -291,6 +292,209 @@ async def test_per_worker_model_limit_is_explicit_blocker_not_a_deliverable(tmp_
             await services.execute(work, key_result, Constitution(), [], "", 0)
         assert error.value.kind == "limit_exceeded"
         assert len(requests) == 1
+
+
+async def test_worker_can_finish_on_its_last_allowed_model_call(tmp_path):
+    kr, work = assignment()
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Completed output on the final allowed turn.",
+                ).model_dump_json()
+            }
+        turn = len(requests)
+        if turn == 12:
+            return {"content": "Completed output.txt after eleven tool turns."}
+        return {
+            "tool_calls": [
+                tool_call(
+                    "write_file",
+                    {"path": "output.txt", "content": f"Completed step {turn}"},
+                    f"write-{turn}",
+                )
+            ]
+        }
+
+    async with services_with_provider(tmp_path, script, limits={"worker_model_calls": 12}) as (
+        services,
+        storage,
+        run,
+        requests,
+        workspace,
+    ):
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert not result.fallback
+        assert len(requests) == 13  # Twelve agent turns plus deliverable extraction.
+        assert sum(not item.get("response_format") for item in requests) == 12
+        assert len(storage.operations) == 11
+        assert (workspace / "output.txt").read_text() == "Completed step 11"
+        assert any(
+            item["kind"] == "deliverable" for item in await storage.list_artifacts(run["run_id"])
+        )
+
+
+async def test_worker_model_limit_stops_long_tool_loop_before_a_thirteenth_call(tmp_path):
+    kr, work = assignment()
+
+    def script(body, requests):
+        return {
+            "tool_calls": [tool_call("read_file", {"path": "input.txt"}, f"read-{len(requests)}")]
+        }
+
+    async with services_with_provider(tmp_path, script, limits={"worker_model_calls": 12}) as (
+        services,
+        storage,
+        run,
+        requests,
+        workspace,
+    ):
+        (workspace / "input.txt").write_text("Input")
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "limit_exceeded"
+        assert len(requests) == len(storage.operations) == 12
+        assert all(
+            item["kind"] != "deliverable" for item in await storage.list_artifacts(run["run_id"])
+        )
+
+
+@pytest.mark.parametrize("critical", [True, False])
+async def test_worker_graph_step_limit_preserves_progress_and_uses_failure_policy(
+    tmp_path, monkeypatch, critical
+):
+    kr, work = assignment()
+    work = work.model_copy(update={"critical": critical})
+    create_agent = agent_services.create_agent
+
+    def limited_agent(*args, **kwargs):
+        agent = create_agent(*args, **kwargs)
+        ainvoke = agent.ainvoke
+
+        async def invoke_with_small_step_limit(inputs, config):
+            return await ainvoke(inputs, {**config, "recursion_limit": 6})
+
+        monkeypatch.setattr(agent, "ainvoke", invoke_with_small_step_limit)
+        return agent
+
+    monkeypatch.setattr(agent_services, "create_agent", limited_agent)
+
+    def script(body, requests):
+        return {
+            "tool_calls": [
+                tool_call(
+                    "write_file",
+                    {"path": "partial.txt", "content": "Unfinished output"},
+                    f"write-{len(requests)}",
+                )
+            ]
+        }
+
+    async with services_with_provider(tmp_path, script) as (
+        services,
+        storage,
+        run,
+        requests,
+        workspace,
+    ):
+        if critical:
+            with pytest.raises(EscalationSignal) as error:
+                await services.execute(work, kr, Constitution(), [], "", 0)
+            assert error.value.kind == "worker_step_limit"
+        else:
+            result = await services.execute(work, kr, Constitution(), [], "", 0)
+            assert result.fallback and result.confidence_score == 0
+            assert len(result.artifact_ids) == 1
+            assert "worker_step_limit" in result.evidence[0]
+        assert (workspace / "partial.txt").read_text() == "Unfinished output"
+        assert len(requests) == len(storage.operations) == 1
+        artifacts = await storage.list_artifacts(run["run_id"])
+        assert len(artifacts) == 1 and artifacts[0]["kind"] == "source"
+
+
+async def test_worker_resumes_saved_last_turn_without_repeating_completed_tools(
+    tmp_path, monkeypatch
+):
+    kr, work = assignment()
+    saver = InMemorySaver()
+    create_agent = agent_services.create_agent
+    graphs = []
+    child_config = {"configurable": {"thread_id": "saved-worker"}}
+
+    def checkpointed_agent(*args, **kwargs):
+        agent = create_agent(*args, **kwargs, checkpointer=saver)
+        resuming = bool(graphs)
+        graphs.append(agent)
+        ainvoke = agent.ainvoke
+
+        async def invoke_checkpointed(inputs, config):
+            # Reproduce an old failed worker, then resume the private checkpoint
+            # as LangGraph does when its parent re-enters the saved child graph.
+            if not resuming:
+                config = {**config, "recursion_limit": 58}
+            return await ainvoke(None if resuming else inputs, {**config, **child_config})
+
+        monkeypatch.setattr(agent, "ainvoke", invoke_checkpointed)
+        return agent
+
+    monkeypatch.setattr(agent_services, "create_agent", checkpointed_agent)
+
+    def script(body, requests):
+        if body.get("response_format"):
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department="engineering",
+                    worker_role=work.role,
+                    summary="Finished using saved output and tool history.",
+                ).model_dump_json()
+            }
+        turn = len(requests)
+        if turn == 13:
+            messages = body["messages"]
+            assert sum(item["role"] == "tool" for item in messages) == 12
+            assert sum(item["role"] == "user" for item in messages) == 1
+            return {"content": "All twelve output updates completed and recorded."}
+        return {
+            "tool_calls": [
+                tool_call(
+                    "write_file",
+                    {"path": "output.txt", "content": f"Completed step {turn}"},
+                    f"write-{turn}",
+                )
+            ]
+        }
+
+    async with services_with_provider(tmp_path, script, limits={"worker_model_calls": 12}) as (
+        services,
+        storage,
+        run,
+        requests,
+        workspace,
+    ):
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "worker_step_limit"
+        assert len(requests) == 12 and len(storage.operations) == 11
+        saved = await graphs[-1].aget_state(child_config)
+        assert saved.values["thread_model_call_count"] == 12
+
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        assert not result.fallback
+        assert len(requests) == 14  # One new worker call and one deliverable extraction.
+        assert len(storage.operations) == 12
+        assert all(item["status"] == "done" for item in storage.operations.values())
+        assert (workspace / "output.txt").read_text() == "Completed step 12"
+        saved = await graphs[-1].aget_state(child_config)
+        assert saved.values["thread_model_call_count"] == 13
+        assert len(result.artifact_ids) == 1  # The final current snapshot of output.txt.
+        artifacts = await storage.list_artifacts(run["run_id"])
+        assert sum(item["kind"] == "source" for item in artifacts) == 12
+        assert any(item["kind"] == "deliverable" for item in artifacts)
 
 
 async def test_semantic_judge_cannot_approve_failed_command_evidence(tmp_path):
