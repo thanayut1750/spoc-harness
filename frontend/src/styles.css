@@ -511,6 +511,35 @@ main {
   gap: 15px;
   margin-bottom: 22px;
 }
+.mission-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.activity-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid #405235;
+  border-radius: 5px;
+  background: #1b281a;
+  color: #bed4ac;
+  font-size: 11px;
+}
+.activity-button:hover {
+  background: #293b23;
+}
+.activity-count {
+  color: #a9c58e;
+  font-size: 10px;
+  border-radius: 3px;
+  background: #31432a;
+  padding: 1px 5px;
+}
 .breadcrumb {
   font-size: 9px;
   display: flex;
@@ -819,7 +848,7 @@ main {
   border-bottom: 1px solid #2c3b27;
   gap: 10px;
 }
-.activity-heading h2 {
+.activity-heading :is(h2, h3) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -827,7 +856,7 @@ main {
   font-weight: 500;
   color: #c3d2b9;
 }
-.activity-heading h2 > svg {
+.activity-heading :is(h2, h3) > svg {
   color: #9bb98b;
 }
 .activity-heading .tiny-count {
@@ -1508,6 +1537,9 @@ main {
 .report-link > span {
   flex: 1;
   text-align: left;
+}
+.inspector > .report-link {
+  grid-column: 1 / -1;
 }
 .modal {
   color: #d4e1c9;
@@ -3612,14 +3644,30 @@ main {
     margin-top: 10px;
   }
   .main-footer {
-    padding: 9px 0;
-    margin-top: 8px;
+    display: none;
   }
   .inspector-content {
     flex: 1 1 0;
     min-height: 0;
     overflow: auto;
   }
+}
+.activity-modal {
+  width: min(780px, calc(100vw - 32px));
+}
+.activity-modal .activity-section {
+  margin-top: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.activity-modal .timeline,
+.activity-modal .timeline-empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(60dvh, 520px);
+  overflow: auto;
 }
 @media (max-width: 700px) {
   .workspace {
@@ -3629,6 +3677,18 @@ main {
   main,
   .inspector {
     flex-shrink: 0;
+  }
+  .mission-actions {
+    gap: 6px;
+  }
+  .activity-button {
+    min-height: 44px;
+    width: 44px;
+    padding: 0;
+  }
+  .activity-button-text,
+  .activity-button .activity-count {
+    display: none;
   }
 }
 @media (max-width: 500px) {

@@ -236,6 +236,10 @@ test("projects live activity, isolates external identities, reconnects from curs
   page,
 }) => {
   await fixture(page);
+  await expect(
+    page.getByRole("dialog", { name: "Activity stream", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".office-footer")).toBeInViewport();
   await page
     .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
     .click();
@@ -264,6 +268,25 @@ test("projects live activity, isolates external identities, reconnects from curs
     page.getByRole("button", {
       name: "Backend coder: Executing. Inspect agent",
     }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const activity = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(
+    activity.getByRole("heading", { name: "Recent activity 1" }),
+  ).toBeVisible();
+  await activity
+    .locator(".timeline > button")
+    .filter({ hasText: "Reading integration notes" })
+    .click();
+  await expect(activity).toBeHidden();
+  await expect(
+    page.getByRole("heading", { name: "Backend Coder", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Reading integration notes", { exact: true }),
   ).toBeVisible();
   await page.evaluate(() => {
     const stream = (
@@ -645,6 +668,19 @@ test("offers usable mobile navigation and keyboard agent selection with reduced 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await fixture(page);
+  await expect(
+    page.getByRole("dialog", { name: "Activity stream", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const activity = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(
+    activity.getByRole("heading", { name: "Recent activity 0" }),
+  ).toBeVisible();
+  await activity.getByRole("button", { name: "Close dialog" }).click();
+  await expect(activity).toBeHidden();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
   await page.getByRole("textbox", { name: "Search agents" }).fill("architect");
   await expect(
@@ -1110,8 +1146,11 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
       ),
     )
     .toContain("after=0");
+  await page.getByRole("button", { name: "Open activity stream" }).click();
   await expect(
-    page.getByRole("heading", { name: "Activity stream 0" }),
+    page
+      .getByRole("dialog", { name: "Activity stream", exact: true })
+      .getByRole("heading", { name: "Recent activity 0" }),
   ).toBeVisible();
 });
 test("another client reset event clears stale run data and reopens the stream at zero", async ({
@@ -1122,9 +1161,16 @@ test("another client reset event clears stale run data and reopens the stream at
     route.fulfill({ json: { agents: [], cursor: 0 } }),
   );
   await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const activity = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(activity).toBeVisible();
   await page.evaluate(() => {
     (window as unknown as { __officeReset: () => void }).__officeReset();
   });
+  await expect(activity).toBeHidden();
   await expect(
     page.getByRole("combobox", { name: "Selected mission" }),
   ).toHaveValue("");
@@ -1141,6 +1187,10 @@ test("another client reset event clears stale run data and reopens the stream at
       ),
     )
     .toContain("after=0");
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  await expect(
+    activity.getByRole("heading", { name: "Recent activity 0" }),
+  ).toBeVisible();
   expect(requests.some((request) => request.path === "/api/regenesis")).toBe(
     false,
   );
@@ -1211,15 +1261,21 @@ test("same-generation reconnect replays missed activity from the last received s
         timestamp: `2026-10-18T10:00:0${seq - 8}Z`,
       });
   });
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const activity = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
   await expect(
-    page.getByText("Read acceptance results while disconnected"),
+    activity.getByText("Read acceptance results while disconnected"),
   ).toBeVisible();
   await expect(
-    page.getByText("Writing the final acceptance report"),
+    activity.getByText("Writing the final acceptance report"),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Activity stream 2" }),
+    activity.getByRole("heading", { name: "Recent activity 2" }),
   ).toBeVisible();
+  await activity.getByRole("button", { name: "Close dialog" }).click();
   await expect(
     page.getByRole("button", { name: "Backend coder: Writing. Inspect agent" }),
   ).toBeVisible();
@@ -1241,7 +1297,12 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
       timestamp: "2026-10-18T10:00:02Z",
     });
   });
-  await expect(page.getByText("Old generation activity")).toBeVisible();
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const activity = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(activity.getByText("Old generation activity")).toBeVisible();
   await page.route("**/api/office", (route) =>
     route.fulfill({
       json: { agents: [], cursor: 0, generation: "after-offline-reset" },
@@ -1268,13 +1329,15 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
       ),
     )
     .toBe("/api/events?after=0&generation=after-offline-reset");
+  await expect(activity).toBeHidden();
   await expect(
     page.getByRole("combobox", { name: "Selected mission" }),
   ).toHaveValue("");
   await expect(page.getByText("Old generation activity")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Old Agent/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Open activity stream" }).click();
   await expect(
-    page.getByRole("heading", { name: "Activity stream 0" }),
+    activity.getByRole("heading", { name: "Recent activity 0" }),
   ).toBeVisible();
   expect(reloadedSettings).toBe(true);
   await page.evaluate(() => {
@@ -1291,13 +1354,14 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
     });
   });
   await expect(
-    page.getByText("First activity after offline reset"),
+    activity.getByText("First activity after offline reset"),
   ).toBeVisible();
+  await expect(
+    activity.getByRole("heading", { name: "Recent activity 1" }),
+  ).toBeVisible();
+  await activity.getByRole("button", { name: "Close dialog" }).click();
   await expect(
     page.getByRole("button", { name: "New Agent: Reading. Inspect agent" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Activity stream 1" }),
   ).toBeVisible();
 });
 test("a regressed snapshot also detects a reset when the generation token is unavailable", async ({

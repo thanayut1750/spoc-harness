@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Activity as ActivityIcon,
@@ -130,12 +130,14 @@ function Modal({
   className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
   return (
     <dialog
       ref={dialog}
+      aria-labelledby={titleId}
       className={`modal ${wide ? "modal-wide" : ""} ${className}`}
       onClose={onClose}
       onClick={(event) => {
@@ -145,7 +147,7 @@ function Modal({
       <div className="modal-heading">
         <div>
           <span className="eyebrow">SPOC WORKSPACE</span>
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           {subtitle && <p>{subtitle}</p>}
         </div>
         <button
@@ -1006,7 +1008,7 @@ export default function App() {
   const [selected, setSelected] = useState("executive");
   const [view, setView] = useState<"office" | "list">("office");
   const [modal, setModal] = useState<
-    "mission" | "review" | "settings" | "report" | null
+    "mission" | "review" | "settings" | "report" | "activity" | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1304,16 +1306,31 @@ export default function App() {
                 <span className="edition">LIVE ORGANIZATION</span>
               </div>
             </div>
-            <button
-              className="primary-button"
-              onClick={() => {
-                setModalError("");
-                setModal("mission");
-              }}
-            >
-              <Plus size={16} />
-              New mission
-            </button>
+            <div className="mission-actions">
+              <button
+                className="activity-button"
+                aria-label="Open activity stream"
+                aria-haspopup="dialog"
+                title="Activity stream"
+                onClick={() => setModal("activity")}
+              >
+                <ActivityIcon size={16} />
+                <span className="activity-button-text">Activity</span>
+                <span className="activity-count" aria-hidden="true">
+                  {events.length}
+                </span>
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setModalError("");
+                  setModal("mission");
+                }}
+              >
+                <Plus size={16} />
+                New mission
+              </button>
+            </div>
           </section>
           <div className="run-bar">
             <div className="run-selector">
@@ -1613,58 +1630,6 @@ export default function App() {
               </span>
             </footer>
           </section>
-          <section className="activity-section">
-            <div className="activity-heading">
-              <h2>
-                <ActivityIcon size={16} /> Activity stream{" "}
-                <span className="tiny-count">{events.length}</span>
-              </h2>
-              <span className="live-word">
-                <Radio size={12} />{" "}
-                {office.connection === "live" ? "LIVE" : "AWAITING CONNECTION"}
-              </span>
-            </div>
-            {events.length === 0 ? (
-              <div className="timeline-empty">
-                <span className="timeline-line" />
-                <div>
-                  <span className="small-dot" />
-                  <strong>The office is ready</strong>
-                  <p>
-                    {run
-                      ? "Activity will appear here as the organization works."
-                      : "Create a mission to see your organization get to work."}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="timeline">
-                {events.slice(0, 60).map((event) => (
-                  <button
-                    key={event.seq}
-                    onClick={() => setSelected(event.agent_id)}
-                  >
-                    <Stamp date={event.timestamp} />
-                    <span className={`small-dot ${event.activity}`} />
-                    <strong>
-                      {event.display_name ?? roleFor(event.agent_id).name}
-                    </strong>
-                    <span>
-                      {event.summary ?? activityLabels[event.activity]}
-                    </span>
-                    <code>{event.kr_id ?? ""}</code>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-          {run?.report && (
-            <button className="report-link" onClick={() => setModal("report")}>
-              <CheckCheck size={17} />
-              <span>Mission report is ready</span>
-              <ArrowRight size={15} />
-            </button>
-          )}
           <footer className="main-footer">
             <span>
               <Code2 size={13} /> SPOC HARNESS
@@ -1688,6 +1653,13 @@ export default function App() {
                 );
               }}
             />
+          )}
+          {run?.report && (
+            <button className="report-link" onClick={() => setModal("report")}>
+              <CheckCheck size={17} />
+              <span>Mission report is ready</span>
+              <ArrowRight size={15} />
+            </button>
           )}
         </aside>
       </div>
@@ -1732,6 +1704,63 @@ export default function App() {
           />
         </Modal>
       )}{" "}
+      {modal === "activity" && (
+        <Modal
+          title="Activity stream"
+          onClose={() => setModal(null)}
+          wide
+          className="activity-modal"
+        >
+          <section className="activity-section" aria-label="Recent activity">
+            <div className="activity-heading">
+              <h3>
+                <ActivityIcon size={16} /> Recent activity{" "}
+                <span className="tiny-count">{events.length}</span>
+              </h3>
+              <span className="live-word">
+                <Radio size={12} />{" "}
+                {office.connection === "live" ? "LIVE" : "AWAITING CONNECTION"}
+              </span>
+            </div>
+            {events.length === 0 ? (
+              <div className="timeline-empty">
+                <span className="timeline-line" />
+                <div>
+                  <span className="small-dot" />
+                  <strong>The office is ready</strong>
+                  <p>
+                    {run
+                      ? "Activity will appear here as the organization works."
+                      : "Create a mission to see your organization get to work."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="timeline">
+                {events.slice(0, 60).map((event) => (
+                  <button
+                    key={event.seq}
+                    onClick={() => {
+                      setSelected(event.agent_id);
+                      setModal(null);
+                    }}
+                  >
+                    <Stamp date={event.timestamp} />
+                    <span className={`small-dot ${event.activity}`} />
+                    <strong>
+                      {event.display_name ?? roleFor(event.agent_id).name}
+                    </strong>
+                    <span>
+                      {event.summary ?? activityLabels[event.activity]}
+                    </span>
+                    <code>{event.kr_id ?? ""}</code>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </Modal>
+      )}
       {modal === "report" && run && (
         <Modal
           title="Mission report"
