@@ -1,0 +1,161 @@
+"""Immutable boundary contracts for graph execution, tools, and HTTP clients."""
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+Department = Literal["research", "engineering"]
+Activity = Literal[
+    "idle",
+    "planning",
+    "reading",
+    "writing",
+    "executing",
+    "reviewing",
+    "waiting",
+    "completed",
+    "error",
+]
+Role = Literal["market_researcher", "data_analyst", "system_architect", "backend_coder"]
+
+
+class Contract(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class Constitution(Contract):
+    mission_statement: str = Field(
+        default="Complete the objective with traceable evidence.", min_length=1
+    )
+    prohibited_actions: tuple[str, ...] = ()
+    compliance_rules: tuple[str, ...] = ()
+    max_revision_loops: int = Field(default=2, ge=0, le=10)
+
+
+class RunLimits(Contract):
+    max_model_calls: int = Field(default=100, ge=1, le=10000)
+    max_tool_calls: int = Field(default=200, ge=1, le=100000)
+    worker_model_calls: int = Field(default=12, ge=1, le=100)
+    command_timeout: int = Field(default=300, ge=1, le=86400)
+
+
+class KeyResult(Contract):
+    kr_id: str = Field(min_length=1, max_length=128)
+    description: str = Field(min_length=1)
+    acceptance_criteria: tuple[str, ...] = Field(min_length=1)
+    target_department: Department
+    dependency_kr_ids: tuple[str, ...] = ()
+    version: int = Field(default=1, ge=1)
+
+
+class StrategicObjective(Contract):
+    objective_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    key_results: tuple[KeyResult, ...] = Field(min_length=1)
+
+
+class StrategicPlan(Contract):
+    objectives: tuple[StrategicObjective, ...] = Field(min_length=1, max_length=3)
+
+
+class WorkPackage(Contract):
+    work_package_id: str = Field(min_length=1)
+    kr_id: str = Field(min_length=1)
+    role: Role
+    task: str = Field(min_length=1)
+    acceptance_criteria: tuple[str, ...] = Field(min_length=1)
+
+
+class TacticalPlan(Contract):
+    work_packages: tuple[WorkPackage, ...] = Field(min_length=1, max_length=4)
+
+
+class ArtifactRef(Contract):
+    artifact_id: str
+    name: str
+    media_type: str = "text/plain"
+    size: int = Field(default=0, ge=0)
+
+
+class Deliverable(Contract):
+    kr_id: str
+    department: Department
+    worker_role: str
+    summary: str = Field(min_length=1)
+    artifact_ids: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    confidence_score: float = Field(default=0.5, ge=0, le=1)
+
+
+class Evaluation(Contract):
+    passed_constitution: bool
+    passed_kr_criteria: bool
+    score: float = Field(ge=0, le=1)
+    feedback: str
+    criterion_results: dict[str, bool] = Field(default_factory=dict)
+    recommended_action: Literal["approve", "retry_worker", "escalate_to_exec"]
+    deterministic_checks_passed: bool = True
+
+
+class Escalation(Contract):
+    escalation_id: str
+    kr_id: str
+    kind: str
+    reason: str
+    resolved: bool = False
+
+
+class DepartmentOutcome(Contract):
+    kr_id: str
+    version: int = Field(default=1, ge=1)
+    epoch: int = Field(default=0, ge=0)
+    status: Literal["passed", "escalated", "failed"]
+    deliverable: Deliverable | None = None
+    evaluation: Evaluation | None = None
+    escalation: Escalation | None = None
+
+
+class RunCreate(Contract):
+    user_request: str = Field(min_length=1, max_length=50000)
+    workspace_path: str | None = None
+    constitution: Constitution = Field(default_factory=Constitution)
+    limits: RunLimits = Field(default_factory=RunLimits)
+
+
+class ReviewDecision(Contract):
+    interrupt_id: str
+    action: Literal["provide_context", "revise_kr", "retry_operation", "abort", "continue"]
+    context: str | None = None
+    kr_id: str | None = None
+    description: str | None = None
+    acceptance_criteria: tuple[str, ...] | None = None
+
+
+class ActivityEvent(Contract):
+    schema_version: Literal[1] = 1
+    event_id: str = Field(min_length=1, max_length=200)
+    source: str = Field(default="external", min_length=1, max_length=100)
+    agent_id: str = Field(min_length=1, max_length=100)
+    run_id: str | None = None
+    kr_id: str | None = None
+    activity: Activity
+    summary: str = Field(default="", max_length=2000)
+    data: dict[str, Any] = Field(default_factory=dict)
+    timestamp: str | None = None
+
+    @model_validator(mode="after")
+    def bounded_payload(self) -> "ActivityEvent":
+        import json
+
+        if len(json.dumps(self.data)) > 65536:
+            raise ValueError("Event display payload exceeds 64 KiB")
+        return self
+
+
+class EscalationSignal(Exception):
+    """Expected execution blocker, distinct from programming failures."""
+
+    def __init__(self, kind: str, reason: str):
+        self.kind = kind
+        self.reason = reason
+        super().__init__(reason)
