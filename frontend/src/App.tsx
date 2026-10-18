@@ -34,11 +34,16 @@ import { api } from "./api";
 import { ArtifactFiles } from "./ArtifactFiles";
 import { ReviewEvidence } from "./ReviewEvidence";
 import {
-  actionImplications,
+  actionCtas,
   actionLabels,
   allowedActions,
   reviewFocus,
   reviewReason,
+  recommendedAction,
+  retryContext,
+  retryDirective,
+  reviewPresentation,
+  reviewOperation,
 } from "./review";
 import { OfficeCanvas } from "./OfficeCanvas";
 import {
@@ -300,6 +305,9 @@ function ReviewModal({
   error: string;
 }) {
   const options = allowedActions(run);
+  const recommended = recommendedAction(run);
+  const presentation = reviewPresentation(run);
+  const operation = reviewOperation(run);
   const focus = reviewFocus(run, events);
   const results =
     run.objectives?.flatMap((objective) => objective.key_results) ?? [];
@@ -307,10 +315,8 @@ function ReviewModal({
   const initialDefinition = results.find(
     (result) => result.kr_id === initialKr,
   );
-  const [action, setAction] = useState<ReviewAction>(options[0] ?? "abort");
-  const selectedAction = options.includes(action)
-    ? action
-    : (options[0] ?? "abort");
+  const [action, setAction] = useState<ReviewAction>(recommended);
+  const selectedAction = options.includes(action) ? action : recommended;
   const [context, setContext] = useState("");
   const [kr, setKr] = useState(initialKr);
   const [description, setDescription] = useState(
@@ -319,13 +325,27 @@ function ReviewModal({
   const [criteria, setCriteria] = useState(
     initialDefinition?.acceptance_criteria.join("\n") ?? "",
   );
+  const guidanceRequired =
+    selectedAction === "provide_context" && presentation.requiresGuidance;
+  const primaryLabel =
+    selectedAction === "provide_context" && presentation.requiresGuidance
+      ? "Send guidance and retry"
+      : actionCtas[selectedAction];
+  const mission = run.review?.context?.mission ?? run.user_request;
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!run.review || !options.length) return;
+    if (!run.review || !options.length || (guidanceRequired && !context.trim()))
+      return;
+    const sentContext =
+      selectedAction === "provide_context"
+        ? guidanceRequired
+          ? context.trim()
+          : retryContext(run, context)
+        : context.trim();
     onSubmit({
       interrupt_id: run.review.interrupt_id,
       action: selectedAction,
-      ...(context.trim() ? { context: context.trim() } : {}),
+      ...(sentContext ? { context: sentContext } : {}),
       ...(selectedAction === "revise_kr"
         ? {
             kr_id: kr,
@@ -338,139 +358,227 @@ function ReviewModal({
         : {}),
     });
   }
-  const implication =
-    run.review?.context?.action_implications?.[selectedAction] ??
-    actionImplications[selectedAction];
-  const subtitle = focus.blocked.length
-    ? `${focus.blocked.length} key ${focus.blocked.length === 1 ? "result needs" : "results need"} review${focus.waiting.length ? ` · ${focus.waiting.length} waiting on dependencies` : ""}`
-    : "Review the saved evidence before deciding how the organization continues.";
+  const descriptions: Partial<Record<ReviewAction, string>> = {
+    provide_context: presentation.requiresGuidance
+      ? presentation.policyIssue
+        ? "Tell the team how to continue within the rules."
+        : "Answer the team's question so work can continue."
+      : retryDirective,
+    revise_kr: "Edit what a successful result should include.",
+    retry_operation: "Run the interrupted command one more time.",
+    continue: "Continue from the saved pause.",
+  };
   return (
     <Modal
-      title="The office needs your direction"
-      subtitle={subtitle}
+      title="How should the team continue?"
       onClose={onClose}
-      wide
-      className="review-modal"
+      className="review-modal review-compact"
     >
-      <div className="review-layout">
-        <ReviewEvidence run={run} files={artifacts} events={events} />
-        <div className="review-decision-panel">
-          <form onSubmit={submit}>
-            <h3>Your decision</h3>
-            <p className="decision-intro">
-              Choose what the organization should do with the blocked work.
-            </p>
-            <label>
-              Decision
-              <select
-                value={selectedAction}
-                onChange={(event) =>
-                  setAction(event.target.value as ReviewAction)
-                }
+      <div className="review-mission-line">
+        <span>Mission</span>
+        <p title={mission}>{mission}</p>
+      </div>
+      <div
+        className={`review-brief ${presentation.policyIssue || presentation.unknownOperation ? "review-brief-warning" : ""}`}
+      >
+        <ShieldCheck size={17} />
+        <div>
+          <p>{presentation.summary}</p>
+          {presentation.warning && (
+            <p className="review-important-note">{presentation.warning}</p>
+          )}
+        </div>
+      </div>
+      {presentation.unknownOperation && (
+        <div className="review-operation">
+          <span>Command to run again</span>
+          <pre>
+            {operation.command ??
+              "The command text is unavailable in this saved review. Inspect its evidence before choosing to run it again."}
+          </pre>
+          {operation.cwd && <small>Folder: {operation.cwd}</small>}
+        </div>
+      )}
+      <form className="review-simple-form" onSubmit={submit}>
+        <fieldset className="review-choices">
+          <legend>Choose the next step</legend>
+          {options
+            .filter((option) => option !== "abort")
+            .map((option) => (
+              <label
+                className={`review-choice ${selectedAction === option ? "selected" : ""}`}
+                key={option}
               >
-                {options.map((option) => (
-                  <option key={option} value={option}>
-                    {actionLabels[option]}
+                <input
+                  type="radio"
+                  name="review-action"
+                  value={option}
+                  checked={selectedAction === option}
+                  onChange={() => setAction(option)}
+                />
+                <span>
+                  <span className="review-choice-title">
+                    {option === "provide_context" &&
+                    presentation.requiresGuidance
+                      ? "Give guidance"
+                      : actionLabels[option]}
+                    {option === recommended &&
+                      !presentation.unknownOperation &&
+                      !presentation.sourceUnavailable &&
+                      !presentation.usageLimit && <small>Recommended</small>}
+                  </span>
+                  <span className="review-choice-description">
+                    {descriptions[option]}
+                  </span>
+                </span>
+              </label>
+            ))}
+        </fieldset>
+        {guidanceRequired && (
+          <label className="required-guidance">
+            What should the team do differently?
+            <textarea
+              rows={3}
+              required
+              value={context}
+              onChange={(event) => setContext(event.target.value)}
+              placeholder={
+                presentation.policyIssue
+                  ? "Explain how the team should complete the task while following the rule…"
+                  : "Provide the missing detail or answer the question above…"
+              }
+            />
+          </label>
+        )}
+        {selectedAction === "provide_context" &&
+          !presentation.requiresGuidance && (
+            <details className="review-add-note">
+              <summary>
+                {presentation.sourceUnavailable
+                  ? "Add instructions or an alternative source"
+                  : "Add instructions (optional)"}
+              </summary>
+              <label>
+                {presentation.sourceUnavailable
+                  ? "Instructions or source URL"
+                  : "Additional instructions"}
+                <textarea
+                  rows={3}
+                  value={context}
+                  onChange={(event) => setContext(event.target.value)}
+                  placeholder={
+                    presentation.sourceUnavailable
+                      ? "Add a source URL, explain an access fix, or suggest another approach…"
+                      : "Add a specific correction or useful information…"
+                  }
+                />
+              </label>
+            </details>
+          )}
+        {selectedAction === "revise_kr" && (
+          <div className="review-advanced">
+            <label>
+              Task to update
+              <select
+                required
+                value={kr}
+                onChange={(event) => {
+                  setKr(event.target.value);
+                  const definition = results.find(
+                    (result) => result.kr_id === event.target.value,
+                  );
+                  setDescription(definition?.description ?? "");
+                  setCriteria(definition?.acceptance_criteria.join("\n") ?? "");
+                }}
+              >
+                <option value="">Select a task</option>
+                {results.map((result, index) => (
+                  <option value={result.kr_id} key={result.kr_id}>
+                    Task {index + 1}: {result.description}
                   </option>
                 ))}
               </select>
             </label>
-            <div className="action-implication">
-              <span className="eyebrow">WHAT HAPPENS NEXT</span>
-              <p>{implication}</p>
-            </div>
-            {selectedAction === "revise_kr" && (
-              <>
-                <label>
-                  Key result
-                  <select
-                    required
-                    value={kr}
-                    onChange={(event) => {
-                      setKr(event.target.value);
-                      const definition = results.find(
-                        (result) => result.kr_id === event.target.value,
-                      );
-                      setDescription(definition?.description ?? "");
-                      setCriteria(
-                        definition?.acceptance_criteria.join("\n") ?? "",
-                      );
-                    }}
-                  >
-                    <option value="">Select a key result</option>
-                    {results.map((result) => (
-                      <option value={result.kr_id} key={result.kr_id}>
-                        {result.kr_id}: {result.description}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Revised description
-                  <textarea
-                    required
-                    rows={3}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Acceptance criteria, one per line
-                  <textarea
-                    required
-                    rows={4}
-                    value={criteria}
-                    onChange={(event) => setCriteria(event.target.value)}
-                  />
-                </label>
-              </>
-            )}
             <label>
-              {selectedAction === "abort" ? "Reason" : "Context for the team"}
+              Updated task
               <textarea
-                rows={5}
-                value={context}
-                onChange={(event) => setContext(event.target.value)}
-                required={selectedAction === "provide_context"}
-                placeholder={
-                  selectedAction === "provide_context"
-                    ? "Explain the missing information or the specific correction the worker should make…"
-                    : "Explain your decision for the team…"
-                }
+                required
+                rows={2}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
               />
             </label>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="modal-footer">
-              <button className="text-button" type="button" onClick={onClose}>
-                Decide later
-              </button>
-              <button
-                className={
-                  selectedAction === "abort"
-                    ? "danger-button"
-                    : "primary-button"
-                }
-                disabled={busy || !run.review || !options.length}
-              >
-                {busy ? (
-                  <LoaderCircle size={15} className="spin" />
-                ) : (
-                  <Play size={15} />
-                )}
-                Apply decision
-              </button>
-            </div>
-            <p className="decision-boundary-note">
-              Your decision applies to this saved interrupt. No work resumes
-              until you apply it.
+            <label>
+              Requirements, one per line
+              <textarea
+                required
+                rows={3}
+                value={criteria}
+                onChange={(event) => setCriteria(event.target.value)}
+              />
+            </label>
+            <p>
+              Changed requirements will be checked again. Any dependent work
+              will be reviewed again too.
             </p>
-          </form>
+          </div>
+        )}
+        {selectedAction === "abort" && (
+          <div className="review-stop-confirm">
+            <p>
+              Stop this run? Existing files and evidence will remain available.
+            </p>
+          </div>
+        )}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="review-simple-footer">
+          <div>
+            {options.includes("abort") && (
+              <button
+                className="text-button stop-run-choice"
+                type="button"
+                onClick={() =>
+                  setAction(selectedAction === "abort" ? recommended : "abort")
+                }
+              >
+                {selectedAction === "abort" ? "Back to options" : "Stop run"}
+              </button>
+            )}
+          </div>
+          <button
+            className={
+              selectedAction === "abort" ? "danger-button" : "primary-button"
+            }
+            disabled={
+              busy ||
+              !run.review ||
+              !options.length ||
+              (guidanceRequired && !context.trim())
+            }
+          >
+            {busy ? (
+              <LoaderCircle size={15} className="spin" />
+            ) : selectedAction === "abort" ? (
+              <Square size={12} />
+            ) : (
+              <Play size={14} />
+            )}{" "}
+            {primaryLabel}
+          </button>
         </div>
-      </div>
+      </form>
+      <details className="review-details">
+        <summary>
+          <FileText size={14} />
+          Review evidence and history
+          <ChevronDown size={13} />
+        </summary>
+        <ReviewEvidence run={run} files={artifacts} events={events} />
+      </details>
     </Modal>
   );
 }
@@ -1169,7 +1277,7 @@ export default function App() {
             >
               <ShieldCheck size={18} />
               <span>
-                <strong>Your direction is needed</strong>
+                <strong>Choose the next step</strong>
                 <span>{reviewRun ? reviewReason(reviewRun) : ""}</span>
               </span>
               <span className="review-action">

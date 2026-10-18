@@ -9,11 +9,11 @@ import type {
   Run,
 } from "./types";
 export const actionLabels: Record<ReviewAction, string> = {
-  provide_context: "Provide context and retry",
-  revise_kr: "Revise a key result",
-  retry_operation: "Retry the reviewed operation",
-  continue: "Continue execution",
-  abort: "Abort this run",
+  provide_context: "Retry task",
+  revise_kr: "Change requirements",
+  retry_operation: "Run command again",
+  continue: "Resume work",
+  abort: "Stop run",
 };
 export const actionImplications: Record<ReviewAction, string> = {
   provide_context:
@@ -191,4 +191,174 @@ export function artifactSizeLabel(artifact: Artifact): string {
   return typeof artifact.size === "number"
     ? `${(artifact.size / 1024).toFixed(1)} KB`
     : "Size not recorded";
+}
+
+export const retryDirective =
+  "Try the blocked work again using the current requirements and recorded feedback.";
+export const actionCtas: Record<ReviewAction, string> = {
+  provide_context: "Retry task",
+  revise_kr: "Save changes and retry",
+  retry_operation: "Run command again",
+  continue: "Resume work",
+  abort: "Stop run",
+};
+export function recommendedAction(run: Run): ReviewAction {
+  const actions = allowedActions(run);
+  const preferred =
+    run.review?.kind === "manual_pause"
+      ? "continue"
+      : run.review?.kind === "unknown_operation"
+        ? "retry_operation"
+        : "provide_context";
+  return actions.includes(preferred)
+    ? preferred
+    : (actions.find((action) => action !== "abort") ?? "abort");
+}
+export function reviewPresentation(run: Run): {
+  summary: string;
+  warning?: string;
+  requiresGuidance: boolean;
+  sourceUnavailable: boolean;
+  unknownOperation: boolean;
+  policyIssue: boolean;
+  usageLimit?: boolean;
+} {
+  const kind = run.review?.kind ?? "";
+  const reason = reviewReason(run);
+  const classifications =
+    run.review?.context?.blockers?.map((blocker) => blocker.classification) ??
+    [];
+  const policyIssue =
+    classifications.includes("policy_violation") ||
+    (kind === "constitution_violation" &&
+      !classifications.includes("quality_or_execution_failure"));
+  const unknownOperation = kind === "unknown_operation";
+  const sourceUnavailable =
+    kind === "missing_resource" ||
+    /reader.*fail|source.*(?:unavailable|could not|failed)|entitlement|quota|MCPError/i.test(
+      reason,
+    );
+  const clarification =
+    [
+      "clarification",
+      "clarification_required",
+      "human_clarification",
+      "ambiguity",
+      "ambiguous_request",
+      "missing_information",
+    ].includes(kind) ||
+    (!sourceUnavailable &&
+      /clarif(?:y|ication)|ambiguous|unclear (?:requirement|request)|missing (?:information|requirements)/i.test(
+        reason,
+      ));
+  if (kind === "manual_pause")
+    return {
+      summary: "The team is paused. Resume when you’re ready.",
+      requiresGuidance: false,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  if (unknownOperation)
+    return {
+      summary: "A command ended before its outcome was recorded.",
+      warning:
+        "The command may already have changed files. Running it again can repeat those changes. Check the recorded evidence before retrying.",
+      requiresGuidance: false,
+      sourceUnavailable: false,
+      unknownOperation: true,
+      policyIssue: false,
+    };
+  if (policyIssue)
+    return {
+      summary: "The team stopped because a rule may have been violated.",
+      warning: reason.length > 260 ? `${reason.slice(0, 257)}…` : reason,
+      requiresGuidance: true,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: true,
+    };
+  if (clarification)
+    return {
+      summary: "The team needs a detail from you before it can continue.",
+      warning: reason.length > 240 ? `${reason.slice(0, 237)}…` : reason,
+      requiresGuidance: true,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  if (
+    kind === "limit_exceeded" ||
+    /usage limit|model.call limit|tool.call limit|budget.{0,30}(?:exceeded|exhausted)|allowance/i.test(
+      reason,
+    )
+  )
+    return {
+      summary: "The team reached an execution limit.",
+      usageLimit: true,
+      warning:
+        "Retrying does not reset this run’s usage allowance. Review the limit or stop the run before spending more calls.",
+      requiresGuidance: false,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  if (sourceUnavailable)
+    return {
+      summary:
+        "A required source could not be read. Retry after access is restored, or add an alternative source.",
+      requiresGuidance: false,
+      sourceUnavailable: true,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  if (
+    /empty result|empty deliverable|no (?:usable )?(?:task )?output|no deliverable|did not produce/i.test(
+      reason,
+    )
+  )
+    return {
+      summary:
+        "The task returned no usable output. You can retry it or change its requirements.",
+      requiresGuidance: false,
+      sourceUnavailable: false,
+      unknownOperation: false,
+      policyIssue: false,
+    };
+  return {
+    summary:
+      "The task could not meet its requirements. Choose how the team should continue.",
+    requiresGuidance: false,
+    sourceUnavailable: false,
+    unknownOperation: false,
+    policyIssue: false,
+  };
+}
+export function retryContext(run: Run, note: string): string {
+  const focus = reviewFocus(run);
+  const feedback = [
+    reviewReason(run),
+    ...focus.blocked
+      .map((kr) => kr.evaluation?.feedback)
+      .filter((value): value is string => !!value),
+  ];
+  const unique = [...new Set(feedback)];
+  return [
+    retryDirective,
+    `Recorded review feedback:\n${unique.join("\n\n")}`,
+    ...(note.trim() ? [`Additional instructions:\n${note.trim()}`] : []),
+  ].join("\n\n");
+}
+export function reviewOperation(run: Run): { command?: string; cwd?: string } {
+  const operation =
+    record(record(run.review?.context)?.operation) ??
+    record(run.review?.operation);
+  const request = record(operation?.request);
+  return {
+    command:
+      text(operation?.command) ??
+      text(request?.command) ??
+      text(run.review?.command),
+    cwd: text(operation?.cwd) ?? text(request?.cwd),
+  };
 }

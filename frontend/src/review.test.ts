@@ -5,6 +5,10 @@ import {
   artifactSizeLabel,
   reviewFocus,
   reviewReason,
+  retryContext,
+  retryDirective,
+  reviewPresentation,
+  reviewOperation,
 } from "./review";
 import type { Artifact, Run } from "./types";
 const run: Run = {
@@ -125,5 +129,82 @@ describe("artifact meaning", () => {
       "Empty log · no diagnostic output",
     );
     expect(artifactSizeLabel(file("task_output", 0))).toBe("Empty task output");
+  });
+});
+
+describe("compact decision semantics", () => {
+  it("preserves actual recorded feedback when retrying and labels added instructions separately", () => {
+    const ordinary: Run = {
+      ...run,
+      review: {
+        ...run.review!,
+        kind: "missing_resource",
+        reason: "Reader access failed.",
+        context: {
+          key_results: [
+            {
+              kr_id: "KR1",
+              description: "Research",
+              acceptance_criteria: ["Cite sources"],
+              evaluation: { feedback: "No citation was recovered." },
+            },
+          ],
+        },
+      },
+    };
+    const context = retryContext(ordinary, "Use a supplied source URL.");
+    expect(context).toContain(retryDirective);
+    expect(context).toContain(
+      "Recorded review feedback:\nReader access failed.",
+    );
+    expect(context).toContain("No citation was recovered.");
+    expect(context).toContain(
+      "Additional instructions:\nUse a supplied source URL.",
+    );
+  });
+  it("distinguishes source failures from policy and human clarification decisions", () => {
+    expect(
+      reviewPresentation({
+        ...run,
+        review: { ...run.review!, kind: "missing_resource" },
+      }),
+    ).toMatchObject({ sourceUnavailable: true, requiresGuidance: false });
+    expect(reviewPresentation(run)).toMatchObject({
+      policyIssue: true,
+      requiresGuidance: true,
+    });
+    expect(
+      reviewPresentation({
+        ...run,
+        review: {
+          ...run.review!,
+          kind: "clarification",
+          reason: "Which dataset should be used?",
+        },
+      }),
+    ).toMatchObject({ requiresGuidance: true, policyIssue: false });
+  });
+  it("keeps unknown command and usage-limit risks explicit without claiming a reset", () => {
+    expect(
+      reviewPresentation({
+        ...run,
+        review: { ...run.review!, kind: "unknown_operation" },
+      }).warning,
+    ).toContain("may already have changed files");
+    expect(
+      reviewPresentation({
+        ...run,
+        review: { ...run.review!, kind: "limit_exceeded" },
+      }).warning,
+    ).toContain("does not reset");
+    expect(
+      reviewOperation({
+        ...run,
+        review: {
+          ...run.review!,
+          operation: { command: "python validate.py", cwd: "/tmp/work" },
+        },
+      }),
+    ).toEqual({ command: "python validate.py", cwd: "/tmp/work" });
   });
 });

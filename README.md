@@ -55,7 +55,9 @@ The office shows the objective/KR hierarchy on the left, actual agent activity i
 
 Ordinary blockers receive one automatic executive replan per run. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
 
-The review panel includes the mission, blocked KR and acceptance criteria, gate feedback, recorded attempts, evidence files, and the effect of each available action. Pending dependent KRs appear separately. Older runs recover the available summaries and evidence without rewriting their saved interrupt; unavailable history is labeled explicitly.
+The review panel starts with a short explanation and plain choices: retry the task, change its requirements, or stop the run. A normal retry preserves the current requirements and recorded feedback; extra instructions are optional. Rule violations and clarification requests require written guidance. The primary button names the action it will take.
+
+Expand **Review evidence and history** for the mission, blocked KR and acceptance criteria, gate feedback, recorded attempts, and files. Pending dependent KRs appear separately. Older runs recover the available summaries and evidence without rewriting their saved interrupt; unavailable history is labeled explicitly.
 
 ## Execution and persistence
 

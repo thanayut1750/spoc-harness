@@ -226,7 +226,7 @@ test("pauses, resumes from a durable boundary, and cancels a run", async ({
     page.getByRole("button", { name: "Review and resume mission" }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "Review and resume mission" }).click();
-  await page.getByRole("button", { name: "Apply decision" }).click();
+  await page.getByRole("button", { name: "Resume work", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   expect(requests.find((r) => r.path.endsWith("/resume"))?.body).toMatchObject({
     interrupt_id: "pause",
@@ -287,17 +287,17 @@ test("submits a versioned KR revision against the current human interrupt", asyn
     },
   });
   await page.getByRole("button", { name: "Review and resume mission" }).click();
+  await page.getByRole("radio", { name: /Change requirements/ }).check();
   await page
-    .getByRole("combobox", { name: "Decision", exact: true })
-    .selectOption("revise_kr");
-  await page
-    .getByRole("combobox", { name: "Key result", exact: true })
+    .getByRole("combobox", { name: "Task to update", exact: true })
     .selectOption("KR2");
-  await page.getByLabel("Revised description").fill("Build a tested local API");
+  await page.getByLabel("Updated task").fill("Build a tested local API");
   await page
-    .getByLabel("Acceptance criteria, one per line")
+    .getByLabel("Requirements, one per line")
     .fill("Unit tests pass\nAPI responds locally");
-  await page.getByRole("button", { name: "Apply decision" }).click();
+  await page
+    .getByRole("button", { name: "Save changes and retry", exact: true })
+    .click();
   await expect(page.getByRole("dialog")).toBeHidden();
   expect(
     requests.find((request) => request.path.endsWith("/resume"))?.body,
@@ -404,10 +404,20 @@ test("shows review evidence and separates failed work from waiting dependencies"
   await page.getByRole("button", { name: "Review and resume mission" }).click();
   const dialog = page.getByRole("dialog");
   await expect(
-    dialog.getByText("Build a useful planning tool with cited evidence"),
+    dialog
+      .locator(".review-mission-line")
+      .getByText("Build a useful planning tool with cited evidence"),
   ).toBeVisible();
   await expect(
-    dialog.getByText("The worker produced no inventory.", { exact: true }),
+    dialog.getByRole("region", { name: "Review KR1", exact: true }),
+  ).not.toBeVisible();
+  await dialog
+    .getByText("Review evidence and history", { exact: true })
+    .click();
+  await expect(
+    dialog
+      .locator(".review-details .review-blocker")
+      .getByText("The worker produced no inventory.", { exact: true }),
   ).toBeVisible();
   const kr = dialog.getByRole("region", { name: "Review KR1", exact: true });
   await expect(
@@ -429,13 +439,110 @@ test("shows review evidence and separates failed work from waiting dependencies"
   await expect(
     dialog.getByRole("region", { name: "Review KR2", exact: true }),
   ).toHaveCount(0);
-  await expect(
-    dialog.getByRole("option", { name: "Continue execution", exact: true }),
-  ).toHaveCount(0);
-  await expect(dialog.getByText("WHAT HAPPENS NEXT")).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /Resume work/ })).toHaveCount(
+    0,
+  );
   await expect(dialog.getByText("1 / 1", { exact: true })).toBeVisible();
   await page.screenshot({
     path: "test-results/review-context-desktop.png",
+    fullPage: true,
+  });
+});
+
+test("ordinary source review offers a compact retry and preserves the exact feedback and interrupt", async ({
+  page,
+}) => {
+  const reason = "The Reader tool failed; check its entitlement and quota.";
+  const requests = await fixture(page, {
+    status: "review",
+    review: {
+      interrupt_id: "reader-interrupt",
+      kind: "missing_resource",
+      reason,
+      allowed_actions: ["provide_context", "revise_kr", "abort"],
+      kr_ids: ["KR1"],
+    },
+  });
+  await page.getByRole("button", { name: "Review and resume mission" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "How should the team continue?" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText(
+      "A required source could not be read. Retry after access is restored, or add an alternative source.",
+    ),
+  ).toBeVisible();
+  await expect(dialog.getByRole("radio")).toHaveCount(2);
+  await expect(
+    dialog.getByRole("region", { name: "Review KR1", exact: true }),
+  ).not.toBeVisible();
+  const button = dialog.getByRole("button", {
+    name: "Retry task",
+    exact: true,
+  });
+  await expect(button).toBeInViewport({ ratio: 1 });
+  await dialog
+    .getByText("Add instructions or an alternative source", { exact: true })
+    .click();
+  await dialog
+    .getByLabel("Instructions or source URL")
+    .fill("Use https://example.org/source as an alternative source.");
+  await button.click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  const body = requests.find((request) =>
+    request.path.endsWith("/resume"),
+  )?.body;
+  expect(body).toMatchObject({
+    interrupt_id: "reader-interrupt",
+    action: "provide_context",
+  });
+  expect(body?.context).toContain(
+    "Try the blocked work again using the current requirements and recorded feedback.",
+  );
+  expect(body?.context).toContain(`Recorded review feedback:\n${reason}`);
+  expect(body?.context).toContain(
+    "Additional instructions:\nUse https://example.org/source as an alternative source.",
+  );
+});
+test("policy review requires written guidance and keeps its action visible on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, {
+    status: "review",
+    review: {
+      interrupt_id: "policy-interrupt",
+      kind: "constitution_violation",
+      reason: "A worker tried to delete protected files.",
+      allowed_actions: ["provide_context", "revise_kr", "abort"],
+    },
+  });
+  await page.getByRole("button", { name: "Review and resume mission" }).click();
+  const dialog = page.getByRole("dialog");
+  const button = dialog.getByRole("button", {
+    name: "Send guidance and retry",
+    exact: true,
+  });
+  await expect(button).toBeDisabled();
+  await dialog
+    .getByLabel("What should the team do differently?")
+    .fill("Use a separate folder and preserve protected files.");
+  await expect(button).toBeEnabled();
+  await expect(button).toBeInViewport({ ratio: 1 });
+  expect((await button.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(
+    (
+      await dialog
+        .getByRole("button", { name: "Stop run", exact: true })
+        .boundingBox()
+    )?.height ?? 0,
+  ).toBeGreaterThanOrEqual(44);
+  expect(
+    await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/review-compact-mobile.png",
     fullPage: true,
   });
 });
