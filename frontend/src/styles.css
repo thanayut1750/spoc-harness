@@ -21,6 +21,12 @@
 * {
   box-sizing: border-box;
 }
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 body {
   margin: 0;
 }
@@ -96,10 +102,14 @@ button {
   background: none;
 }
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 .app-header {
   height: 68px;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -214,7 +224,11 @@ button {
 .workspace {
   display: grid;
   grid-template-columns: 245px minmax(450px, 1fr) 287px;
-  min-height: calc(100vh - 68px);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
   max-width: 1920px;
   margin: auto;
 }
@@ -3513,6 +3527,103 @@ main {
   padding: 8px 10px;
   background: #1b2b15;
   border-left: 2px solid #577642;
+}
+
+/* Keep the dashboard in the viewport; long records scroll within their panel. */
+@media (min-width: 701px) {
+  .strategy-sidebar,
+  .inspector,
+  main {
+    min-height: 0;
+    overflow: auto;
+  }
+  main {
+    display: flex;
+    flex-direction: column;
+    padding-top: 20px;
+  }
+  main > *,
+  .inspector > * {
+    flex-shrink: 0;
+  }
+  .mission-bar {
+    margin-bottom: 14px;
+  }
+  .run-bar {
+    margin-bottom: 12px;
+  }
+  .run-configuration {
+    margin-bottom: 12px;
+  }
+  .office-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 200px;
+  }
+  .office-toolbar,
+  .office-footer {
+    flex-shrink: 0;
+  }
+  .office-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    container-type: size;
+  }
+  .office-canvas {
+    width: min(100cqw, calc(100cqh * 1000 / 650));
+    min-width: 0;
+  }
+  .agent-list {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+  }
+  .activity-section {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 150px;
+    min-height: 80px;
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  .activity-heading {
+    flex-shrink: 0;
+    padding-bottom: 8px;
+  }
+  .timeline,
+  .timeline-empty {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+  }
+  .report-link {
+    padding: 9px 12px;
+    margin-top: 10px;
+  }
+  .main-footer {
+    padding: 9px 0;
+    margin-top: 8px;
+  }
+  .inspector-content {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+@media (max-width: 700px) {
+  .workspace {
+    min-height: 0;
+    overflow: auto;
+  }
+  main,
+  .inspector {
+    flex-shrink: 0;
+  }
 }
 @media (max-width: 500px) {
   .agent-model-inheritance {
