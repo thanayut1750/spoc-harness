@@ -229,10 +229,24 @@ class ServiceManager:
             raise LifecycleError(
                 f"Cannot verify legacy {role} configuration; no signals sent."
             ) from None
-        for key, value in self.environment.items():
-            actual = process_env.get(key.encode())
-            if actual is not None and actual != value.encode():
-                raise LifecycleError(f"Legacy {role} has different configuration; no signals sent.")
+        exported_data_dir = process_env.get(b"SPOC_DATA_DIR")
+        if exported_data_dir is not None:
+            try:
+                directory = os.fsdecode(exported_data_dir)
+                if contains_invalid_json_text(directory):
+                    raise ValueError
+                owned_directory = Path(directory).resolve()
+            except (OSError, ValueError, RuntimeError):
+                raise LifecycleError(
+                    f"Cannot verify legacy {role} data directory; no signals sent."
+                ) from None
+            if owned_directory != self.data_dir:
+                raise LifecycleError(
+                    f"Legacy {role} belongs to a different data directory; no signals sent."
+                )
+        # Provider/model/database changes are a reason to restart an owned
+        # service. Keep its original marker so start cannot claim it already
+        # runs with the new settings.
         marker = process_env.get(CONFIG_ENV.encode())
         return {**identity, "service": role, "config_identity": marker.decode() if marker else None}
 

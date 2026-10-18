@@ -302,6 +302,69 @@ def test_unknown_legacy_configuration_requires_restart_but_can_stop(running_mana
             child.wait(timeout=5)
 
 
+@pytest.mark.parametrize("action", ["stop", "restart"])
+def test_verified_legacy_configuration_drift_can_stop_or_restart(running_manager, action):
+    manager = running_manager
+    old_settings = manager.settings.model_copy(update={"main_model": "previous-model"})
+    old_manager = ServiceManager(old_settings)
+    manager.data_dir.mkdir(parents=True)
+    child = subprocess.Popen(
+        [sys.executable, "-m", "org_harness.cli", "worker"],
+        cwd=manager.cwd,
+        env={**os.environ, **old_manager.environment},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        (manager.data_dir / "worker.pid").write_text(str(child.pid))
+        with pytest.raises(LifecycleError, match="settings changed"):
+            manager.start(timeout=1)
+        record = json.loads(manager.state_path.read_text())["services"]["worker"]
+        assert record["config_identity"] == old_manager.config_identity
+        result = getattr(manager, action)(timeout=10)
+        child.wait(timeout=5)
+        if action == "restart":
+            assert result["services"]["worker"]["pid"] != child.pid
+            current = httpx.get(f"{manager.api_url}/api/settings", trust_env=False).json()
+            assert current["model_config"]["model"] == manager.settings.main_model
+        else:
+            assert result["services"]["worker"]["status"] == "stopped"
+    finally:
+        if child.poll() is None:
+            child.terminate()
+            child.wait(timeout=5)
+
+
+def test_legacy_process_in_different_data_directory_is_not_signalled(running_manager):
+    manager = running_manager
+    foreign_settings = manager.settings.model_copy(
+        update={"data_dir": manager.data_dir.parent / "other-harness"}
+    )
+    foreign = ServiceManager(foreign_settings)
+    manager.data_dir.mkdir(parents=True)
+    child = subprocess.Popen(
+        [sys.executable, "-m", "org_harness.cli", "worker"],
+        cwd=manager.cwd,
+        env={**os.environ, **foreign.environment},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        (manager.data_dir / "worker.pid").write_text(str(child.pid))
+        for action in ("stop", "restart"):
+            with pytest.raises(LifecycleError, match="different data directory"):
+                getattr(manager, action)(timeout=1)
+            assert child.poll() is None
+    finally:
+        child.terminate()
+        child.wait(timeout=5)
+        (manager.data_dir / "worker.pid").unlink(missing_ok=True)
+
+
 def test_spawned_child_is_rolled_back_when_state_write_fails(manager, monkeypatch):
     original_write = manager._write
     writes = 0

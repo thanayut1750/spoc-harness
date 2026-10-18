@@ -20,13 +20,17 @@ def display(value):
     typer.echo(json.dumps(value, indent=2, default=str))
 
 
+def api_base_url(settings: Settings) -> str:
+    host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(settings.api_host, settings.api_host)
+    return str(httpx.URL(scheme="http", host=host, port=settings.api_port))
+
+
 def request(method: str, path: str, *, body: dict | None = None):
     settings = Settings()
-    host = settings.api_host if settings.api_host not in {"0.0.0.0", "::"} else "127.0.0.1"
     try:
         response = httpx.request(
             method,
-            f"http://{host}:{settings.api_port}{path}",
+            f"{api_base_url(settings)}{path}",
             json=body,
             timeout=30,
             headers={"Idempotency-Key": str(uuid4())},

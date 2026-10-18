@@ -1,6 +1,7 @@
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from typer.testing import CliRunner
 
@@ -8,6 +9,30 @@ from org_harness import cli
 from org_harness.config import Settings
 
 runner = CliRunner()
+
+
+@pytest.mark.parametrize(
+    "host,expected",
+    [
+        ("0.0.0.0", "http://127.0.0.1:8123"),
+        ("::", "http://[::1]:8123"),
+        ("::1", "http://[::1]:8123"),
+        ("localhost", "http://localhost:8123"),
+    ],
+)
+def test_cli_api_requests_format_ipv6_and_map_wildcards_to_loopback(monkeypatch, host, expected):
+    settings = Settings(_env_file=None, api_host=host, api_port=8123)
+    assert cli.api_base_url(settings) == expected
+    requested = []
+
+    def capture(method, url, **kwargs):
+        requested.append(url)
+        return httpx.Response(200, json={"status": "ok"}, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(cli, "Settings", lambda: settings)
+    monkeypatch.setattr(httpx, "request", capture)
+    assert cli.request("GET", "/api/runs") == {"status": "ok"}
+    assert requested == [f"{expected}/api/runs"]
 
 
 @pytest.fixture
