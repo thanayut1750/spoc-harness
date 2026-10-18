@@ -23,11 +23,23 @@ function label(
   color = "#4b4a3e",
   size = 11,
   align: CanvasTextAlign = "center",
+  maxWidth?: number,
 ) {
   ctx.fillStyle = color;
   ctx.font = `600 ${size}px ui-monospace, SFMono-Regular, monospace`;
   ctx.textAlign = align;
-  ctx.fillText(text, x, y);
+  let display = text;
+  if (maxWidth !== undefined && ctx.measureText(text).width > maxWidth) {
+    const characters = Array.from(text);
+    while (
+      characters.length &&
+      ctx.measureText(`${characters.join("")}…`).width > maxWidth
+    ) {
+      characters.pop();
+    }
+    display = `${characters.join("")}…`;
+  }
+  ctx.fillText(display, x, y);
 }
 function floor(
   ctx: CanvasRenderingContext2D,
@@ -272,7 +284,9 @@ function draw(
         x,
         y + 35,
         "#435047",
-        10,
+        external ? 11 : 10,
+        "center",
+        external ? 112 : 140,
       );
     }
     if (active || agent.activity === "error" || agent.activity === "waiting") {
