@@ -463,6 +463,54 @@ class HostTools:
             call_id, "write_file", {"path": path, "content": content}, execute
         )
 
+    async def publish_file(self, call_id: str, path: str) -> dict:
+        """Register an existing text output without sending its contents through the model."""
+
+        async def execute() -> dict:
+            target = self.path(path)
+            try:
+                with target.open("rb") as source:
+                    body = source.read(2_000_001)
+            except (OSError, ValueError) as exc:
+                raise ExpectedToolInputError(
+                    f"Output file cannot be published ({type(exc).__name__})"
+                ) from exc
+            if len(body) > 2_000_000:
+                raise ExpectedToolInputError(
+                    "Output file exceeds the 2000000-byte publication limit"
+                )
+            if not readable_text(body).strip():
+                raise ExpectedToolInputError(
+                    "Output file is empty; publish a completed text output"
+                )
+            artifact = await self.artifacts.save(
+                target.name,
+                body,
+                kr_id=self.kr_id,
+                department=self.department,
+                epoch=self.epoch,
+                version=self.version,
+                scope=self.scope,
+                kind="source",
+                write_id=self.operation_id(call_id, "publish_file"),
+                original_path=str(target),
+            )
+            await self.emit(
+                self.role,
+                "writing",
+                f"Published {target.name}",
+                kr_id=self.kr_id,
+                artifact_id=artifact["artifact_id"],
+            )
+            return {
+                "artifact_id": artifact["artifact_id"],
+                "path": str(target),
+                "size": artifact["size"],
+                "sha256": artifact["sha256"],
+            }
+
+        return await self.journal(call_id, "publish_file", {"path": path}, execute)
+
     async def read_file(self, call_id: str, path: str) -> dict:
         async def execute() -> dict:
             target = self.path(path)

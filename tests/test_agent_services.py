@@ -192,6 +192,52 @@ async def test_real_create_agent_executes_tools_and_preserves_reasoning_roundtri
         assert requests[-1]["response_format"] == {"type": "json_object"}
 
 
+@pytest.mark.parametrize(
+    "role", ["market_researcher", "data_analyst", "system_architect", "backend_coder"]
+)
+async def test_all_workers_can_publish_existing_output_without_rewriting(tmp_path, role):
+    kr, work = assignment()
+    department = "research" if role in {"market_researcher", "data_analyst"} else "engineering"
+    kr = kr.model_copy(update={"target_department": department})
+    work = work.model_copy(update={"role": role})
+
+    def script(body, requests):
+        if body.get("response_format"):
+            payload = json.loads(body["messages"][-1]["content"])
+            assert payload["recorded_tool_artifacts"][0]["name"] == "index.html"
+            return {
+                "content": Deliverable(
+                    kr_id=kr.kr_id,
+                    department=department,
+                    worker_role=role,
+                    summary="Published the existing output.",
+                ).model_dump_json()
+            }
+        assert "publish_file" in {item["function"]["name"] for item in body["tools"]}
+        assert "register its final exact bytes with publish_file" in body["messages"][0]["content"]
+        results = [message for message in body["messages"] if message["role"] == "tool"]
+        if not results:
+            return {
+                "tool_calls": [
+                    tool_call("publish_file", {"path": "index.html"}, "publish-existing")
+                ]
+            }
+        metadata = json.loads(results[-1]["content"])
+        assert set(metadata) == {"artifact_id", "path", "size", "sha256"}
+        return {"content": "The existing HTML was published as the requested output."}
+
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, workspace):
+        content = b"<!doctype html><html><script>const threeScene = true;</script></html>"
+        (workspace / "index.html").write_bytes(content)
+        result = await services.execute(work, kr, Constitution(), [], "", 0)
+        source = next(
+            item for item in await storage.list_artifacts(run["run_id"]) if item["kind"] == "source"
+        )
+        assert source["artifact_id"] in result.artifact_ids
+        assert (workspace / "index.html").read_bytes() == content
+        assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
+
+
 async def test_escalation_preempts_other_tools_from_same_model_response(tmp_path):
     key_result, work = assignment()
 

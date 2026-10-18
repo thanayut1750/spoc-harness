@@ -109,7 +109,8 @@ class WorkerPolicy(AgentMiddleware):
                             content="Your response ended before completing the assignment. "
                             "Continue from the tool results already in this conversation; do not repeat "
                             "completed tools. Write the requested task outputs in small complete files "
-                            "using write_file, then give a concise summary with their artifact IDs. "
+                            "using write_file, or publish completed text outputs already on disk with "
+                            "publish_file. Then give a concise summary with their artifact IDs. "
                             "If work cannot continue, call escalate_blocker with the actual reason."
                         )
                     ],
@@ -567,6 +568,17 @@ class AgentServices:
             return json.dumps(await host.write_file(call_identifier(runtime), path, content))
 
         @tool
+        async def publish_file(path: str, runtime: ToolRuntime) -> str:
+            """Publish an existing UTF-8 output file as an immutable source artifact (up to 2 MB).
+
+            After run_command creates or modifies HTML/code/text, call this to register its exact
+            bytes and receive artifact_id without rewriting the file. Publish each completed
+            task output; logs and verification scripts do not replace the requested deliverable.
+            Images and other binary files are unsupported by this tool.
+            """
+            return json.dumps(await host.publish_file(call_identifier(runtime), path))
+
+        @tool
         async def read_artifact(
             artifact_id: str, runtime: ToolRuntime, offset: int = 0, limit: int = 12000
         ) -> str:
@@ -697,7 +709,14 @@ class AgentServices:
                 }
             )
 
-        available = [read_file, write_file, read_artifact, read_web_page, escalate_blocker]
+        available = [
+            read_file,
+            write_file,
+            publish_file,
+            read_artifact,
+            read_web_page,
+            escalate_blocker,
+        ]
         if kr.target_department == "research":
             available.append(search_market_data)
             if work.role == "data_analyst":
@@ -713,6 +732,10 @@ class AgentServices:
             f"Prior rejection feedback: {feedback}\n"
             "Execute the assignment using your tools. Read dependency artifacts when needed. "
             "Produce the requested task output files using write_file, incrementally in small complete files. "
+            "If run_command creates or modifies an output, register its final exact bytes with publish_file; "
+            "do not rewrite existing content just to publish it. Publish every requested output file. "
+            "Verification logs/scripts and shell-created files that were never published do not substitute "
+            "for the actual deliverable artifact. "
             "Reading sources alone does not complete the assignment. Long tool responses are excerpts; "
             "fetch reference URLs with read_web_page. read_artifact accepts only exact artifact IDs "
             "returned by tools or supplied as prior inputs, never URLs or file paths. Read further "

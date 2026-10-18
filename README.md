@@ -80,6 +80,8 @@ Files are grouped as task outputs, sources, verification logs, and submission me
 
 Immutable earlier file versions and failed checks remain available for inspection. Submission evidence uses current file revisions and final checks, so a corrected file does not remain rejected because of an obsolete broken snapshot.
 
+Workers register requested text output with `write_file`, or use `publish_file` to snapshot a file created or edited by a host command. Publication preserves the exact bytes and records the current assignment, integrity hash and downloadable artifact ID without regenerating its content. Empty, binary and oversized files receive a tool error. Verification logs alone do not replace the requested output.
+
 Research uses Z.AI Search and Reader MCP tools with the configured key. Access depends on the key's tool entitlement; unavailable tools report a blocker rather than returning sample results. `spoc doctor --live` makes real provider requests and consumes provider quota.
 
 Engineering workers can read reference URLs directly with a bounded HTTP `read_web_page` tool while remaining in Engineering. `read_artifact` accepts only IDs returned by tools, not URLs or file paths. Expected resource/input errors are recorded as actionable tool results so the model can correct them. Missing run records, database failures, unknown command effects and programming errors are never presented as successful tool output.

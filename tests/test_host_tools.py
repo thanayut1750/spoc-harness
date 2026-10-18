@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import json
 from pathlib import Path
 
@@ -492,3 +493,82 @@ def test_display_escaping_is_reversible_without_key_collisions():
         return value
 
     assert restore(escaped) == original
+
+
+async def check_existing_html_publication(storage, tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path, storage)
+    body = (
+        b"\xef\xbb\xbf<!doctype html><html><script>const scene = '"
+        + "🌏".encode()
+        + b"';</script></html>"
+        + b" " * 11000
+    )
+    target = host.workspace / "index.html"
+    target.write_bytes(body)
+    first = await host.publish_file("publish-html", "index.html")
+    assert set(first) == {"artifact_id", "path", "size", "sha256"}
+    assert first["size"] == len(body)
+    assert first["sha256"] == hashlib.sha256(body).hexdigest()
+    assert target.read_bytes() == body
+    metadata = await storage.get_artifact(first["artifact_id"])
+    assert metadata["kind"] == "source"
+    assert metadata["kr_id"] == host.kr_id
+    assert metadata["version"] == host.version
+    assert metadata["epoch"] == host.epoch
+    assert metadata["scope"] == host.scope
+    assert metadata["original_path"] == str(target)
+    assert metadata["write_id"] == host.operation_id("publish-html", "publish_file")
+    assert Path(metadata["path"]).read_bytes() == body
+    target.unlink()
+    assert await host.publish_file("publish-html", "index.html") == first
+    assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
+    replacement = b"<!doctype html><html>Updated final HTML</html>"
+    target.write_bytes(replacement)
+    second = await host.publish_file("publish-updated", "index.html")
+    assert second["artifact_id"] != first["artifact_id"]
+    current = await host.recorded_artifacts(current=True)
+    assert [item["artifact_id"] for item in current] == [second["artifact_id"]]
+    assert Path(metadata["path"]).read_bytes() == body
+    assert not await storage.uncertain_operations(run["run_id"])
+
+
+async def test_publish_existing_html_preserves_bytes_scope_and_replay(tmp_path):
+    await check_existing_html_publication(MemoryStorage(), tmp_path)
+
+
+@pytest.mark.integration
+async def test_postgres_publish_existing_html_preserves_bytes_scope_and_replay(
+    tmp_path, postgres_url
+):
+    storage = PostgresStorage(postgres_url)
+    await storage.open()
+    try:
+        await storage.migrate()
+        await check_existing_html_publication(storage, tmp_path)
+    finally:
+        await storage.close()
+
+
+@pytest.mark.parametrize("body", [b"", b" \n\t", PNG, b"text\x00binary", b"\xff", b"x" * 2_000_001])
+async def test_publish_rejects_empty_binary_invalid_and_oversized_outputs(tmp_path, body):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    target = host.workspace / "invalid-output"
+    target.write_bytes(body)
+    result = await host.publish_file("invalid-publication", str(target))
+    assert result["error"] == "ExpectedToolInputError"
+    assert target.read_bytes() == body
+    assert not await storage.list_artifacts(run["run_id"])
+    operation = await storage.get_operation(
+        host.operation_id("invalid-publication", "publish_file")
+    )
+    assert operation["status"] == "done"
+
+
+async def test_publish_accepts_exact_size_bound_and_rejects_missing_output(tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    target = host.workspace / "large.txt"
+    target.write_bytes(b"x" * 2_000_000)
+    result = await host.publish_file("maximum", str(target))
+    assert result["size"] == 2_000_000
+    assert (await host.publish_file("missing", "missing.txt"))["error"] == "ExpectedToolInputError"
+    assert (await host.publish_file("directory", "."))["error"] == "ExpectedToolInputError"

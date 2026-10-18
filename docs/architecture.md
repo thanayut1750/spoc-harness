@@ -57,6 +57,8 @@ Expected tool-input failures use `ExpectedToolInputError` at the point that inte
 
 External contracts and provider messages reject U+0000 and unsupported Unicode surrogate code points before persistence. HTTP validation responses omit raw input and exception context. Valid Unicode, emoji, tabs, newlines and literal escape sequences remain supported. Text previews can explicitly escape incompatible characters while original artifact bytes remain intact; database serialization does not silently rewrite requests or evidence.
 
+Text outputs created through host commands can be explicitly snapshotted with `publish_file`. The journal records a bounded, nonempty UTF-8 file as a source artifact under the current work package and epoch, preserving its bytes and integrity hash. Publishing does not approve the output or replace verification; replay reuses the recorded snapshot rather than reading changed bytes again.
+
 | Boundary | Expected failure behavior | Protected behavior |
 | --- | --- | --- |
 | Artifact, file and syntax tools | Missing/foreign/corrupt references, paging and path errors become actionable tool results | Missing run records and persistence failures propagate |
