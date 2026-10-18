@@ -265,7 +265,11 @@ def worker_context(state: DepartmentState, work: WorkPackage) -> WorkerState:
         "run_id": state["run_id"],
         "constitution": state["constitution"],
         "kr": state["kr"],
-        "work": work.model_dump(mode="json"),
+        # Attempt identity belongs to the deterministic coordinator. A model may
+        # propose a package, but cannot select/reuse an earlier execution scope.
+        "work": work.model_copy(update={"execution_attempt": state.get("revisions", 0)}).model_dump(
+            mode="json"
+        ),
         "epoch": state["epoch"],
         "inputs": state.get("inputs", []) + state.get("accepted", []),
         "feedback": state.get("feedback", "")[-12000:],

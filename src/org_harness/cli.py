@@ -54,7 +54,10 @@ def serve(host: str | None = None, port: int | None = None):
 
     settings = Settings()
     uvicorn.run(
-        create_app(settings), host=host or settings.api_host, port=port or settings.api_port
+        create_app(settings),
+        host=host or settings.api_host,
+        port=port or settings.api_port,
+        timeout_graceful_shutdown=5,
     )
 
 

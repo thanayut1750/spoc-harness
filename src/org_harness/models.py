@@ -64,6 +64,7 @@ class WorkPackage(Contract):
     role: Role
     task: str = Field(min_length=1)
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
+    execution_attempt: int = Field(default=0, ge=0)
 
 
 class TacticalPlan(Contract):

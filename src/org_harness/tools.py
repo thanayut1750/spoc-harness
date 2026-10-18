@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from org_harness.models import EscalationSignal
-from org_harness.storage import BudgetExceeded, NotFoundError
+from org_harness.storage import BudgetExceeded, NotFoundError, fingerprint
 
 
 class Artifacts:
@@ -31,12 +31,15 @@ class Artifacts:
         epoch: int = 0,
         version: int = 1,
         kind: str = "document",
+        scope: str = "",
         **extra: Any,
     ) -> dict:
         body = content.encode() if isinstance(content, str) else content
         digest = hashlib.sha256(body).hexdigest()
         artifact_id = hashlib.sha256(
-            f"{self.run_id}:{kr_id}:{version}:{department}:{epoch}:{name}:{digest}".encode()
+            json.dumps(
+                [self.run_id, kr_id, version, department, epoch, scope, name, digest]
+            ).encode()
         ).hexdigest()[:32]
         try:
             return await self.storage.get_artifact(artifact_id)
@@ -63,19 +66,21 @@ class Artifacts:
             "size": len(body),
             "sha256": digest,
             "kind": kind,
+            "scope": scope,
             "media_type": mimetypes.guess_type(name)[0] or "text/plain",
             **extra,
         }
         return await self.storage.register_artifact(metadata)
 
-    async def read(self, artifact_id: str) -> tuple[dict, str]:
+    async def read(self, artifact_id: str, *, limit: int | None = 65536) -> tuple[dict, str]:
         metadata = await self.storage.get_artifact(artifact_id)
         if metadata["run_id"] != self.run_id:
             raise ValueError("Artifact belongs to a different run")
         body = Path(metadata["path"]).read_bytes()
         if hashlib.sha256(body).hexdigest() != metadata["sha256"]:
             raise ValueError("Artifact content no longer matches its evidence record")
-        return metadata, body[:65536].decode(errors="replace")
+        excerpt = body if limit is None else body[:limit]
+        return metadata, excerpt.decode(errors="replace")
 
 
 class HostTools:
@@ -91,10 +96,13 @@ class HostTools:
         role: str,
         emit: Callable[..., Awaitable[None]],
         version: int = 1,
+        work_package_id: str = "",
+        attempt: int = 0,
     ):
         self.storage, self.artifacts, self.run = storage, artifacts, run
         self.kr_id, self.department, self.epoch, self.role = kr_id, department, epoch, role
         self.version = version
+        self.scope = json.dumps([work_package_id or role, attempt, role])
         self.emit = emit
         configured = run.get("workspace_path")
         self.workspace = (
@@ -108,6 +116,18 @@ class HostTools:
         value = Path(path).expanduser()
         return value.resolve() if value.is_absolute() else (self.workspace / value).resolve()
 
+    def operation_id(self, call_id: str, name: str) -> str:
+        identity = [
+            self.run["run_id"],
+            self.kr_id,
+            self.version,
+            self.epoch,
+            self.scope,
+            call_id,
+            name,
+        ]
+        return hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+
     async def journal(
         self,
         call_id: str,
@@ -117,10 +137,12 @@ class HostTools:
         *,
         kind: str = "tool",
     ) -> dict:
-        operation_id = hashlib.sha256(
-            f"{self.run['run_id']}:{self.kr_id}:{self.epoch}:{call_id}:{name}".encode()
-        ).hexdigest()
+        operation_id = self.operation_id(call_id, name)
         existing = await self.storage.get_operation(operation_id)
+        if existing and fingerprint(existing["request"]) != fingerprint(request):
+            raise EscalationSignal(
+                "operation_conflict", "A reused tool-call ID contains a different request"
+            )
         if existing and existing["status"] == "done":
             return existing["result"]
         if existing and existing["status"] == "pending" and kind == "command":
@@ -161,6 +183,7 @@ class HostTools:
                 department=self.department,
                 epoch=self.epoch,
                 version=self.version,
+                scope=self.scope,
                 kind="source",
                 original_path=str(target),
             )
@@ -199,7 +222,7 @@ class HostTools:
             raise ValueError("Command timeout must be positive")
 
         async def execute() -> dict:
-            log_id = hashlib.sha256(f"{self.kr_id}:{self.epoch}:{call_id}".encode()).hexdigest()
+            log_id = self.operation_id(call_id, "run_command")
             log_dir = self.artifacts.root / "operations"
             log_dir.mkdir(parents=True, exist_ok=True)
             stdout_path, stderr_path = log_dir / f"{log_id}.stdout", log_dir / f"{log_id}.stderr"
@@ -241,6 +264,7 @@ class HostTools:
                     department=self.department,
                     epoch=self.epoch,
                     version=self.version,
+                    scope=self.scope,
                     kind="command_log",
                     exit_code=124 if timed_out else process.returncode,
                     command=command,
@@ -300,6 +324,7 @@ class HostTools:
                 department=self.department,
                 epoch=self.epoch,
                 version=self.version,
+                scope=self.scope,
                 kind="research",
             )
             await self.emit(

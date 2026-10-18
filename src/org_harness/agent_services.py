@@ -13,7 +13,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, ModelCallLimitMiddleware
 from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
 from langchain.tools import ToolRuntime, tool
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 from pydantic import BaseModel, Field, ValidationError
 
@@ -302,6 +302,24 @@ class AgentServices:
                 self._mcp[kind] = match
             return self._mcp[kind]
 
+    async def _invoke_mcp(self, kind: str, arguments: dict, call_id: str) -> Any:
+        remote = await self._mcp_tool(kind)
+        result = await remote.ainvoke(
+            {
+                "type": "tool_call",
+                "id": call_id,
+                "name": remote.name,
+                "args": arguments,
+            }
+        )
+        if isinstance(result, ToolMessage):
+            if result.status == "error":
+                raise EscalationSignal(
+                    "missing_resource", f"The {kind} tool failed; check its entitlement and quota."
+                )
+            return result.content
+        return result
+
     async def execute(
         self,
         work: WorkPackage,
@@ -321,6 +339,8 @@ class AgentServices:
             epoch=epoch,
             role=work.role,
             emit=self.emit,
+            work_package_id=work.work_package_id,
+            attempt=work.execution_attempt,
         )
         if self.settings.harness_test_mode:
             return await self._fixture_execute(work, kr, host)
@@ -388,8 +408,9 @@ class AgentServices:
             """Search the live web for research evidence and preserve source results."""
 
             async def search() -> dict:
-                remote = await self._mcp_tool("search")
-                result = await remote.ainvoke({"search_query": query})
+                result = await self._invoke_mcp(
+                    "search", {"search_query": query}, call_identifier(runtime)
+                )
                 return {"query": query, "response": result}
 
             return json.dumps(
@@ -404,8 +425,7 @@ class AgentServices:
             """Read a web page through Z.AI Reader and preserve the source URL."""
 
             async def read() -> dict:
-                remote = await self._mcp_tool("reader")
-                result = await remote.ainvoke({"url": url})
+                result = await self._invoke_mcp("reader", {"url": url}, call_identifier(runtime))
                 return {"url": url, "response": result}
 
             return json.dumps(
@@ -555,7 +575,7 @@ class AgentServices:
         substantive_evidence = False
         for artifact_id in deliverable.artifact_ids:
             try:
-                metadata, content = await self.artifacts.read(artifact_id)
+                metadata, content = await self.artifacts.read(artifact_id, limit=None)
                 if metadata["name"].endswith(".py"):
                     ast.parse(content)
                 if metadata.get("kind") != "deliverable":

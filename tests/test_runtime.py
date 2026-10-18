@@ -233,6 +233,7 @@ async def test_worker_and_department_share_revision_budget_then_only_one_run_rep
     assert result["status"] == "awaiting_review"
     assert result["auto_replans"] == 1
     assert len(services.executions) == 6  # initial + two reworks, twice
+    assert [call[0].execution_attempt for call in services.executions] == [0, 1, 2, 0, 1, 2]
     assert result["epochs"] == {"research": 1}
     assert result["review"]["kind"] == "blocked"
     assert services.planning_calls == 1
@@ -251,8 +252,34 @@ async def test_worker_and_department_share_revision_budget_then_only_one_run_rep
     assert result["status"] == "completed"
     assert result["auto_replans"] == 1
     assert len(services.executions) == before + 1
+    assert services.executions[-1][0].execution_attempt == 0
     assert services.planning_calls == 1
     assert all(escalation["resolved"] for escalation in result["escalations"].values())
+
+
+async def test_provider_cannot_select_worker_execution_attempt():
+    services = Services()
+    services.packages = lambda key_result: [
+        WorkPackage(
+            work_package_id="model-proposed-work",
+            kr_id=key_result.kr_id,
+            role="market_researcher",
+            task=key_result.description,
+            acceptance_criteria=("work accepted",),
+            execution_attempt=5,
+        )
+    ]
+
+    def reject_first_attempt(deliverable, criteria):
+        if len(services.executions) == 1:
+            return evaluation(criteria, score=0.2, feedback="Correct the first attempt")
+        return None
+
+    services.judge = reject_first_attempt
+    _, result = await invoke(services)
+    assert result["status"] == "completed"
+    assert [call[0].execution_attempt for call in services.executions] == [0, 1]
+    assert services.tactical_calls["research"] == 1
 
 
 async def test_department_gate_cannot_bypass_shared_worker_revision_budget():
@@ -406,6 +433,7 @@ async def test_mid_worker_recovery_restores_nested_checkpoint_without_replanning
     # A real AgentServices execution reuses the tool journal when the worker node
     # is retried; this graph-level test checks that completed planning is durable.
     assert len(services.executions) == 2
+    assert [call[0].execution_attempt for call in services.executions] == [0, 0]
     assert len(services.evaluations) == 2
 
 

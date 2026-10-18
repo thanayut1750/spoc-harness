@@ -43,9 +43,7 @@ async def test_completed_command_is_not_reexecuted(tmp_path):
 
 async def test_unknown_command_requires_review(tmp_path):
     storage, run, artifacts, host = await make_host(tmp_path)
-    import hashlib
-
-    operation = hashlib.sha256(f"{run['run_id']}:kr-1:0:call-1:run_command".encode()).hexdigest()
+    operation = host.operation_id("call-1", "run_command")
     await storage.begin_operation(
         run["run_id"], operation, "command", {"command": "echo hello", "cwd": None, "timeout": 300}
     )
@@ -76,3 +74,33 @@ async def test_timeout_and_artifact_integrity(tmp_path):
     Path(metadata["path"]).write_text("changed")
     with pytest.raises(ValueError, match="evidence record"):
         await artifacts.read(artifact["artifact_id"])
+
+
+async def test_cached_operation_rejects_a_different_request(tmp_path):
+    _, _, _, host = await make_host(tmp_path)
+    await host.run_command("reused-id", "true")
+    with pytest.raises(EscalationSignal) as error:
+        await host.run_command("reused-id", "false")
+    assert error.value.kind == "operation_conflict"
+
+
+async def test_reused_provider_ids_are_isolated_between_work_packages_and_attempts(tmp_path):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    command = "echo executed >> attempts.txt"
+    await host.run_command("provider-id", command)
+    for work_package, attempt in [("second-package", 0), ("second-package", 1)]:
+        other = HostTools(
+            storage,
+            artifacts,
+            run,
+            kr_id="kr-1",
+            department="engineering",
+            epoch=0,
+            role="backend_coder",
+            emit=host.emit,
+            work_package_id=work_package,
+            attempt=attempt,
+        )
+        await other.run_command("provider-id", command)
+        await other.run_command("provider-id", command)  # Same attempt is a replay.
+    assert (host.workspace / "attempts.txt").read_text().splitlines() == ["executed"] * 3

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import pytest
+from langchain_core.tools import ToolException, tool
 from langgraph.checkpoint.memory import InMemorySaver
 from openai import AsyncOpenAI
 
@@ -358,6 +359,62 @@ async def test_artifact_reads_require_assignment_or_approved_dependency(
         assert ("Other assignment evidence" in tool_result) is approved_dependency
         assert ("outside this assignment" in tool_result) is not approved_dependency
         assert (await storage.get_run(run["run_id"]))["tool_calls"] == 1
+
+
+@pytest.mark.parametrize("malformed_suffix", [False, True])
+async def test_syntax_gate_checks_complete_source_beyond_prompt_excerpt(tmp_path, malformed_suffix):
+    kr, _ = assignment()
+    criteria = ("The complete Python source has valid syntax",)
+
+    def script(body, requests):
+        return {"content": json.dumps(approve(criteria))}
+
+    async with services_with_provider(tmp_path, script) as (services, _, _, requests, _):
+        source = (
+            ("#" + "x" * 70000 + "\nbroken = '\n")
+            if malformed_suffix
+            else ("value = '" + "x" * 70000 + "'\n")
+        )
+        artifact = await services.artifacts.save("large.py", source, kind="source", kr_id=kr.kr_id)
+        deliverable = Deliverable(
+            kr_id=kr.kr_id,
+            department="engineering",
+            worker_role="backend_coder",
+            summary="Large Python source",
+            artifact_ids=(artifact["artifact_id"],),
+        )
+        result = await services.evaluate(deliverable, criteria, Constitution())
+        assert result.deterministic_checks_passed is not malformed_suffix
+        # Complete local validation must not remove the separate model context cap.
+        payload = json.loads(requests[0]["messages"][-1]["content"])
+        if payload["recorded_artifact_evidence"]:
+            assert len(payload["recorded_artifact_evidence"][0]["content"]) <= 12000
+
+
+async def test_mcp_execution_error_is_a_blocker_not_research_evidence(tmp_path, monkeypatch):
+    kr, work = assignment()
+    kr = kr.model_copy(update={"target_department": "research"})
+    work = work.model_copy(update={"role": "market_researcher"})
+
+    def script(body, requests):
+        return {"tool_calls": [tool_call("search_market_data", {"query": "public research"})]}
+
+    @tool
+    async def remote_search(search_query: str) -> str:
+        """A remote tool with an MCP-style handled execution error."""
+        raise ToolException("Tool quota is unavailable")
+
+    remote_search.handle_tool_error = True
+    async with services_with_provider(tmp_path, script) as (services, storage, run, _, _):
+
+        async def remote(kind):
+            return remote_search
+
+        monkeypatch.setattr(services, "_mcp_tool", remote)
+        with pytest.raises(EscalationSignal) as error:
+            await services.execute(work, kr, Constitution(), [], "", 0)
+        assert error.value.kind == "missing_resource"
+        assert not await storage.list_artifacts(run["run_id"])
 
 
 async def test_real_worker_tool_checkpoint_survives_process_restart(tmp_path):
