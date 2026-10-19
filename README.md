@@ -15,6 +15,8 @@ docker compose up -d --wait
 
 Keep your existing `.env` provider configuration. For a new installation, copy `.env.example` to `.env`, then set `OPENAI_API_KEY`. The defaults target Z.AI's Coding Plan endpoint and `glm-5.3-flash`. Process environment variables override `.env`. The legacy spelling `REASIONING_EFFORT` remains accepted; `REASONING_EFFORT` takes precedence.
 
+Set the server's `EXA_API_KEY` to use Exa for web search and page contents. Exa is selected automatically when that key is configured; without it, the harness retains legacy Z.AI MCP search and reading. Set `WEB_SEARCH_PROVIDER=exa` or `zai_mcp` to select explicitly. `EXA_TIMEOUT` defaults to 30 seconds. The office reports the selected provider and whether it is configured; credentials stay on the server.
+
 ```bash
 uv run spoc migrate
 cd frontend
@@ -96,7 +98,7 @@ Immutable earlier file versions and failed checks remain available for inspectio
 
 Workers register requested text output with `write_file`, or use `publish_file` to snapshot a file created or edited by a host command. Publication preserves the exact bytes and records the current assignment, integrity hash and downloadable artifact ID without regenerating its content. Empty, binary and oversized files receive a tool error. Verification logs alone do not replace the requested output.
 
-Research uses Z.AI Search and Reader MCP tools with the configured key. Access depends on the key's tool entitlement; unavailable tools report a blocker rather than returning sample results. `spoc doctor --live` makes real provider requests and consumes provider quota.
+Research and Tools R&D use the selected web provider for search and page contents, including R&D consulted for an Engineering KR. Exa uses the dedicated `EXA_API_KEY`. Legacy Z.AI MCP uses `ZAI_API_KEY`, or the configured Z.AI endpoint's `OPENAI_API_KEY` when no separate Z.AI key is set; the key needs the relevant tool entitlement. Native OpenAI credentials are not reused for MCP. An Exa failure remains an explicit tool error or blocker and never silently switches to Z.AI or sample results. Saved research artifacts and operation evidence remain available after changing providers. `spoc doctor --live` makes real provider requests and consumes provider quota.
 
 Engineering workers can read reference URLs directly with a bounded HTTP `read_web_page` tool while remaining in Engineering. `read_artifact` accepts only IDs returned by tools, not URLs or file paths. Expected resource/input errors are recorded as actionable tool results so the model can correct them. Missing run records, database failures, unknown command effects and programming errors are never presented as successful tool output.
 

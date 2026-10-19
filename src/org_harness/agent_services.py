@@ -45,6 +45,7 @@ from org_harness.models import (
 from org_harness.providers import ProviderResponseError, ZaiChatModel, create_model
 from org_harness.storage import ArtifactNotFoundError, BudgetExceeded
 from org_harness.tools import Artifacts, ExpectedToolInputError, HostTools, read_reference_page
+from org_harness.web_search import ExaSearchError, ExaWebClient
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -190,6 +191,7 @@ class AgentServices:
         self._contexts = AsyncExitStack()
         self._mcp: dict[str, Any] = {}
         self._mcp_lock = asyncio.Lock()
+        self._exa: ExaWebClient | None = None
         self._dynamic_agents: dict[str, dict[str, Any]] = {}
         self._mission_catalog: Any = None
 
@@ -930,6 +932,11 @@ class AgentServices:
             if kind not in self._mcp:
                 from langchain.mcp import MCPAdapter
 
+                key = self.settings.provider_connection("zai")[1].get_secret_value()
+                if not key:
+                    raise EscalationSignal(
+                        "missing_resource", "Z.AI web tools are not configured on the server"
+                    )
                 url = (
                     self.settings.search_mcp_url
                     if kind == "search"
@@ -941,9 +948,7 @@ class AgentServices:
                             "mcpServers": {
                                 kind: {
                                     "url": url,
-                                    "headers": {
-                                        "Authorization": f"Bearer {self.settings.openai_api_key.get_secret_value()}"
-                                    },
+                                    "headers": {"Authorization": f"Bearer {key}"},
                                 }
                             }
                         }
@@ -996,6 +1001,29 @@ class AgentServices:
                     pass
             return content
         return result
+
+    def _exa_client(self) -> ExaWebClient:
+        if self._exa is None:
+            self._exa = ExaWebClient(self.settings)
+            self._contexts.push_async_callback(self._exa.close)
+        return self._exa
+
+    async def _search_web(self, query: str, call_id: str) -> Any:
+        """Use the selected server-owned connection without changing journal identity."""
+        if self.settings.selected_web_search_provider() == "exa":
+            try:
+                return await self._exa_client().search(query)
+            except ExaSearchError as exc:
+                raise EscalationSignal("missing_resource", str(exc)) from exc
+        return await self._invoke_mcp("search", {"search_query": query}, call_id)
+
+    async def _read_web(self, url: str, call_id: str) -> Any:
+        if self.settings.selected_web_search_provider() == "exa":
+            try:
+                return await self._exa_client().read(url)
+            except ExaSearchError as exc:
+                raise EscalationSignal("missing_resource", str(exc)) from exc
+        return await self._invoke_mcp("reader", {"url": url}, call_id)
 
     async def execute(
         self,
@@ -1260,12 +1288,10 @@ class AgentServices:
 
         @tool
         async def search_market_data(query: str, runtime: ToolRuntime) -> str:
-            """Search the live web for research evidence and preserve source results."""
+            """Search the live web using the configured search provider and preserve sources."""
 
             async def search() -> dict:
-                result = await self._invoke_mcp(
-                    "search", {"search_query": query}, call_identifier(runtime)
-                )
+                result = await self._search_web(query, call_identifier(runtime))
                 return {"query": query, "response": result}
 
             return json.dumps(
@@ -1285,8 +1311,8 @@ class AgentServices:
             async def read() -> dict:
                 result = (
                     await read_reference_page(url)
-                    if kr.target_department == "engineering"
-                    else await self._invoke_mcp("reader", {"url": url}, call_identifier(runtime))
+                    if kr.target_department == "engineering" and actor != "tools_rd_lead"
+                    else await self._read_web(url, call_identifier(runtime))
                 )
                 return {"url": url, "response": result}
 

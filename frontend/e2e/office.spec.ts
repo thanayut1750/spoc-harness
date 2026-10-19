@@ -44,6 +44,7 @@ const defaultSettings: WorkspaceSettings = {
   triage: { model: "jev-1.13.0", configured: true },
   worker_timeout: 3600,
   model_call_budget: { max_model_calls: 100, worker_model_calls: 12 },
+  web_search: { provider: "exa", configured: true },
   agent_model_configs: {},
 };
 const initialRun: Run = {
@@ -1419,6 +1420,46 @@ test("saves configured provider choices and snapshots model selection into new m
     model: "custom-glm-model",
     reasoning_effort: "high",
   });
+});
+test("workspace settings report the server search provider without exposing a new save control", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  let search: WorkspaceSettings["web_search"] = defaultSettings.web_search;
+  await page.route("**/api/settings", (route) =>
+    route.fulfill({ json: { ...defaultSettings, web_search: search } }),
+  );
+  for (const [value, expected] of [
+    [{ provider: "exa", configured: true }, "Web search: Exa"],
+    [{ provider: "zai_mcp", configured: true }, "Web search: Z.AI MCP"],
+    [
+      { provider: "exa", configured: false },
+      "Web search: Exa · Not configured",
+    ],
+    [
+      { provider: "zai_mcp", configured: false },
+      "Web search: Z.AI MCP · Not configured",
+    ],
+    [undefined, "Web search: Not reported"],
+  ] as const) {
+    search = value;
+    await page.reload();
+    await page.getByRole("button", { name: "Workspace settings" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText(expected, { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole("combobox", { name: /Web search/ }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("textbox", { name: /API key|credential/i }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Save model settings", exact: true }),
+    ).toBeEnabled();
+  }
+  expect(
+    requests.some((request) => request.path.startsWith("/api/settings/")),
+  ).toBe(false);
 });
 test("workspace call budgets persist independently of model drafts and agent overrides", async ({
   page,

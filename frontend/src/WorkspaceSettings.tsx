@@ -254,6 +254,12 @@ export function WorkspaceSettings({
                       : "Not configured"}
                   </span>
                   <span>Worker timeout: {settings.worker_timeout}s</span>
+                  <span>
+                    Web search:{" "}
+                    {settings.web_search
+                      ? `${settings.web_search.provider === "exa" ? "Exa" : "Z.AI MCP"}${settings.web_search.configured ? "" : " · Not configured"}`
+                      : "Not reported"}
+                  </span>
                 </div>
                 <button
                   className="primary-button"

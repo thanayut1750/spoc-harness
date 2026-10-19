@@ -182,8 +182,7 @@ def migrate():
 
 
 async def live_diagnostics(settings: Settings) -> dict[str, object]:
-    """Opt-in live provider roundtrip and read-only MCP tool discovery."""
-    from langchain.mcp import MCPAdapter
+    """Opt-in model roundtrip and checks of the selected web provider."""
     from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
     from org_harness.providers import ZaiChatModel
@@ -237,6 +236,11 @@ async def live_diagnostics(settings: Settings) -> dict[str, object]:
 
     async def probe_mcp(kind: str, url: str) -> None:
         try:
+            from langchain.mcp import MCPAdapter
+
+            key = settings.provider_connection("zai")[1].get_secret_value()
+            if not key:
+                raise ValueError("Z.AI web tools are not configured")
 
             async def discover():
                 async with MCPAdapter(
@@ -244,9 +248,7 @@ async def live_diagnostics(settings: Settings) -> dict[str, object]:
                         "mcpServers": {
                             kind: {
                                 "url": url,
-                                "headers": {
-                                    "Authorization": f"Bearer {settings.openai_api_key.get_secret_value()}"
-                                },
+                                "headers": {"Authorization": f"Bearer {key}"},
                             }
                         }
                     }
@@ -261,9 +263,36 @@ async def live_diagnostics(settings: Settings) -> dict[str, object]:
             result[f"{kind}_mcp"] = False
             result[f"{kind}_mcp_error"] = type(exc).__name__
 
-    await asyncio.gather(
-        probe_mcp("search", settings.search_mcp_url), probe_mcp("reader", settings.reader_mcp_url)
-    )
+    result["web_search_provider"] = settings.selected_web_search_provider()
+    if result["web_search_provider"] == "exa":
+        from org_harness.web_search import ExaWebClient
+
+        client = ExaWebClient(settings)
+
+        async def probe_exa(kind: str) -> None:
+            try:
+                if kind == "web_search":
+                    await client.search("Python JSON standard library documentation")
+                else:
+                    await client.read("https://docs.python.org/3/library/json.html")
+                result[kind] = True
+            except Exception as exc:
+                result[kind] = False
+                result[f"{kind}_error"] = type(exc).__name__
+
+        try:
+            await asyncio.gather(probe_exa("web_search"), probe_exa("web_reader"))
+        finally:
+            await client.close()
+    else:
+        await asyncio.gather(
+            probe_mcp("search", settings.search_mcp_url),
+            probe_mcp("reader", settings.reader_mcp_url),
+        )
+        # Retain the legacy diagnostic keys for operators while doctor uses
+        # provider-independent checks for its exit status.
+        result["web_search"] = result["search_mcp"]
+        result["web_reader"] = result["reader_mcp"]
     return result
 
 
@@ -295,7 +324,7 @@ def doctor(live: bool = False):
         live
         and any(
             not result.get(check)
-            for check in ("provider_json", "provider_tool_roundtrip", "search_mcp", "reader_mcp")
+            for check in ("provider_json", "provider_tool_roundtrip", "web_search", "web_reader")
         )
     ):
         raise typer.Exit(1)

@@ -219,6 +219,7 @@ export interface WorkspaceSettings {
   triage: { model: string; configured: boolean };
   worker_timeout: number;
   model_call_budget: ModelCallBudget;
+  web_search?: { provider: "exa" | "zai_mcp"; configured: boolean };
 }
 export interface RegenesisResult {
   status: "reset";

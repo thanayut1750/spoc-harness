@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     )
     compatible_base_url: str = Field(default="", validation_alias="SPOC_COMPATIBLE_BASE_URL")
     compatible_model: str = Field(default="", validation_alias="SPOC_COMPATIBLE_MODEL")
+    exa_api_key: SecretStr = SecretStr("")
+    web_search_provider: Literal["auto", "exa", "zai_mcp"] = "auto"
+    exa_timeout: float = Field(default=30, gt=0, le=120)
     search_mcp_url: str = "https://api.z.ai/api/mcp/web_search_prime/mcp"
     reader_mcp_url: str = "https://api.z.ai/api/mcp/web_reader/mcp"
     langsmith_tracing: bool = False
@@ -63,6 +66,7 @@ class Settings(BaseSettings):
             "test_mode": self.harness_test_mode,
             "storage_backend": self.storage_backend,
             "triage_configured": bool(self.typesafe_api_key.get_secret_value()),
+            "web_search": self.web_search_settings(),
         }
 
     def default_model_selection(self) -> ModelSelection:
@@ -73,6 +77,16 @@ class Settings(BaseSettings):
                 "reasoning_effort": self.reasoning_effort,
             }
         )
+
+    def selected_web_search_provider(self) -> Literal["exa", "zai_mcp"]:
+        if self.web_search_provider != "auto":
+            return self.web_search_provider
+        return "exa" if self.exa_api_key.get_secret_value().strip() else "zai_mcp"
+
+    def web_search_settings(self) -> dict[str, str | bool]:
+        provider = self.selected_web_search_provider()
+        key = self.exa_api_key if provider == "exa" else self.provider_connection("zai")[1]
+        return {"provider": provider, "configured": bool(key.get_secret_value().strip())}
 
     def provider_connection(self, provider: str) -> tuple[str, SecretStr, bool]:
         """Resolve credentials only on the server; never store them in a run."""
@@ -150,6 +164,7 @@ class Settings(BaseSettings):
             "model_call_budget": ModelCallBudget.model_validate(model_call_budget or {}).model_dump(
                 mode="json"
             ),
+            "web_search": self.web_search_settings(),
         }
 
 

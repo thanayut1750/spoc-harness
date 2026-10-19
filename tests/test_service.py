@@ -550,20 +550,20 @@ async def test_real_services_complete_via_api_worker_and_persist_artifacts(tmp_p
 
 
 @pytest.mark.live
-async def test_live_provider_roundtrip_and_mcp_discovery():
+async def test_live_provider_roundtrip_and_selected_web_provider():
     import os
 
     from org_harness.cli import live_diagnostics
 
     if os.getenv("SPOC_RUN_LIVE") != "1":
-        pytest.skip("Set SPOC_RUN_LIVE=1 to call the configured provider and MCP services")
+        pytest.skip("Set SPOC_RUN_LIVE=1 to call the configured model and web providers")
     settings = Settings()
     assert settings.openai_api_key.get_secret_value(), "Configure provider credentials in .env"
     result = await live_diagnostics(settings)
     assert result.get("provider_json"), result
     assert result.get("provider_tool_roundtrip"), result
-    assert result.get("search_mcp"), result
-    assert result.get("reader_mcp"), result
+    assert result.get("web_search"), result
+    assert result.get("web_reader"), result
 
 
 async def test_legacy_review_is_enriched_from_saved_evidence_without_mutating_interrupt(

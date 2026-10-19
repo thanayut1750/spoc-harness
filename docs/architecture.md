@@ -70,13 +70,15 @@ Text outputs created through host commands can be explicitly snapshotted with `p
 | Boundary | Expected failure behavior | Protected behavior |
 | --- | --- | --- |
 | Artifact, file and syntax tools | Missing/foreign/corrupt references, paging and path errors become actionable tool results | Missing run records and persistence failures propagate |
-| URL and MCP tools | Engineering reads actual bounded HTTP sources; network/content errors remain explicit; research MCP failures become typed resource blockers | Cancellation, policy and budgets are not replaced by fallback content |
+| URL and search-provider tools | Engineering reads actual bounded HTTP sources; Research and Tools R&D use the selected Exa or legacy MCP provider; network/content failures remain explicit tool errors or resource blockers | Cancellation, policy and budgets are not replaced by fallback content; Exa failures never silently select another provider |
 | Command journal | Invalid pre-start input is recorded; repeated identical IDs execute once | Started commands with unknown or unrecorded effects remain pending until reviewed |
 | Model adapter | Missing response choices/messages/function fields and invalid usage become sanitized provider errors | Internal `KeyError`, storage errors and unrelated `ValueError` are not silently retried |
 | Graph services | Returned contract validation and typed resource escalations have explicit routes | Exceptions inside services are not confused with malformed returned JSON |
 | HTTP, CLI and UI | Resource errors are 404/422; failed runs can retry saved work; artifact/read failures show visible recoverable messages | Mutation requests are not automatically repeated; cancelled/succeeded runs cannot retry |
 
 Unexpected worker failures retain a class-only message and safe diagnostic frames (file basename, function, line and execution phase), excluding exception bodies, prompts and credentials. Recovery preserves usage and epoch counters. The worker checks uncertain commands before constructing services or resuming graph work.
+
+Web-provider selection is server configuration: a configured `EXA_API_KEY` selects Exa search and contents by default, while installations without it retain legacy Z.AI MCP. `WEB_SEARCH_PROVIDER=exa|zai_mcp` explicitly selects one provider; `EXA_TIMEOUT` defaults to 30 seconds. Research and Tools R&D share this selection, including R&D work attached to an Engineering KR. Engineering's direct bounded HTTP URL reader remains separate. Provider changes preserve saved research artifacts and operation evidence; a failed Exa request does not silently fall back to MCP. Public settings expose only `{provider, configured}` in `web_search`, never keys, and the office displays this status without a save control.
 
 ## Office projection
 
