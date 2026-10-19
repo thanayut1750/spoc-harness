@@ -1,6 +1,11 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type { Artifact, Run, WorkspaceSettings } from "../src/types";
+import type {
+  ActivityEvent,
+  Artifact,
+  Run,
+  WorkspaceSettings,
+} from "../src/types";
 const runId = "run-fixture";
 const defaultSettings: WorkspaceSettings = {
   defaults: {
@@ -189,6 +194,17 @@ async function fixture(
           generation: "fixture-generation",
         },
       });
+    if (path === "/api/events/history")
+      return route.fulfill({
+        json: {
+          events: [],
+          next_before: null,
+          has_more: false,
+          generation:
+            new URL(route.request().url()).searchParams.get("generation") ??
+            "fixture-generation",
+        },
+      });
     if (path === "/api/runs" && method === "GET")
       return route.fulfill({ json: didReset ? [] : [run] });
     if (path === "/api/runs" && method === "POST") {
@@ -274,6 +290,7 @@ test("projects live activity, isolates external identities, reconnects from curs
     name: "Activity stream",
     exact: true,
   });
+  await activity.getByLabel("Activity scope").selectOption("all");
   await expect(
     activity.getByRole("heading", { name: "Recent activity 1" }),
   ).toBeVisible();
@@ -308,6 +325,319 @@ test("projects live activity, isolates external identities, reconnects from curs
     path: "test-results/office-desktop.png",
     fullPage: true,
   });
+});
+test("restores paginated mission and agent activity after reload without changing the live desk projection", async ({
+  page,
+}) => {
+  await fixture(page);
+  const otherRun = {
+    ...initialRun,
+    run_id: "older-mission",
+    user_request: "An older mission",
+    status: "succeeded",
+  };
+  const history: ActivityEvent[] = Array.from({ length: 205 }, (_, index) => ({
+    event_id: `saved-${index + 1}`,
+    seq: index + 1,
+    source: "harness",
+    agent_id: "backend_coder",
+    run_id: runId,
+    activity: "writing",
+    summary: `Saved worker step ${index + 1}`,
+    timestamp: "2026-10-18T09:00:00Z",
+  }));
+  history.push({
+    ...history[0],
+    seq: 206,
+    event_id: "saved-sibling",
+    agent_id: "system_architect",
+    summary: "Sibling architecture activity",
+  });
+  history.push({
+    ...history[0],
+    seq: 207,
+    event_id: "saved-other-mission",
+    run_id: otherRun.run_id,
+    summary: "Activity belonging to the older mission",
+  });
+  await page.route("**/api/runs", (route) =>
+    route.fulfill({ json: [initialRun, otherRun] }),
+  );
+  await page.route(`**/api/runs/${otherRun.run_id}`, (route) =>
+    route.fulfill({ json: otherRun }),
+  );
+  const historyRequests: string[] = [];
+  await page.route("**/api/events/history?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    historyRequests.push(query.toString());
+    const before = Number(query.get("before") || Infinity);
+    const matching = history
+      .filter(
+        (event) =>
+          event.seq < before &&
+          (!query.get("run_id") || event.run_id === query.get("run_id")) &&
+          (!query.get("agent_id") ||
+            event.agent_id === query.get("agent_id")) &&
+          (!query.get("source") || event.source === query.get("source")),
+      )
+      .sort((a, b) => b.seq - a.seq);
+    const events = matching.slice(0, 100);
+    return route.fulfill({
+      json: {
+        events,
+        has_more: matching.length > events.length,
+        next_before:
+          matching.length > events.length ? events.at(-1)!.seq : null,
+        generation: "fixture-generation",
+      },
+    });
+  });
+  await page.reload();
+  await expect(page.getByText("Office connected")).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Backend coder: Executing. Inspect agent",
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(dialog.locator(".timeline > button")).toHaveCount(100);
+  await expect(
+    dialog.getByText("Saved worker step 205", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("Activity belonging to the older mission"),
+  ).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Load earlier activity" }).click();
+  await expect(dialog.locator(".timeline > button")).toHaveCount(200);
+  await dialog.getByRole("button", { name: "Load earlier activity" }).click();
+  await expect(dialog.locator(".timeline > button")).toHaveCount(206);
+  await expect(
+    dialog.getByText("Saved worker step 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Load earlier activity" }),
+  ).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(inspector.locator(".agent-event")).toHaveCount(100);
+  await expect(
+    inspector.getByText("Sibling architecture activity"),
+  ).toHaveCount(0);
+  await inspector
+    .getByRole("button", { name: "Load earlier activity" })
+    .click();
+  await expect(inspector.locator(".agent-event")).toHaveCount(200);
+  await inspector
+    .getByRole("button", { name: "Load earlier activity" })
+    .click();
+  await expect(inspector.locator(".agent-event")).toHaveCount(205);
+  await page
+    .getByRole("combobox", { name: "Selected mission" })
+    .selectOption(otherRun.run_id);
+  await expect(
+    inspector.getByText("Activity belonging to the older mission"),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("Saved worker step 205", { exact: true }),
+  ).toHaveCount(0);
+  expect(
+    historyRequests.some(
+      (query) =>
+        query.includes("before=") &&
+        query.includes("agent_id=backend_coder") &&
+        query.includes("source=harness"),
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as { __officeStreams: EventSource[] }
+        ).__officeStreams.at(-1)?.url,
+    ),
+  ).toContain("after=10");
+});
+
+test("activity history errors stay visible and retry restores source-isolated integration history", async ({
+  page,
+}) => {
+  await fixture(page);
+  let unavailable = true;
+  await page.route("**/api/events/history?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    if (unavailable)
+      return route.fulfill({
+        status: 503,
+        json: { detail: "Activity database temporarily unavailable" },
+      });
+    const events: ActivityEvent[] = [
+      {
+        seq: 8,
+        event_id: "internal-history",
+        source: "harness",
+        agent_id: "backend_coder",
+        run_id: runId,
+        activity: "writing",
+        summary: "Internal saved output",
+        timestamp: "2026-10-18T09:00:00Z",
+      },
+      {
+        seq: 9,
+        event_id: "external-history",
+        source: "custom",
+        agent_id: "backend_coder",
+        activity: "reading",
+        summary: "External saved integration output",
+        timestamp: "2026-10-18T09:00:01Z",
+      },
+    ].filter(
+      (event) =>
+        (!query.get("run_id") || event.run_id === query.get("run_id")) &&
+        (!query.get("source") || event.source === query.get("source")) &&
+        (!query.get("agent_id") || event.agent_id === query.get("agent_id")),
+    ) as ActivityEvent[];
+    return route.fulfill({
+      json: {
+        events,
+        next_before: null,
+        has_more: false,
+        generation: "fixture-generation",
+      },
+    });
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Activity database temporarily unavailable",
+  );
+  await expect(dialog.getByText("The office is ready")).toHaveCount(0);
+  unavailable = false;
+  await dialog.getByRole("button", { name: "Retry activity" }).click();
+  await expect(dialog.getByText("Internal saved output")).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await dialog.getByLabel("Activity scope").selectOption("all");
+  await expect(
+    dialog.getByText("External saved integration output"),
+  ).toBeVisible();
+  await dialog
+    .locator(".timeline > button")
+    .filter({ hasText: "External saved integration output" })
+    .click();
+  // An integration may be absent from the latest projection; its persisted event still identifies the inspector.
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(
+    inspector.getByText("External saved integration output"),
+  ).toBeVisible();
+  await expect(inspector.getByText("Internal saved output")).toHaveCount(0);
+});
+test("retains every matching live event when a batched burst exceeds the animation buffer", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    page.getByText("No activity recorded for this agent yet."),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    for (let seq = 11; seq <= 260; seq++)
+      emit({
+        seq,
+        event_id: `burst-${seq}`,
+        source: "harness",
+        agent_id: "backend_coder",
+        run_id: "run-fixture",
+        activity: "writing",
+        summary: `Batched worker event ${seq}`,
+        timestamp: "2026-10-18T10:00:01Z",
+      });
+  });
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(inspector.locator(".agent-event")).toHaveCount(250);
+  await expect(
+    inspector.getByText("Batched worker event 11", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Activity stream",
+    exact: true,
+  });
+  await expect(dialog.locator(".timeline > button")).toHaveCount(250);
+  await expect(
+    dialog.getByText("Batched worker event 11", { exact: true }),
+  ).toBeVisible();
+});
+test("a history generation mismatch resets stale client data before loading the new history", async ({
+  page,
+}) => {
+  await fixture(page);
+  let snapshots = 0;
+  await page.route("**/api/office", (route) => {
+    snapshots++;
+    return route.fulfill({
+      json: {
+        agents: [],
+        cursor: snapshots === 1 ? 10 : 0,
+        generation: snapshots === 1 ? "fixture-generation" : "history-reset",
+      },
+    });
+  });
+  await page.route("**/api/runs", (route) =>
+    route.fulfill({ json: snapshots < 2 ? [initialRun] : [] }),
+  );
+  await page.route("**/api/events/history?*", (route) => {
+    const old =
+      new URL(route.request().url()).searchParams.get("generation") !==
+      "history-reset";
+    return route.fulfill({
+      json: {
+        events: [],
+        next_before: null,
+        has_more: false,
+        generation: "history-reset",
+        cursor: 0,
+        reset: old,
+      },
+    });
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("combobox", { name: "Selected mission" }),
+  ).toHaveValue("");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __officeStreams: EventSource[] }
+          ).__officeStreams.at(-1)?.url,
+      ),
+    )
+    .toBe("/api/events?after=0&generation=history-reset");
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Recent activity 0" }),
+  ).toBeVisible();
 });
 test("creates a mission with constitution and sends targeted guidance", async ({
   page,
@@ -1302,6 +1632,7 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
     name: "Activity stream",
     exact: true,
   });
+  await activity.getByLabel("Activity scope").selectOption("all");
   await expect(activity.getByText("Old generation activity")).toBeVisible();
   await page.route("**/api/office", (route) =>
     route.fulfill({

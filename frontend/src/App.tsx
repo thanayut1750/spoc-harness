@@ -63,6 +63,8 @@ import {
   terminalStatuses,
 } from "./office";
 import { useOffice } from "./useOffice";
+import { agentActivityScope } from "./activityHistory";
+import { useActivityHistory } from "./useActivityHistory";
 import type {
   ActivityEvent,
   AgentActivity,
@@ -74,6 +76,7 @@ import type {
   ModelConfig,
   RegenesisResult,
   WorkspaceSettings as SettingsData,
+  ActivitySubscription,
 } from "./types";
 
 const statusTone = (status: string) =>
@@ -767,6 +770,10 @@ function Inspector({
   run,
   onNote,
   busy,
+  activityRunId,
+  snapshot,
+  onHistoryReset,
+  subscribe,
 }: {
   agent: AgentActivity;
   events: ActivityEvent[];
@@ -774,13 +781,24 @@ function Inspector({
   run: Run | null;
   onNote: (content: string) => Promise<boolean>;
   busy: boolean;
+  activityRunId?: string;
+  snapshot: { generation?: string } | null;
+  onHistoryReset: () => void;
+  subscribe: ActivitySubscription;
 }) {
   const [tab, setTab] = useState("overview");
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
   const role = roleFor(agent);
   const model = agentModelSelection(agent, run);
-  const relevant = events.filter((e) => e.agent_id === agent.agent_id);
+  const history = useActivityHistory({
+    scope: agentActivityScope(agent, activityRunId),
+    liveEvents: events,
+    snapshot,
+    onReset: onHistoryReset,
+    subscribe,
+  });
+  const relevant = history.events;
   const outcome = agent.kr_id ? run?.outcomes?.[agent.kr_id] : undefined;
   const canGuide =
     !!run &&
@@ -959,14 +977,22 @@ function Inspector({
           </>
         ) : tab === "activity" ? (
           <div className="agent-activity">
-            {relevant.length === 0 ? (
+            <p className="muted small">
+              {role.kind === "external"
+                ? "Activity from this integration"
+                : activityRunId
+                  ? "Activity for the selected mission"
+                  : "Activity across all missions"}
+            </p>
+            <ActivityHistoryControls history={history} />
+            {relevant.length === 0 && !history.loading && !history.error ? (
               <Empty
                 icon={<ActivityIcon size={21} />}
                 text="No activity recorded for this agent yet."
               />
             ) : (
               relevant.map((event) => (
-                <div key={event.seq}>
+                <div className="agent-event" key={event.seq}>
                   <span className={`small-dot ${event.activity}`} />
                   <div>
                     <strong>{activityLabels[event.activity]}</strong>
@@ -981,6 +1007,17 @@ function Inspector({
                   </div>
                 </div>
               ))
+            )}
+            {history.hasMore && !history.error && (
+              <button
+                className="text-button history-more"
+                disabled={history.loading}
+                onClick={history.loadEarlier}
+              >
+                {history.loading
+                  ? "Loading activity…"
+                  : "Load earlier activity"}
+              </button>
             )}
           </div>
         ) : (
@@ -1041,6 +1078,28 @@ function Inspector({
     </>
   );
 }
+function ActivityHistoryControls({
+  history,
+}: {
+  history: ReturnType<typeof useActivityHistory>;
+}) {
+  return history.error ? (
+    <div className="history-error" role="alert">
+      <p>{history.error}</p>
+      <button
+        className="text-button history-more"
+        onClick={history.retry}
+        disabled={history.loading}
+      >
+        Retry activity
+      </button>
+    </div>
+  ) : history.loading ? (
+    <p className="muted small" role="status">
+      Loading activity…
+    </p>
+  ) : null;
+}
 function Empty({ icon, text }: { icon: ReactNode; text: string }) {
   return (
     <div className="empty-state">
@@ -1056,6 +1115,9 @@ export default function App() {
   const [run, setRun] = useState<Run | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selected, setSelected] = useState("executive");
+  const [historicalAgent, setHistoricalAgent] = useState<AgentActivity | null>(
+    null,
+  );
   const [view, setView] = useState<"office" | "list">("office");
   const [modal, setModal] = useState<
     "mission" | "review" | "settings" | "report" | "activity" | null
@@ -1074,6 +1136,9 @@ export default function App() {
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("model");
   const [officeVersion, setOfficeVersion] = useState(0);
+  const [activityScope, setActivityScope] = useState<"mission" | "all">(
+    "mission",
+  );
   const dataEpoch = useRef(0);
   const selectedRun = useRef(runId);
   useEffect(() => {
@@ -1160,6 +1225,7 @@ export default function App() {
     setRuns([]);
     setArtifacts([]);
     setSelected("executive");
+    setHistoricalAgent(null);
     setView("office");
     setFilter("");
     setDepartment("all");
@@ -1177,6 +1243,14 @@ export default function App() {
     void refreshRuns();
   }, [clearClientData, reloadSettings, refreshRuns]);
   const office = useOffice(onEvent, officeVersion, onOfficeReset);
+  const activityHistory = useActivityHistory({
+    scope: activityScope === "mission" && runId ? { run_id: runId } : {},
+    liveEvents: office.events,
+    snapshot: office.snapshot,
+    resetVersion: officeVersion,
+    onReset: onOfficeReset,
+    subscribe: office.subscribe,
+  });
   async function regenesis(confirmation: string): Promise<RegenesisResult> {
     const result = await api.regenesis(confirmation);
     clearClientData();
@@ -1220,13 +1294,17 @@ export default function App() {
     activeActivities.has(agent.activity),
   ).length;
   const selectedAgent =
-    allAgents.find((agent) => agent.agent_id === selected) ?? allAgents[0];
+    allAgents.find((agent) => agent.agent_id === selected) ??
+    (historicalAgent?.agent_id === selected
+      ? displayActivity(
+          historicalAgent,
+          activityRuns.get(historicalAgent.run_id ?? ""),
+        )
+      : allAgents[0]);
   const inspectedRun = selectedAgent?.run_id
     ? (activityRuns.get(selectedAgent.run_id) ?? null)
     : run;
-  const events = office.events.filter(
-    (event) => !runId || event.run_id === runId || !event.run_id,
-  );
+  const events = activityHistory.events;
   async function perform(operation: () => Promise<unknown>, close = false) {
     setBusy(true);
     setError("");
@@ -1696,6 +1774,10 @@ export default function App() {
               events={office.events}
               artifacts={inspectedRun?.run_id === run?.run_id ? artifacts : []}
               run={inspectedRun}
+              activityRunId={runId || undefined}
+              snapshot={office.snapshot}
+              onHistoryReset={onOfficeReset}
+              subscribe={office.subscribe}
               busy={busy}
               onNote={async (content) => {
                 if (!inspectedRun) return false;
@@ -1777,7 +1859,25 @@ export default function App() {
                 {office.connection === "live" ? "LIVE" : "AWAITING CONNECTION"}
               </span>
             </div>
-            {events.length === 0 ? (
+            <label className="activity-scope">
+              Show
+              <select
+                aria-label="Activity scope"
+                value={runId ? activityScope : "all"}
+                onChange={(event) =>
+                  setActivityScope(event.target.value as "mission" | "all")
+                }
+              >
+                <option value="mission" disabled={!runId}>
+                  Selected mission
+                </option>
+                <option value="all">All activity</option>
+              </select>
+            </label>
+            <ActivityHistoryControls history={activityHistory} />
+            {events.length === 0 &&
+            !activityHistory.loading &&
+            !activityHistory.error ? (
               <div className="timeline-empty">
                 <span className="timeline-line" />
                 <div>
@@ -1792,7 +1892,7 @@ export default function App() {
               </div>
             ) : (
               <div className="timeline">
-                {events.slice(0, 60).map((event) => {
+                {events.map((event) => {
                   const current = office.agents[event.agent_id];
                   const role = roleFor({
                     ...current,
@@ -1803,7 +1903,10 @@ export default function App() {
                     <button
                       key={event.seq}
                       onClick={() => {
+                        setHistoricalAgent(event);
                         setSelected(event.agent_id);
+                        if (event.source === "harness" && event.run_id)
+                          setRunId(event.run_id);
                         setModal(null);
                       }}
                     >
@@ -1818,6 +1921,17 @@ export default function App() {
                   );
                 })}
               </div>
+            )}
+            {activityHistory.hasMore && !activityHistory.error && (
+              <button
+                className="text-button history-more"
+                disabled={activityHistory.loading}
+                onClick={activityHistory.loadEarlier}
+              >
+                {activityHistory.loading
+                  ? "Loading activity…"
+                  : "Load earlier activity"}
+              </button>
             )}
           </section>
         </Modal>

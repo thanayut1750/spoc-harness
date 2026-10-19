@@ -1379,7 +1379,7 @@ main {
   font-size: 7px;
   color: #748e65;
 }
-.agent-activity > div {
+.agent-activity > .agent-event {
   display: flex;
   gap: 9px;
   border-left: 1px solid #344c2a;
@@ -1415,8 +1415,32 @@ main {
   color: #89a976;
   cursor: pointer;
 }
-.agent-activity > div > div {
+.agent-activity > .agent-event > div {
   min-width: 0;
+}
+.activity-scope {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a3b69a;
+  font-size: 12px;
+  margin: 14px 0;
+}
+.activity-scope select {
+  min-height: 40px;
+  font-size: 12px;
+  max-width: 100%;
+}
+.history-more {
+  min-height: 44px;
+  font-size: 12px;
+  margin-top: 10px;
+}
+.history-error {
+  color: #e9b2a0;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0;
 }
 .agent-list {
   min-height: 350px;

@@ -526,10 +526,9 @@ class HostTools:
                 raise ExpectedToolInputError(
                     f"Host file cannot be read ({type(exc).__name__})"
                 ) from exc
-            return {
-                "path": str(target),
-                "content": readable_text(body, partial=len(body) == 262148)[:65536],
-            }
+            content = readable_text(body, partial=len(body) == 262148)[:65536]
+            await self.emit(self.role, "reading", f"Read {target.name}", kr_id=self.kr_id)
+            return {"path": str(target), "content": content}
 
         return await self.journal(call_id, "read_file", {"path": path}, execute)
 

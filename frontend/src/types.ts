@@ -29,6 +29,22 @@ export interface ActivityEvent extends AgentActivity {
   source: string;
   timestamp: string;
 }
+export interface ActivityScope {
+  run_id?: string;
+  agent_id?: string;
+  source?: string;
+}
+export interface ActivityPage {
+  events: ActivityEvent[];
+  next_before: number | null;
+  has_more: boolean;
+  generation?: string;
+  cursor?: number;
+  reset?: boolean;
+}
+export type ActivitySubscription = (
+  listener: (event: ActivityEvent) => void,
+) => () => void;
 export interface KeyResult {
   kr_id: string;
   description: string;

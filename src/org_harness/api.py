@@ -356,6 +356,25 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     async def office():
         return await storage.office_snapshot()
 
+    @app.get("/api/events/history")
+    async def event_history(
+        before: int | None = Query(default=None, ge=1),
+        run_id: str | None = Query(default=None, min_length=1),
+        agent_id: str | None = Query(default=None, min_length=1, max_length=100),
+        source: str | None = Query(default=None, min_length=1, max_length=100),
+        limit: int = Query(default=100, ge=1, le=500),
+        generation: str | None = Query(default=None, min_length=1, max_length=200),
+    ):
+        """Read durable newest-first history without changing the live office projection."""
+        return await storage.event_history(
+            before=before,
+            run_id=run_id,
+            agent_id=agent_id,
+            source=source,
+            limit=limit,
+            generation=generation,
+        )
+
     @app.get("/api/events")
     async def events(
         request: Request,

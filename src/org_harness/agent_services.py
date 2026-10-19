@@ -80,9 +80,15 @@ class WorkerPolicy(AgentMiddleware):
     state_schema = WorkerAgentState
 
     def __init__(
-        self, services: AgentServices, role: str, *, recovery_instruction: str | None = None
+        self,
+        services: AgentServices,
+        role: str,
+        *,
+        kr_id: str | None = None,
+        recovery_instruction: str | None = None,
     ):
         self.services, self.role = services, role
+        self.kr_id = kr_id
         self.recovery_instruction = recovery_instruction
 
     async def awrap_model_call(self, request: Any, handler: Any) -> Any:
@@ -91,6 +97,17 @@ class WorkerPolicy(AgentMiddleware):
             raise EscalationSignal("cancelled", "Run was cancelled")
         if control == "suspend":
             raise EscalationSignal("suspended", "Execution suspended for constitution review")
+        await self.services.emit(
+            self.role,
+            "planning"
+            if self.role in {"planner", "engineering_head", "research_head"}
+            else "executing",
+            "Preparing the next plan step"
+            if self.role in {"planner", "engineering_head", "research_head"}
+            else "Working on the next assignment step",
+            kr_id=self.kr_id,
+            phase="model_request",
+        )
         return await self.services.model_request(lambda: handler(request))
 
     @hook_config(can_jump_to=["model"])
@@ -119,6 +136,7 @@ class WorkerPolicy(AgentMiddleware):
                     self.role,
                     "waiting",
                     "Response incomplete; continuing from recorded tool results",
+                    kr_id=self.kr_id,
                     finish_reason=finish,
                 )
                 return {
@@ -451,6 +469,64 @@ class AgentServices:
         *,
         mode: Literal["auto", "research", "build_tool"] = "auto",
     ) -> dict:
+        if caller not in {"planner", "engineering_head"} or host.role != caller:
+            raise EscalationSignal("policy_violation", "This agent cannot delegate Tools R&D")
+        if not requirement.strip():
+            raise ExpectedToolInputError("Describe the concrete missing tool capability")
+        if mode not in {"auto", "research", "build_tool"}:
+            raise ExpectedToolInputError("Tools R&D mode must be auto, research, or build_tool")
+        delegation_kr_id = kr.kr_id if kr else "planner-tools"
+        self._dynamic_agents["tools_rd_lead"] = {
+            "display_name": "Tools R&D Lead",
+            "agent_type": "tools_rd_lead",
+            "parent_agent_id": caller,
+            "department": "engineering",
+            "model_parent": "tools_rd_lead",
+        }
+        await self.emit(
+            caller,
+            "waiting",
+            "Waiting for delegated Tools R&D",
+            kr_id=kr.kr_id if kr else None,
+            target_agent_id="tools_rd_lead",
+        )
+        try:
+            return await self._consult_tools_rd(
+                caller, requirement, constitution, host, call_id, kr, mode=mode
+            )
+        except EscalationSignal as exc:
+            await self.emit(
+                "tools_rd_lead", "error", exc.reason, kr_id=delegation_kr_id, kind=exc.kind
+            )
+            raise
+        except asyncio.CancelledError:
+            await self.emit(
+                "tools_rd_lead",
+                "waiting",
+                "Tools R&D interrupted; recorded work is retained",
+                kr_id=delegation_kr_id,
+            )
+            raise
+        except Exception as exc:
+            await self.emit(
+                "tools_rd_lead",
+                "error",
+                f"Tools R&D stopped unexpectedly ({type(exc).__name__})",
+                kr_id=delegation_kr_id,
+            )
+            raise
+
+    async def _consult_tools_rd(
+        self,
+        caller: str,
+        requirement: str,
+        constitution: Constitution,
+        host: WorkerHostTools,
+        call_id: str,
+        kr: KeyResult | None = None,
+        *,
+        mode: Literal["auto", "research", "build_tool"] = "auto",
+    ) -> dict:
         """Private delegation capability; a worker's tool schema cannot select its caller."""
         if caller not in {"planner", "engineering_head"} or host.role != caller:
             raise EscalationSignal("policy_violation", "This agent cannot delegate Tools R&D")
@@ -519,13 +595,6 @@ class AgentServices:
         # Graph cancellation can return before a nested tool's finally block;
         # mirror identities when commands start, not only when the child exits.
         rd_host.parent_command_operations = host.command_operations
-        self._dynamic_agents["tools_rd_lead"] = {
-            "display_name": "Tools R&D Lead",
-            "agent_type": "tools_rd_lead",
-            "parent_agent_id": caller,
-            "department": "engineering",
-            "model_parent": "tools_rd_lead",
-        }
         await self.emit(
             "tools_rd_lead",
             "planning",
@@ -677,6 +746,7 @@ class AgentServices:
                 WorkerPolicy(
                     self,
                     actor,
+                    kr_id=kr.kr_id if kr else None,
                     recovery_instruction="Your planning response was incomplete. Continue from saved "
                     "tool results without repeating completed tools. Return the complete final JSON "
                     "object conforming to the schema in your system instructions.",
@@ -962,7 +1032,7 @@ class AgentServices:
         if work.specialist:
             await self.emit(
                 actor,
-                "planning",
+                "executing",
                 f"Activate {worker_agent_name(work)}",
                 kr_id=kr.kr_id,
                 work_package_id=work.work_package_id,
@@ -1133,6 +1203,14 @@ class AgentServices:
                         "Artifact is outside this assignment and its approved dependencies"
                     )
                 end = min(offset + limit, len(content))
+                await self.emit(
+                    agent_id,
+                    "reading",
+                    f"Read artifact {metadata['name']}",
+                    kr_id=kr.kr_id,
+                    artifact_id=artifact_id,
+                    offset=offset,
+                )
                 return {
                     "name": metadata["name"],
                     "content": content[offset:end],
@@ -1342,7 +1420,7 @@ class AgentServices:
                 await self.mission_tools().list_tools(), default=str
             )
         middleware: list[AgentMiddleware[Any, Any, Any]] = [
-            WorkerPolicy(self, agent_id),
+            WorkerPolicy(self, agent_id, kr_id=kr.kr_id),
             ModelCallLimitMiddleware(
                 run_limit=self.limits.worker_model_calls, exit_behavior="error"
             ),

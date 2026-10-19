@@ -130,6 +130,8 @@ curl http://127.0.0.1:8000/api/integrations/events \
 
 Activity values are `idle`, `planning`, `reading`, `writing`, `executing`, `reviewing`, `waiting`, `completed`, and `error`. Optional fields include `run_id`, `kr_id`, `timestamp`, and bounded display `data`. The office snapshots its current event cursor and reconnects to persisted SSE events after that cursor.
 
+Activity Stream and the inspector load saved history after a refresh and merge new live events into it. Use **Selected mission** or **All activity** in the stream, and **Load earlier activity** to page backward. Inspector activity follows the actual agent and mission; external integrations keep their separate source identity. Historical events leave the current office positions and handoffs intact. Public model-work, file-read, delegation, and failure events keep activity visible as agents work.
+
 ## API
 
 | Route | Purpose |
@@ -142,6 +144,7 @@ Activity values are `idle`, `planning`, `reading`, `writing`, `executing`, `revi
 | `PUT`, `DELETE /api/settings/agents/{agent_id}` | Set an agent override or return it to the default |
 | `POST /api/regenesis` | Confirmed reset of all harness-managed data |
 | `GET /api/office`, `GET /api/events?after=CURSOR` | Snapshot and SSE event replay |
+| `GET /api/events/history` | Newest-first saved activity, with `run_id`, `agent_id`, `source`, exclusive `before`, and bounded `limit` filters |
 | `GET /api/runs/{id}/artifacts`, `GET /api/artifacts/{id}` | Evidence and files |
 | `POST /api/integrations/events` | External display activity |
 | `GET /healthz`, `GET /readyz` | Liveness and database readiness |

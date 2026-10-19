@@ -7,7 +7,10 @@ import type {
   ModelConfig,
   WorkspaceSettings,
   RegenesisResult,
+  ActivityScope,
+  ActivityPage,
 } from "./types";
+import { normalizeAgent, parseActivityEvent } from "./office";
 async function responseFor(
   path: string,
   body?: unknown,
@@ -92,6 +95,38 @@ export const api = {
     request<{ agents: AgentActivity[]; cursor: number; generation?: string }>(
       "/office",
     ),
+  history: async (
+    scope: ActivityScope,
+    before?: number,
+    generation?: string,
+  ): Promise<ActivityPage> => {
+    const query = new URLSearchParams({ limit: "100" });
+    for (const [key, value] of Object.entries(scope))
+      if (value) query.set(key, value);
+    if (before !== undefined) query.set("before", String(before));
+    if (generation) query.set("generation", generation);
+    const page = await request<ActivityPage>(`/events/history?${query}`);
+    if (
+      !page ||
+      !Array.isArray(page.events) ||
+      typeof page.has_more !== "boolean" ||
+      !(
+        page.next_before === null ||
+        (Number.isSafeInteger(page.next_before) && page.next_before > 0)
+      ) ||
+      (page.has_more &&
+        (page.next_before === null ||
+          (before !== undefined && page.next_before >= before)))
+    )
+      throw new Error("The harness returned invalid activity history.");
+    const events = page.events.map((event) => {
+      const parsed = parseActivityEvent(JSON.stringify(event));
+      if (!parsed)
+        throw new Error("The harness returned invalid activity history.");
+      return normalizeAgent(parsed);
+    });
+    return { ...page, events };
+  },
   runs: async () => {
     const data = await request<Run[] | { runs: Run[] }>("/runs");
     const runs = Array.isArray(data) ? data : data?.runs;

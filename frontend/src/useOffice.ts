@@ -21,10 +21,20 @@ export function useOffice(
     "connecting" | "live" | "offline"
   >("connecting");
   const [error, setError] = useState("");
+  const [snapshot, setSnapshot] = useState<{
+    generation?: string;
+  } | null>(null);
   const cursor = useRef(0);
   const generation = useRef<string | undefined>(undefined);
   const eventCallback = useRef(onEvent);
   const resetCallback = useRef(onReset);
+  const listeners = useRef(new Set<(event: ActivityEvent) => void>());
+  const subscribe = useCallback((listener: (event: ActivityEvent) => void) => {
+    listeners.current.add(listener);
+    return () => {
+      listeners.current.delete(listener);
+    };
+  }, []);
   useEffect(() => {
     resetCallback.current = onReset;
   }, [onReset]);
@@ -38,6 +48,7 @@ export function useOffice(
     cursor.current = parsed.seq;
     setAgents((current) => projectEvent(current, parsed));
     setEvents((current) => appendEvent(current, parsed));
+    for (const listener of listeners.current) listener(parsed);
     eventCallback.current(parsed);
   }, []);
   useEffect(() => {
@@ -48,6 +59,7 @@ export function useOffice(
     setEvents([]);
     setConnection("connecting");
     setError("");
+    setSnapshot(null);
     let stream: EventSource | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let hasSnapshot = false;
@@ -84,11 +96,13 @@ export function useOffice(
         hasSnapshot = true;
         if (changed) {
           setEvents([]);
+          setSnapshot(null);
           if (resetCallback.current) {
             resetCallback.current();
             return;
           }
         }
+        setSnapshot({ generation: state.generation });
         setAgents((current) => ({
           ...initialAgents(),
           ...Object.fromEntries(
@@ -124,6 +138,7 @@ export function useOffice(
           hasSnapshot = false;
           setAgents(initialAgents());
           setEvents([]);
+          setSnapshot(null);
           setConnection("connecting");
           if (resetCallback.current) resetCallback.current();
           else void connect();
@@ -153,5 +168,5 @@ export function useOffice(
       clearTimeout(retry);
     };
   }, [receive, resetVersion]);
-  return { agents, events, connection, error };
+  return { agents, events, connection, error, snapshot, subscribe };
 }

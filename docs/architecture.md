@@ -80,6 +80,8 @@ Unexpected worker failures retain a class-only message and safe diagnostic frame
 
 Version 1 activity events are persisted with monotonically ordered cursors and source-scoped event IDs. Projection updates and event inserts commit together. The browser snapshots a cursor, then replays subsequent SSE events; duplicate events are ignored. Internal handoff events identify both agent endpoints and the KR, allowing animation to reflect real transfers.
 
+Saved activity is fetched separately through `/api/events/history`, with newest-first pages and an exclusive `before` cursor. Run, raw agent ID, and source filters select the relevant history. The page includes a consistent reset generation and global cursor; a stale generation clears the client before it can display old records. The browser merges saved pages with live activity without projecting historical states or animating old handoffs. Agent history and stream history have independent pagination, so busy agents cannot evict another agent's records. PostgreSQL snapshot/history reads acquire table locks in the same order as reset to avoid reader/reset deadlocks.
+
 External webhooks update external display identities only. They cannot change run records, approvals, or reviews. Engineering specialists and external integrations occupy separate paged desks, and every agent remains available in the searchable list. Canvas rendering, hit targets, and handoffs share one position resolver. Trusted specialist identity metadata survives later tool events and snapshot reloads; external metadata cannot create an internal agent identity.
 
 ## Dynamic specialists and tool development

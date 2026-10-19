@@ -188,7 +188,7 @@ class Worker:
                 {
                     "run_id": run_id,
                     "agent_id": "executive",
-                    "activity": "planning",
+                    "activity": "waiting",
                     "summary": "Recovering execution" if snapshot.values else "Starting execution",
                 }
             )
@@ -255,7 +255,12 @@ class Worker:
                 {
                     "run_id": run_id,
                     "agent_id": "executive",
-                    "activity": "completed" if result["status"] == "succeeded" else "waiting",
+                    "activity": {
+                        "succeeded": "completed",
+                        "failed": "error",
+                        "cancelled": "idle",
+                        "aborted": "idle",
+                    }.get(result["status"], "waiting"),
                     "summary": f"Run {result['status']}",
                 }
             )
@@ -263,6 +268,14 @@ class Worker:
             current = await self.storage.get_run(run_id)
             if current.get("cancel_requested"):
                 await self.storage.update_run(run_id, status="cancelled")
+                await self.storage.emit(
+                    {
+                        "run_id": run_id,
+                        "agent_id": "executive",
+                        "activity": "idle",
+                        "summary": "Run cancelled",
+                    }
+                )
             else:
                 # Retain running state for checkpoint recovery after shutdown/lost lease.
                 logger.info("Execution interrupted; checkpoint recovery remains available")

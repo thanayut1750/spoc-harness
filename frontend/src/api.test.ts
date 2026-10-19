@@ -107,3 +107,56 @@ it("retries the existing failed run through its recovery endpoint without a requ
     headers: { Accept: "application/json" },
   });
 });
+it("requests a bounded earlier history page with exact source, actor, mission, and generation filters", async () => {
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        events: [
+          {
+            event_id: "saved",
+            seq: 3,
+            source: "custom",
+            agent_id: "backend_coder",
+            activity: "reading",
+            timestamp: "2026-10-19T09:00:00Z",
+          },
+        ],
+        has_more: false,
+        next_before: null,
+        generation: "generation-a",
+      }),
+    ),
+  );
+  vi.stubGlobal("fetch", fetch);
+  const result = await api.history(
+    { run_id: "mission / a", source: "custom", agent_id: "backend_coder" },
+    9,
+    "generation-a",
+  );
+  expect(fetch.mock.calls[0][0]).toBe(
+    "/api/events/history?limit=100&run_id=mission+%2F+a&source=custom&agent_id=backend_coder&before=9&generation=generation-a",
+  );
+  expect(result.events[0].agent_id).toBe("custom:backend_coder");
+  expect(result.events[0].original_agent_id).toBe("backend_coder");
+});
+it("rejects malformed history and nonadvancing pagination instead of silently hiding activity", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ events: [], has_more: true, next_before: 10 }),
+      ),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          events: [{ seq: 1 }],
+          has_more: false,
+          next_before: null,
+        }),
+      ),
+    );
+  vi.stubGlobal("fetch", fetch);
+  await expect(api.history({}, 10)).rejects.toThrow("invalid activity history");
+  await expect(api.history({})).rejects.toThrow("invalid activity history");
+});

@@ -9,8 +9,11 @@ import json
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from itertools import islice
 from typing import Any, cast
 from uuid import uuid4
+
+from org_harness.text_safety import require_json_text
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
 _AGENT_IDENTITY_FIELDS = (
@@ -60,6 +63,27 @@ def _retain_internal_agent_identity(event: dict, previous: dict | None) -> None:
         }
     if _internal_agent_type(event) and isinstance(event["data"].get("display_name"), str):
         event["display_name"] = event["data"]["display_name"]
+
+
+def _event_history_page(
+    events: list[dict],
+    *,
+    limit: int,
+    cursor: int,
+    generation: str,
+    expected_generation: str | None,
+) -> dict:
+    reset = expected_generation is not None and expected_generation != generation
+    page = [] if reset else events[:limit]
+    has_more = not reset and len(events) > limit
+    return {
+        "events": page,
+        "next_before": page[-1]["seq"] if has_more else None,
+        "has_more": has_more,
+        "cursor": cursor,
+        "generation": generation,
+        "reset": reset,
+    }
 
 
 class NotFoundError(LookupError):
@@ -404,6 +428,41 @@ class MemoryStorage:
                     for event in self.events
                     if event["seq"] > cursor and (not run_id or event.get("run_id") == run_id)
                 ][:limit]
+            )
+
+    async def event_history(
+        self,
+        *,
+        before: int | None = None,
+        run_id: str | None = None,
+        agent_id: str | None = None,
+        source: str | None = None,
+        limit: int = 100,
+        generation: str | None = None,
+    ) -> dict:
+        require_json_text((run_id, agent_id, source, generation))
+        async with self.lock:
+            events = list(
+                islice(
+                    (
+                        event
+                        for event in reversed(self.events)
+                        if (before is None or event["seq"] < before)
+                        and (run_id is None or event.get("run_id") == run_id)
+                        and (agent_id is None or event.get("agent_id") == agent_id)
+                        and (source is None or event.get("source") == source)
+                    ),
+                    limit + 1,
+                )
+            )
+            return copy.deepcopy(
+                _event_history_page(
+                    events,
+                    limit=limit,
+                    cursor=len(self.events),
+                    generation=self.reset_generation,
+                    expected_generation=generation,
+                )
             )
 
     async def office_snapshot(self) -> dict:
@@ -855,16 +914,72 @@ class PostgresStorage:
             ).fetchall()
             return [{"schema_version": 1, **row["data"], "seq": row["seq"]} for row in rows]
 
+    async def event_history(
+        self,
+        *,
+        before: int | None = None,
+        run_id: str | None = None,
+        agent_id: str | None = None,
+        source: str | None = None,
+        limit: int = 100,
+        generation: str | None = None,
+    ) -> dict:
+        require_json_text((run_id, agent_id, source, generation))
+        async with self.pool.connection() as conn, conn.transaction():
+            await conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            # Lock events before settings, matching reset's table-lock order.
+            head = await (
+                await conn.execute("SELECT COALESCE(MAX(seq),0) AS cursor FROM harness_events")
+            ).fetchone()
+            assert head is not None
+            epoch = await (
+                await conn.execute("SELECT data FROM harness_settings WHERE key='reset_generation'")
+            ).fetchone()
+            current_generation = epoch["data"]["value"] if epoch else "initial"
+            if generation is not None and generation != current_generation:
+                rows = []
+            else:
+                rows = await (
+                    await conn.execute(
+                        """SELECT seq,data FROM harness_events
+                        WHERE (%s::bigint IS NULL OR seq<%s)
+                        AND (%s::text IS NULL OR run_id=%s)
+                        AND (%s::text IS NULL OR data->>'agent_id'=%s)
+                        AND (%s::text IS NULL OR source=%s)
+                        ORDER BY seq DESC LIMIT %s""",
+                        (
+                            before,
+                            before,
+                            run_id,
+                            run_id,
+                            agent_id,
+                            agent_id,
+                            source,
+                            source,
+                            limit + 1,
+                        ),
+                    )
+                ).fetchall()
+            return _event_history_page(
+                [{"schema_version": 1, **row["data"], "seq": row["seq"]} for row in rows],
+                limit=limit,
+                cursor=head["cursor"],
+                generation=current_generation,
+                expected_generation=generation,
+            )
+
     async def office_snapshot(self) -> dict:
         async with self.pool.connection() as conn, conn.transaction():
             await conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
-            rows = await (
-                await conn.execute("SELECT data FROM harness_projection ORDER BY agent_key")
-            ).fetchall()
+            # Reset locks events before projections/settings. Acquire read locks
+            # in that order so a concurrent reset cannot deadlock this snapshot.
             cursor = await (
                 await conn.execute("SELECT COALESCE(MAX(seq),0) AS cursor FROM harness_events")
             ).fetchone()
             assert cursor is not None  # Aggregate SELECT returns a row even with no events.
+            rows = await (
+                await conn.execute("SELECT data FROM harness_projection ORDER BY agent_key")
+            ).fetchall()
             generation = await (
                 await conn.execute("SELECT data FROM harness_settings WHERE key='reset_generation'")
             ).fetchone()

@@ -803,7 +803,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "triage_router"
             if state.get("execution_mode") == "FAST_TRACK"
             else f"{kr.target_department}_head",
-            "planning",
+            "waiting",
             f"Assign {work.work_package_id[:128]}",
             kr_id=kr.kr_id,
             target_agent_id=agent_id,
@@ -931,6 +931,13 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
+            await services.emit(
+                f"{deliverable.department}_gatekeeper",
+                "error",
+                str(exc),
+                kr_id=deliverable.kr_id,
+                kind=kind,
+            )
             return {
                 "escalation": _escalation(state, kind, str(exc)).model_dump(mode="json"),
                 "approved": False,
@@ -1002,6 +1009,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
+            await services.emit(
+                f"{kr.target_department}_head", "error", str(exc), kr_id=kr.kr_id, kind=kind
+            )
             return {
                 "outcome": _outcome(state, escalation=_escalation(state, kind, str(exc))),
                 "route": "done",
@@ -1159,6 +1169,13 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
+            await services.emit(
+                f"{kr.target_department}_gatekeeper",
+                "error",
+                str(exc),
+                kr_id=kr.kr_id,
+                kind=kind,
+            )
             escalation = _escalation(state, kind, str(exc))
             attempt = _attempt(
                 state, stage="department", deliverable=combined, escalation=escalation
@@ -1452,7 +1469,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         for kr in selected:
             await services.emit(
                 coordinator,
-                "planning",
+                "waiting",
                 f"Dispatch KR {kr.kr_id}",
                 kr_id=kr.kr_id,
                 target_agent_id=state.get("triage", {}).get("worker_role", "backend_coder")
@@ -1651,7 +1668,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 f"Run {status}. {sum(o.status == 'passed' for o in outcomes)} key results passed."
             )
         await services.emit(
-            "executive", "completed" if status == "completed" else "error", f"Run {status}"
+            "executive",
+            "completed" if status == "completed" else "idle" if status == "cancelled" else "error",
+            f"Run {status}",
         )
         return {"report": report, "status": status}
 
