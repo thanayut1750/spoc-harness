@@ -71,8 +71,8 @@ class Constitution(Contract):
     max_revision_loops: int = Field(default=2, ge=0, le=10)
 
 
-MaxModelCalls = Annotated[int, Field(ge=1, le=10000)]
-WorkerModelCalls = Annotated[int, Field(ge=1, le=100)]
+MaxModelCalls = Annotated[int, Field(ge=1, le=10000)] | None
+WorkerModelCalls = Annotated[int, Field(ge=1, le=100)] | None
 
 
 class ModelCallBudget(Contract):

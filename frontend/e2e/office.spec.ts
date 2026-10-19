@@ -1512,6 +1512,11 @@ test("workspace call budgets persist independently of model drafts and agent ove
     requests.find((request) => request.path === "/api/settings/budgets")?.body,
   ).toEqual({ max_model_calls: 240, worker_model_calls: 24 });
   await mission.fill("300");
+  const workerUnlimited = dialog.getByRole("checkbox", {
+    name: "No limit for agent model turns per invocation",
+    exact: true,
+  });
+  await workerUnlimited.check();
   await model.fill("updated-architect-model");
   await dialog
     .getByRole("button", { name: "Save agent model", exact: true })
@@ -1523,6 +1528,9 @@ test("workspace call budgets persist independently of model drafts and agent ove
     ),
   ).toBeVisible();
   await expect(mission).toHaveValue("300");
+  await expect(workerUnlimited).toBeChecked();
+  await expect(worker).toBeDisabled();
+  await workerUnlimited.uncheck();
   await expect(worker).toHaveValue("24");
   await dialog
     .getByRole("combobox", { name: "Apply to", exact: true })
@@ -1548,6 +1556,121 @@ test("workspace call budgets persist independently of model drafts and agent ove
   ).toBe(false);
 });
 
+test("No limit budgets persist as independent nulls, retry failed saves, and restore finite drafts", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  const mission = dialog.getByRole("spinbutton", {
+    name: "Model calls per mission",
+    exact: true,
+  });
+  const worker = dialog.getByRole("spinbutton", {
+    name: "Agent model turns per invocation",
+    exact: true,
+  });
+  const missionUnlimited = dialog.getByRole("checkbox", {
+    name: "No limit for model calls per mission",
+    exact: true,
+  });
+  const workerUnlimited = dialog.getByRole("checkbox", {
+    name: "No limit for agent model turns per invocation",
+    exact: true,
+  });
+  const save = dialog.getByRole("button", {
+    name: "Save call budget",
+    exact: true,
+  });
+  await mission.fill("240");
+  await worker.fill("24");
+  await missionUnlimited.check();
+  await expect(mission).toBeDisabled();
+  await expect(mission).toHaveValue("");
+  await expect(worker).toBeEnabled();
+  await missionUnlimited.uncheck();
+  await expect(mission).toHaveValue("240");
+  await mission.fill("");
+  await worker.fill("");
+  await expect(save).toBeDisabled();
+  await missionUnlimited.check();
+  await workerUnlimited.check();
+  await expect(save).toBeEnabled();
+  await expect(
+    dialog.getByText(/timeouts, tool-call and revision limits still apply/),
+  ).toBeVisible();
+  let rejectSave = true;
+  await page.route("**/api/settings/budgets", (route) =>
+    rejectSave
+      ? route.fulfill({
+          status: 503,
+          json: { detail: "Budget storage unavailable" },
+        })
+      : route.fallback(),
+  );
+  await save.click();
+  const budget = dialog.getByRole("region", {
+    name: "Model call budget",
+    exact: true,
+  });
+  await expect(budget.getByRole("alert")).toContainText(
+    "Budget storage unavailable",
+  );
+  await expect(missionUnlimited).toBeChecked();
+  await expect(workerUnlimited).toBeChecked();
+  rejectSave = false;
+  await save.click();
+  await expect(budget.getByRole("alert")).toHaveCount(0);
+  await expect(budget.getByRole("status")).toContainText("Saved.");
+  expect(
+    requests
+      .filter((request) => request.path === "/api/settings/budgets")
+      .at(-1)?.body,
+  ).toEqual({ max_model_calls: null, worker_model_calls: null });
+  await missionUnlimited.uncheck();
+  await expect(mission).toHaveValue("240");
+  await missionUnlimited.check();
+  await workerUnlimited.uncheck();
+  await expect(worker).toHaveValue("24");
+  await workerUnlimited.check();
+  await page.reload();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  await expect(missionUnlimited).toBeChecked();
+  await expect(workerUnlimited).toBeChecked();
+  await expect(mission).toBeDisabled();
+  await expect(worker).toBeDisabled();
+  await missionUnlimited.uncheck();
+  await expect(mission).toHaveValue("100");
+  await save.click();
+  await expect(budget.getByRole("status")).toContainText("Saved.");
+  expect(
+    requests
+      .filter((request) => request.path === "/api/settings/budgets")
+      .at(-1)?.body,
+  ).toEqual({ max_model_calls: 100, worker_model_calls: null });
+  await page.reload();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  await expect(missionUnlimited).not.toBeChecked();
+  await expect(workerUnlimited).toBeChecked();
+  await missionUnlimited.check();
+  await workerUnlimited.uncheck();
+  await expect(worker).toHaveValue("12");
+  await save.click();
+  await expect(budget.getByRole("status")).toContainText("Saved.");
+  expect(
+    requests
+      .filter((request) => request.path === "/api/settings/budgets")
+      .at(-1)?.body,
+  ).toEqual({ max_model_calls: null, worker_model_calls: 12 });
+  await page.reload();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  await expect(missionUnlimited).toBeChecked();
+  await expect(workerUnlimited).not.toBeChecked();
+  await expect(worker).toBeEnabled();
+  expect(
+    requests.some((request) => request.path === "/api/settings/model"),
+  ).toBe(false);
+});
 test("call budget validation prevents invalid writes and failed saves can be retried on mobile", async ({
   page,
 }) => {
@@ -1657,6 +1780,18 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
     })
     .fill("22");
   await dialog
+    .getByRole("checkbox", {
+      name: "No limit for model calls per mission",
+      exact: true,
+    })
+    .check();
+  await dialog
+    .getByRole("checkbox", {
+      name: "No limit for agent model turns per invocation",
+      exact: true,
+    })
+    .check();
+  await dialog
     .getByRole("button", { name: "Save call budget", exact: true })
     .click();
   await expect(
@@ -1664,6 +1799,12 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
       exact: true,
     }),
   ).toBeVisible();
+  await dialog
+    .getByRole("checkbox", {
+      name: "No limit for agent model turns per invocation",
+      exact: true,
+    })
+    .uncheck();
   await dialog
     .getByRole("spinbutton", {
       name: "Agent model turns per invocation",
@@ -1705,6 +1846,18 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
       exact: true,
     }),
   ).toHaveValue("12");
+  await expect(
+    dialog.getByRole("checkbox", {
+      name: "No limit for model calls per mission",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await expect(
+    dialog.getByRole("checkbox", {
+      name: "No limit for agent model turns per invocation",
+      exact: true,
+    }),
+  ).not.toBeChecked();
   expect(
     requests.find((request) => request.path === "/api/regenesis")?.body,
   ).toEqual({ confirmation: "REGENESIS" });

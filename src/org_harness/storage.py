@@ -512,7 +512,8 @@ class MemoryStorage:
             run = self.runs[run_id]
             field = f"{kind}_calls"
             limit = run.get("limits", {}).get(f"max_{kind}_calls", 100 if kind == "model" else 200)
-            if run[field] + amount > limit:
+            unlimited = kind == "model" and limit is None
+            if not unlimited and run[field] + amount > limit:
                 raise BudgetExceeded(f"Run {kind} call budget exhausted")
             run[field] += amount
             return run[field]
@@ -1064,7 +1065,8 @@ class PostgresStorage:
             run = row["data"]
             field = f"{kind}_calls"
             limit = run.get("limits", {}).get(f"max_{kind}_calls", 100 if kind == "model" else 200)
-            if run[field] + amount > limit:
+            unlimited = kind == "model" and limit is None
+            if not unlimited and run[field] + amount > limit:
                 raise BudgetExceeded(f"Run {kind} call budget exhausted")
             run[field] += amount
             await conn.execute(

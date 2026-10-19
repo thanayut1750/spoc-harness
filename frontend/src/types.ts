@@ -208,8 +208,8 @@ export interface ProviderConfig {
   reasoning_efforts: string[];
 }
 export interface ModelCallBudget {
-  max_model_calls: number;
-  worker_model_calls: number;
+  max_model_calls: number | null;
+  worker_model_calls: number | null;
 }
 export interface WorkspaceSettings {
   defaults: ModelConfig;

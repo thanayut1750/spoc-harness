@@ -6,6 +6,7 @@ import ast
 import asyncio
 import hashlib
 import json
+import sys
 from contextlib import AsyncExitStack
 from typing import Any, Literal, NotRequired, TypeVar
 from uuid import uuid4
@@ -56,6 +57,16 @@ def call_identifier(runtime: ToolRuntime) -> str:
             "invalid_tool_call", "A tool operation requires a model tool-call ID"
         )
     return runtime.tool_call_id
+
+
+def agent_step_limit(agent: Any, model_call_limit: int | None) -> int:
+    # LangGraph requires a positive integer and create_agent supplies its own
+    # finite default. An unlimited model budget must explicitly override that
+    # default; deadlines, control checks, and tool budgets still terminate work.
+    if model_call_limit is None:
+        return sys.maxsize
+    nodes = len(agent.get_graph().nodes.keys() - {START, END})
+    return nodes * (model_call_limit + 1) + 2
 
 
 class Narrative(Contract):
@@ -753,10 +764,13 @@ class AgentServices:
                     "tool results without repeating completed tools. Return the complete final JSON "
                     "object conforming to the schema in your system instructions.",
                 ),
-                ModelCallLimitMiddleware(
-                    run_limit=self.limits.worker_model_calls, exit_behavior="error"
-                ),
             ]
+            if self.limits.worker_model_calls is not None:
+                middleware.append(
+                    ModelCallLimitMiddleware(
+                        run_limit=self.limits.worker_model_calls, exit_behavior="error"
+                    )
+                )
             agent = create_agent(
                 self.model_for(actor),
                 [consult, run_mission_tool],
@@ -764,10 +778,9 @@ class AgentServices:
                 name=actor,
                 middleware=middleware,
             )
-            nodes = len(agent.get_graph().nodes.keys() - {START, END})
             result = await agent.ainvoke(
                 {"messages": [HumanMessage(content=json.dumps(payload, ensure_ascii=False))]},
-                config={"recursion_limit": nodes * (self.limits.worker_model_calls + 1) + 2},
+                config={"recursion_limit": agent_step_limit(agent, self.limits.worker_model_calls)},
             )
             final = str(result["messages"][-1].content)
             try:
@@ -1447,10 +1460,13 @@ class AgentServices:
             )
         middleware: list[AgentMiddleware[Any, Any, Any]] = [
             WorkerPolicy(self, agent_id, kr_id=kr.kr_id),
-            ModelCallLimitMiddleware(
-                run_limit=self.limits.worker_model_calls, exit_behavior="error"
-            ),
         ]
+        if self.limits.worker_model_calls is not None:
+            middleware.append(
+                ModelCallLimitMiddleware(
+                    run_limit=self.limits.worker_model_calls, exit_behavior="error"
+                )
+            )
         agent = create_agent(
             self.model_for(model_role),
             available,
@@ -1461,8 +1477,7 @@ class AgentServices:
         # Middleware hooks are separate graph steps, not model calls. Size the
         # safety bound from the actual graph so every allowed model turn can
         # finish, with one extra traversal for the explicit model-limit check.
-        graph_nodes = len(agent.get_graph().nodes.keys() - {START, END})
-        step_limit = graph_nodes * (self.limits.worker_model_calls + 1) + 2
+        step_limit = agent_step_limit(agent, self.limits.worker_model_calls)
         try:
             result = await agent.ainvoke(
                 {"messages": [HumanMessage(content=work.task)]},

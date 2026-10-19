@@ -3407,6 +3407,23 @@ main {
 .call-budget-fields input[aria-invalid="true"] {
   border-color: #b8886b;
 }
+.call-budget-fields .call-budget-unlimited {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 5px 0 0;
+  cursor: pointer;
+}
+.call-budget-unlimited input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: #b9e98b;
+}
 .settings-notice {
   display: flex;
   align-items: flex-start;

@@ -1,6 +1,7 @@
 """CLI submissions inherit workspace budgets through the same API as the office."""
 
 import httpx
+import pytest
 from typer.testing import CliRunner
 
 from org_harness import cli
@@ -9,8 +10,17 @@ from org_harness.config import Settings
 from org_harness.storage import MemoryStorage
 
 
+@pytest.mark.parametrize(
+    "saved",
+    [
+        {"max_model_calls": 500, "worker_model_calls": 17},
+        {"max_model_calls": None, "worker_model_calls": 17},
+        {"max_model_calls": 500, "worker_model_calls": None},
+        {"max_model_calls": None, "worker_model_calls": None},
+    ],
+)
 async def test_cli_submission_uses_saved_budgets_without_baking_in_schema_defaults(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, saved
 ):
     submitted = []
 
@@ -24,7 +34,6 @@ async def test_cli_submission_uses_saved_budgets_without_baking_in_schema_defaul
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=create_app(settings, storage)), base_url="http://test"
     ) as client:
-        saved = {"max_model_calls": 500, "worker_model_calls": 17}
         assert (await client.put("/api/settings/budgets", json=saved)).status_code == 200
         result = CliRunner().invoke(
             cli.app, ["run", "Use the workspace call budget", "--workspace", str(tmp_path)]

@@ -9,14 +9,21 @@ export function validCallBudgetValue(value: string, maximum: number) {
 export function parseCallBudget(
   mission: string,
   worker: string,
+  {
+    missionUnlimited = false,
+    workerUnlimited = false,
+  }: {
+    missionUnlimited?: boolean;
+    workerUnlimited?: boolean;
+  } = {},
 ): ModelCallBudget | null {
   if (
-    !validCallBudgetValue(mission, 10000) ||
-    !validCallBudgetValue(worker, 100)
+    (!missionUnlimited && !validCallBudgetValue(mission, 10000)) ||
+    (!workerUnlimited && !validCallBudgetValue(worker, 100))
   )
     return null;
   return {
-    max_model_calls: Number(mission),
-    worker_model_calls: Number(worker),
+    max_model_calls: missionUnlimited ? null : Number(mission),
+    worker_model_calls: workerUnlimited ? null : Number(worker),
   };
 }

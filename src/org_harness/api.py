@@ -198,6 +198,9 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     @app.post("/api/runs", status_code=202)
     async def submit(body: RunCreate, idempotency_key: str | None = Header(default=None)):
         payload = body.model_dump(mode="json", by_alias=True, exclude_none=True)
+        # Budget null means unlimited, so retain it inside limits while other
+        # optional request fields preserve their existing omitted representation.
+        payload["limits"] = body.limits.model_dump(mode="json")
         legacy_request_payload = dict(payload)
         request_payload = {
             "fingerprint_version": 2,

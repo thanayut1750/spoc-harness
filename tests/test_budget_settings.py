@@ -186,7 +186,7 @@ def test_shared_model_budget_defaults_and_bounds_match_run_limits():
         limits = RunLimits.model_json_schema()["properties"][name]
         update = ModelCallBudgetUpdate.model_json_schema()["properties"][name]
         assert budget == limits
-        assert (update["minimum"], update["maximum"]) == (budget["minimum"], budget["maximum"])
+        assert update["anyOf"] == budget["anyOf"]
     assert ModelCallBudgetUpdate.model_json_schema()["required"] == [
         "max_model_calls",
         "worker_model_calls",

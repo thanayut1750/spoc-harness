@@ -39,4 +39,25 @@ describe("model-call budgets", () => {
     });
     expect(validCallBudgetValue("9007199254740992", 10000)).toBe(false);
   });
+  it("encodes each unlimited choice as an explicit null independently of the finite draft", () => {
+    expect(parseCallBudget("", "12", { missionUnlimited: true })).toEqual({
+      max_model_calls: null,
+      worker_model_calls: 12,
+    });
+    expect(parseCallBudget("240", "", { workerUnlimited: true })).toEqual({
+      max_model_calls: 240,
+      worker_model_calls: null,
+    });
+    expect(
+      parseCallBudget("", "", {
+        missionUnlimited: true,
+        workerUnlimited: true,
+      }),
+    ).toEqual({ max_model_calls: null, worker_model_calls: null });
+  });
+  it("still validates any finite side when the other budget is unlimited", () => {
+    expect(parseCallBudget("", "101", { missionUnlimited: true })).toBeNull();
+    expect(parseCallBudget("10001", "", { workerUnlimited: true })).toBeNull();
+    expect(parseCallBudget("null", "12")).toBeNull();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Check, LoaderCircle, Save } from "lucide-react";
 import { api } from "./api";
@@ -16,16 +16,35 @@ export function ModelCallBudgetForm({
   onSaved: (settings: WorkspaceSettings) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
-  const [mission, setMission] = useState(String(budget.max_model_calls));
-  const [worker, setWorker] = useState(String(budget.worker_model_calls));
+  const [mission, setMission] = useState(String(budget.max_model_calls ?? 100));
+  const [worker, setWorker] = useState(String(budget.worker_model_calls ?? 12));
+  const finiteMission = useRef(String(budget.max_model_calls ?? 100));
+  const finiteWorker = useRef(String(budget.worker_model_calls ?? 12));
+  const [missionUnlimited, setMissionUnlimited] = useState(
+    budget.max_model_calls === null,
+  );
+  const [workerUnlimited, setWorkerUnlimited] = useState(
+    budget.worker_model_calls === null,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const helpId = useId();
-  const parsed = parseCallBudget(mission, worker);
+  const parsed = parseCallBudget(mission, worker, {
+    missionUnlimited,
+    workerUnlimited,
+  });
   useEffect(() => {
-    setMission(String(budget.max_model_calls));
-    setWorker(String(budget.worker_model_calls));
+    if (budget.max_model_calls !== null) {
+      finiteMission.current = String(budget.max_model_calls);
+      setMission(String(budget.max_model_calls));
+    }
+    if (budget.worker_model_calls !== null) {
+      finiteWorker.current = String(budget.worker_model_calls);
+      setWorker(String(budget.worker_model_calls));
+    }
+    setMissionUnlimited(budget.max_model_calls === null);
+    setWorkerUnlimited(budget.worker_model_calls === null);
   }, [budget.max_model_calls, budget.worker_model_calls]);
 
   async function save(event: FormEvent) {
@@ -57,7 +76,9 @@ export function ModelCallBudgetForm({
       <p>
         Workspace-wide limits for new missions, across all model choices.
         Existing missions keep their recorded limits. The mission budget covers
-        all generative model requests, including reviews and retries.
+        all generative model requests, including reviews and retries. No limit
+        removes the selected model cap; timeouts, tool-call and revision limits
+        still apply.
       </p>
       <form onSubmit={save}>
         <div className="call-budget-fields">
@@ -72,18 +93,41 @@ export function ModelCallBudgetForm({
               min={1}
               max={10000}
               step={1}
-              required
-              value={mission}
-              disabled={disabled || saving}
+              required={!missionUnlimited}
+              value={missionUnlimited ? "" : mission}
+              placeholder={missionUnlimited ? "No limit" : undefined}
+              disabled={disabled || saving || missionUnlimited}
               aria-describedby={`${helpId}-mission`}
-              aria-invalid={!validCallBudgetValue(mission, 10000)}
+              aria-invalid={
+                !missionUnlimited && !validCallBudgetValue(mission, 10000)
+              }
               onChange={(event) => {
                 setMission(event.target.value);
+                if (validCallBudgetValue(event.target.value, 10000))
+                  finiteMission.current = event.target.value;
                 setNotice("");
               }}
             />
+            <label className="call-budget-unlimited">
+              <input
+                type="checkbox"
+                aria-label="No limit for model calls per mission"
+                checked={missionUnlimited}
+                disabled={disabled || saving}
+                onChange={(event) => {
+                  setMissionUnlimited(event.target.checked);
+                  if (
+                    !event.target.checked &&
+                    !validCallBudgetValue(mission, 10000)
+                  )
+                    setMission(finiteMission.current);
+                  setNotice("");
+                }}
+              />
+              No limit
+            </label>
             <small id={`${helpId}-mission`}>
-              1–10,000 calls shared by all agents in one mission.
+              When limited: 1–10,000 calls shared by all agents in one mission.
             </small>
           </div>
           <div>
@@ -97,18 +141,42 @@ export function ModelCallBudgetForm({
               min={1}
               max={100}
               step={1}
-              required
-              value={worker}
-              disabled={disabled || saving}
+              required={!workerUnlimited}
+              value={workerUnlimited ? "" : worker}
+              placeholder={workerUnlimited ? "No limit" : undefined}
+              disabled={disabled || saving || workerUnlimited}
               aria-describedby={`${helpId}-worker`}
-              aria-invalid={!validCallBudgetValue(worker, 100)}
+              aria-invalid={
+                !workerUnlimited && !validCallBudgetValue(worker, 100)
+              }
               onChange={(event) => {
                 setWorker(event.target.value);
+                if (validCallBudgetValue(event.target.value, 100))
+                  finiteWorker.current = event.target.value;
                 setNotice("");
               }}
             />
+            <label className="call-budget-unlimited">
+              <input
+                type="checkbox"
+                aria-label="No limit for agent model turns per invocation"
+                checked={workerUnlimited}
+                disabled={disabled || saving}
+                onChange={(event) => {
+                  setWorkerUnlimited(event.target.checked);
+                  if (
+                    !event.target.checked &&
+                    !validCallBudgetValue(worker, 100)
+                  )
+                    setWorker(finiteWorker.current);
+                  setNotice("");
+                }}
+              />
+              No limit
+            </label>
             <small id={`${helpId}-worker`}>
-              1–100 turns each time an agent runs, within the mission budget.
+              When limited: 1–100 turns each time an agent runs, within any
+              mission budget.
             </small>
           </div>
         </div>

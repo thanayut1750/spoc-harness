@@ -184,3 +184,25 @@ it("saves only workspace call budgets through a separate endpoint and preserves 
     body: JSON.stringify(budget),
   });
 });
+it.each([
+  { max_model_calls: null, worker_model_calls: 12 },
+  { max_model_calls: 100, worker_model_calls: null },
+  { max_model_calls: null, worker_model_calls: null },
+])(
+  "sends both budget keys including explicit unlimited values: %j",
+  async (budget) => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ model_call_budget: budget })),
+      );
+    vi.stubGlobal("fetch", fetch);
+    await expect(api.saveCallBudget(budget)).resolves.toEqual({
+      model_call_budget: budget,
+    });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(budget);
+    expect(Object.keys(JSON.parse(fetch.mock.calls[0][1].body)).sort()).toEqual(
+      ["max_model_calls", "worker_model_calls"],
+    );
+  },
+);
