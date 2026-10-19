@@ -42,7 +42,7 @@ const defaultSettings: WorkspaceSettings = {
     },
   ],
   triage: { model: "jev-1.13.0", configured: true },
-  worker_timeout: 180,
+  worker_timeout: 3600,
   agent_model_configs: {},
 };
 const initialRun: Run = {

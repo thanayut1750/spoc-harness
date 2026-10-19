@@ -69,15 +69,37 @@ async def test_default_worker_deadline_matches_schema_settings_and_run_snapshot(
     client, storage, settings = api
     public = (await client.get("/api/settings")).json()
     schema = (await client.get("/openapi.json")).json()
-    assert public["worker_timeout"] == 180
+    assert public["worker_timeout"] == 3600
     assert (
         schema["components"]["schemas"]["RunLimits"]["properties"]["worker_timeout"]["default"]
-        == 180
+        == 3600
+    )
+    assert (
+        schema["components"]["schemas"]["RunLimits"]["properties"]["worker_timeout"]["maximum"]
+        == 3600
     )
     response = await client.post("/api/runs", json={"user_request": "Use the default deadline"})
     assert response.status_code == 202
     default_run = await storage.get_run(response.json()["run_id"])
-    assert default_run["limits"]["worker_timeout"] == 180
+    assert default_run["limits"]["worker_timeout"] == 3600
+    default_services = AgentServices(settings, storage, default_run)
+    try:
+        assert default_services.limits.worker_timeout == 3600
+    finally:
+        await default_services.close()
+
+    response = await client.post(
+        "/api/runs",
+        json={"user_request": "Allow a full hour", "limits": {"worker_timeout": 3600}},
+    )
+    assert response.status_code == 202
+    assert (await storage.get_run(response.json()["run_id"]))["limits"]["worker_timeout"] == 3600
+    assert (
+        await client.post(
+            "/api/runs",
+            json={"user_request": "Exceeds the maximum", "limits": {"worker_timeout": 3601}},
+        )
+    ).status_code == 422
 
     response = await client.post(
         "/api/runs",
@@ -91,7 +113,7 @@ async def test_default_worker_deadline_matches_schema_settings_and_run_snapshot(
         assert services.limits.worker_timeout == 60
     finally:
         await services.close()
-    assert (await storage.get_run(default_run["run_id"]))["limits"]["worker_timeout"] == 180
+    assert (await storage.get_run(default_run["run_id"]))["limits"]["worker_timeout"] == 3600
     assert (await storage.get_run(explicit_run["run_id"]))["limits"]["worker_timeout"] == 60
 
 

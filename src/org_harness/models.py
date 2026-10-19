@@ -76,7 +76,7 @@ class RunLimits(Contract):
     max_tool_calls: int = Field(default=200, ge=1, le=100000)
     worker_model_calls: int = Field(default=12, ge=1, le=100)
     command_timeout: int = Field(default=300, ge=1, le=86400)
-    worker_timeout: float = Field(default=180, ge=0.01, le=600)
+    worker_timeout: float = Field(default=3600, ge=0.01, le=3600)
 
 
 class ModelSelection(Contract):
