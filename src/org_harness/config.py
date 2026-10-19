@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from org_harness.models import ModelSelection, RunLimits
+from org_harness.models import ModelCallBudget, ModelSelection, RunLimits
 
 
 class Settings(BaseSettings):
@@ -113,7 +113,10 @@ class Settings(BaseSettings):
         return ["none", "minimal", "low", "medium", "high", "max"]
 
     def public_settings(
-        self, selection: dict | None = None, agent_models: dict | None = None
+        self,
+        selection: dict | None = None,
+        agent_models: dict | None = None,
+        model_call_budget: dict | None = None,
     ) -> dict:
         defaults = self.default_model_selection().model_dump()
         names = {
@@ -144,6 +147,9 @@ class Settings(BaseSettings):
                 "configured": bool(self.typesafe_api_key.get_secret_value()),
             },
             "worker_timeout": RunLimits().worker_timeout,
+            "model_call_budget": ModelCallBudget.model_validate(model_call_budget or {}).model_dump(
+                mode="json"
+            ),
         }
 
 

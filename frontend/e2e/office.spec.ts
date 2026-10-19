@@ -43,6 +43,7 @@ const defaultSettings: WorkspaceSettings = {
   ],
   triage: { model: "jev-1.13.0", configured: true },
   worker_timeout: 3600,
+  model_call_budget: { max_model_calls: 100, worker_model_calls: 12 },
   agent_model_configs: {},
 };
 const initialRun: Run = {
@@ -139,6 +140,12 @@ async function fixture(
       const body = route.request().postDataJSON();
       requests.push({ path, body });
       settings = { ...settings, model_config: body };
+      return route.fulfill({ json: settings });
+    }
+    if (path === "/api/settings/budgets" && method === "PUT") {
+      const body = route.request().postDataJSON();
+      requests.push({ path, body });
+      settings = { ...settings, model_call_budget: body };
       return route.fulfill({ json: settings });
     }
     if (path.startsWith("/api/settings/agents/")) {
@@ -1413,6 +1420,173 @@ test("saves configured provider choices and snapshots model selection into new m
     reasoning_effort: "high",
   });
 });
+test("workspace call budgets persist independently of model drafts and agent overrides", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  const mission = dialog.getByRole("spinbutton", {
+    name: "Model calls per mission",
+    exact: true,
+  });
+  const worker = dialog.getByRole("spinbutton", {
+    name: "Agent model turns per invocation",
+    exact: true,
+  });
+  const model = dialog.getByRole("textbox", { name: "Model", exact: true });
+  await expect(mission).toHaveValue("100");
+  await expect(worker).toHaveValue("12");
+  await expect(
+    dialog.getByText("Worker timeout: 3600s", { exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("system_architect");
+  await model.fill("saved-architect-model");
+  await dialog
+    .getByRole("button", { name: "Save agent model", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Use default model", exact: true }),
+  ).toBeVisible();
+  await model.fill("unsaved-model-draft");
+  await mission.fill("240");
+  await worker.fill("24");
+  await dialog
+    .getByRole("button", { name: "Save call budget", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("Saved. New missions will use this call budget.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(model).toHaveValue("unsaved-model-draft");
+  expect(
+    requests.filter((request) =>
+      request.path.startsWith("/api/settings/agents/"),
+    ),
+  ).toHaveLength(1);
+  expect(
+    requests.find((request) => request.path === "/api/settings/budgets")?.body,
+  ).toEqual({ max_model_calls: 240, worker_model_calls: 24 });
+  await mission.fill("300");
+  await model.fill("updated-architect-model");
+  await dialog
+    .getByRole("button", { name: "Save agent model", exact: true })
+    .click();
+  await expect(
+    dialog.getByText(
+      "Saved. New missions will use this model for System architect.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(mission).toHaveValue("300");
+  await expect(worker).toHaveValue("24");
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("all");
+  await expect(mission).toHaveValue("300");
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  await expect(mission).toHaveValue("240");
+  await expect(worker).toHaveValue("24");
+  await page.reload();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  await expect(mission).toHaveValue("240");
+  await expect(worker).toHaveValue("24");
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("system_architect");
+  await expect(model).toHaveValue("updated-architect-model");
+  await expect(
+    dialog.getByRole("button", { name: "Use default model", exact: true }),
+  ).toBeVisible();
+  expect(
+    requests.some((request) => request.path === "/api/settings/model"),
+  ).toBe(false);
+});
+
+test("call budget validation prevents invalid writes and failed saves can be retried on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests = await fixture(page);
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  const mission = dialog.getByRole("spinbutton", {
+    name: "Model calls per mission",
+    exact: true,
+  });
+  const worker = dialog.getByRole("spinbutton", {
+    name: "Agent model turns per invocation",
+    exact: true,
+  });
+  const save = dialog.getByRole("button", {
+    name: "Save call budget",
+    exact: true,
+  });
+  for (const invalid of ["", "0", "-1", "1.5", "10001"]) {
+    await mission.fill(invalid);
+    await expect(mission).toHaveAttribute("aria-invalid", "true");
+    await expect(save).toBeDisabled();
+    await mission.press("Enter");
+  }
+  await mission.fill("240");
+  for (const invalid of ["", "0", "-1", "12.5", "101"]) {
+    await worker.fill(invalid);
+    await expect(worker).toHaveAttribute("aria-invalid", "true");
+    await expect(save).toBeDisabled();
+    await worker.press("Enter");
+  }
+  expect(
+    requests.some((request) => request.path === "/api/settings/budgets"),
+  ).toBe(false);
+  await worker.fill("24");
+  let rejectSave = true;
+  let attempts = 0;
+  await page.route("**/api/settings/budgets", (route) => {
+    attempts++;
+    return rejectSave
+      ? route.fulfill({
+          status: 503,
+          json: { detail: "Call budget storage is temporarily unavailable" },
+        })
+      : route.fallback();
+  });
+  await save.click();
+  const budget = dialog.getByRole("region", {
+    name: "Model call budget",
+    exact: true,
+  });
+  await expect(budget.getByRole("alert")).toContainText(
+    "Call budget storage is temporarily unavailable",
+  );
+  await expect(budget.getByRole("status")).toHaveCount(0);
+  await expect(mission).toHaveValue("240");
+  await expect(worker).toHaveValue("24");
+  rejectSave = false;
+  await save.click();
+  await expect(budget.getByRole("alert")).toHaveCount(0);
+  await expect(
+    budget.getByText("Saved. New missions will use this call budget.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(attempts).toBe(2);
+  expect(
+    requests.filter((request) => request.path === "/api/settings/budgets"),
+  ).toHaveLength(1);
+  expect((await save.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(
+    await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth),
+  ).toBe(true);
+  await budget.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results/call-budget-mobile.png",
+    fullPage: true,
+  });
+});
 test("Regenesis requires exact typed confirmation and resets the client from a fresh stream snapshot", async ({
   page,
 }) => {
@@ -1432,6 +1606,29 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
   });
   await page.getByRole("button", { name: "Workspace settings" }).click();
   const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("spinbutton", { name: "Model calls per mission", exact: true })
+    .fill("220");
+  await dialog
+    .getByRole("spinbutton", {
+      name: "Agent model turns per invocation",
+      exact: true,
+    })
+    .fill("22");
+  await dialog
+    .getByRole("button", { name: "Save call budget", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("Saved. New missions will use this call budget.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("spinbutton", {
+      name: "Agent model turns per invocation",
+      exact: true,
+    })
+    .fill("33");
   await dialog.getByRole("tab", { name: "Regenesis", exact: true }).click();
   const reset = dialog.getByRole("button", {
     name: "Reset all harness data",
@@ -1455,6 +1652,18 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
   await expect(
     dialog.getByText(/Regenesis complete. 1 run was removed/),
   ).toBeVisible();
+  await expect(
+    dialog.getByRole("spinbutton", {
+      name: "Model calls per mission",
+      exact: true,
+    }),
+  ).toHaveValue("100");
+  await expect(
+    dialog.getByRole("spinbutton", {
+      name: "Agent model turns per invocation",
+      exact: true,
+    }),
+  ).toHaveValue("12");
   expect(
     requests.find((request) => request.path === "/api/regenesis")?.body,
   ).toEqual({ confirmation: "REGENESIS" });

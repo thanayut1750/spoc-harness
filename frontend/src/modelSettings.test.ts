@@ -42,6 +42,7 @@ const settings: WorkspaceSettings = {
   ],
   triage: { model: "jev-1.13.0", configured: true },
   worker_timeout: 3600,
+  model_call_budget: { max_model_calls: 100, worker_model_calls: 12 },
 };
 describe("model selection", () => {
   it("does not switch into an unconfigured provider or accept its model configuration", () => {

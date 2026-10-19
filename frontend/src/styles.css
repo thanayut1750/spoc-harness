@@ -3373,6 +3373,40 @@ main {
   color: #7f9c6e;
   margin: 17px 0 20px;
 }
+.settings-call-budget {
+  border-top: 1px solid #3c4f31;
+  margin-top: 26px;
+  padding-top: 23px;
+}
+.settings-call-budget > h3 + p {
+  font-size: 12px;
+  color: #8faa7c;
+  line-height: 1.85;
+  margin-top: 8px;
+}
+.call-budget-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.call-budget-fields label {
+  font-size: 12px;
+}
+.call-budget-fields input {
+  min-height: 44px;
+  font-size: 13px;
+}
+.call-budget-fields small {
+  display: block;
+  margin-top: 7px;
+  color: #8faa7c;
+  font-size: 11px;
+  line-height: 1.75;
+}
+.call-budget-fields input[aria-invalid="true"] {
+  border-color: #b8886b;
+}
 .settings-notice {
   display: flex;
   align-items: flex-start;
@@ -3576,6 +3610,10 @@ main {
   transform: rotate(180deg);
 }
 @media (max-width: 500px) {
+  .call-budget-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
   .settings-tabs {
     gap: 3px;
   }

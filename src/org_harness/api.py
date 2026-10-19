@@ -21,6 +21,8 @@ from org_harness.models import (
     ConfigurableAgent,
     Contract,
     Deliverable,
+    ModelCallBudget,
+    ModelCallBudgetUpdate,
     ModelSelection,
     ReviewDecision,
     RunCreate,
@@ -196,7 +198,25 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     @app.post("/api/runs", status_code=202)
     async def submit(body: RunCreate, idempotency_key: str | None = Header(default=None)):
         payload = body.model_dump(mode="json", by_alias=True, exclude_none=True)
-        request_payload = dict(payload)
+        legacy_request_payload = dict(payload)
+        request_payload = {
+            "fingerprint_version": 2,
+            "request": legacy_request_payload,
+            "explicit_budget_fields": sorted(
+                body.limits.model_fields_set & ModelCallBudget.model_fields.keys()
+            ),
+        }
+        budget = ModelCallBudget.model_validate(
+            await storage.get_setting("model_call_budget") or {}
+        )
+        payload["limits"] = {
+            **payload["limits"],
+            **{
+                name: value
+                for name, value in budget.model_dump(mode="json").items()
+                if name not in body.limits.model_fields_set
+            },
+        }
         selected = body.model_config_selection
         if selected is None:
             saved = await storage.get_setting("model_config")
@@ -235,7 +255,12 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             if not exists:
                 raise HTTPException(422, "Workspace must be an existing directory")
             payload["workspace_path"] = str(workspace)
-        run = await storage.create_run(payload, idempotency_key, request_payload=request_payload)
+        run = await storage.create_run(
+            payload,
+            idempotency_key,
+            request_payload=request_payload,
+            legacy_request_payload=legacy_request_payload,
+        )
         await storage.emit(
             {
                 "event_id": f"run:{run['run_id']}:created",
@@ -254,7 +279,13 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
         return settings.public_settings(
             await storage.get_setting("model_config"),
             await storage.get_setting("agent_model_configs"),
+            await storage.get_setting("model_call_budget"),
         )
+
+    @app.put("/api/settings/budgets")
+    async def save_model_call_budget(body: ModelCallBudgetUpdate):
+        await storage.save_setting("model_call_budget", body.model_dump(mode="json"))
+        return await get_settings()
 
     @app.put("/api/settings/model")
     async def save_model(body: ModelSelection):

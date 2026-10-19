@@ -57,6 +57,8 @@ Worker invocation and deliverable extraction share an `asyncio.wait_for` deadlin
 
 Public model selections are immutable run snapshots; per-agent overrides select server-owned provider connections. Credentials never enter persisted selections. Regenesis serializes API mutations, cancels unfinished work, acquires the same worker guard as execution, then erases managed disk directories and database/checkpoint/store contents. This excludes external user workspaces and preserves migration schemas and server credentials.
 
+Workspace model-call defaults use the existing settings table. New API and CLI missions merge those defaults only into omitted budget fields, preserving explicit per-run values. Each saved mission owns its global request budget and per-invocation agent-turn limit; extraction, reviews, and request retries still consume the global budget. Run-creation fingerprints retain explicit budget-field presence so omission and an explicit schema-default value remain distinct. A legacy-fingerprint fallback replays submissions created before this feature without changing their saved limits. Regenesis clears the budget preference with other settings; no table migration is required.
+
 ## Error boundaries
 
 Expected tool-input failures use `ExpectedToolInputError` at the point that interprets a model-supplied file, artifact, URL, directory or command timeout. The journal records those errors as completed results; a model can read the error and correct its call without cancelling parallel work. Unknown run records, persistence failures and raw programming exceptions retain their failure semantics. Identical parallel operation IDs share a per-host lock and reuse the recorded result; conflicting requests still stop for review.

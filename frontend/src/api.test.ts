@@ -160,3 +160,27 @@ it("rejects malformed history and nonadvancing pagination instead of silently hi
   await expect(api.history({}, 10)).rejects.toThrow("invalid activity history");
   await expect(api.history({})).rejects.toThrow("invalid activity history");
 });
+it("saves only workspace call budgets through a separate endpoint and preserves model settings in the response", async () => {
+  const budget = { max_model_calls: 240, worker_model_calls: 24 };
+  const selection = {
+    provider: "configured",
+    model: "saved-model",
+    reasoning_effort: "high",
+  };
+  const response = {
+    model_call_budget: budget,
+    model_config: selection,
+    agent_model_configs: { planner: selection },
+    worker_timeout: 3600,
+  };
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify(response)));
+  vi.stubGlobal("fetch", fetch);
+  await expect(api.saveCallBudget(budget)).resolves.toEqual(response);
+  expect(fetch).toHaveBeenCalledWith("/api/settings/budgets", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(budget),
+  });
+});

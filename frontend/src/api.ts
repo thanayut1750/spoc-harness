@@ -9,6 +9,7 @@ import type {
   RegenesisResult,
   ActivityScope,
   ActivityPage,
+  ModelCallBudget,
 } from "./types";
 import { normalizeAgent, parseActivityEvent } from "./office";
 async function responseFor(
@@ -77,6 +78,8 @@ export const api = {
   settings: () => request<WorkspaceSettings>("/settings"),
   saveModel: (config: ModelConfig) =>
     request<WorkspaceSettings>("/settings/model", config, "PUT"),
+  saveCallBudget: (budget: ModelCallBudget) =>
+    request<WorkspaceSettings>("/settings/budgets", budget, "PUT"),
   saveAgentModel: (agentId: string, config: ModelConfig) =>
     request<WorkspaceSettings>(
       `/settings/agents/${encodeURIComponent(agentId)}`,

@@ -311,10 +311,18 @@ class MemoryStorage:
         idempotency_key: str | None = None,
         *,
         request_payload: dict | None = None,
+        legacy_request_payload: dict | None = None,
     ) -> dict:
         async with self.lock:
             value = {"create_run": request_payload if request_payload is not None else payload}
-            cached = self._cached(idempotency_key, value)
+            try:
+                cached = self._cached(idempotency_key, value)
+            except ConflictError:
+                if legacy_request_payload is None:
+                    raise
+                cached = self._cached(idempotency_key, {"create_run": legacy_request_payload})
+                if cached is None:
+                    raise
             if cached:
                 return cached
             run = new_run(copy.deepcopy(payload))
@@ -748,10 +756,20 @@ class PostgresStorage:
         idempotency_key: str | None = None,
         *,
         request_payload: dict | None = None,
+        legacy_request_payload: dict | None = None,
     ) -> dict:
         async with self.pool.connection() as conn, conn.transaction():
             value = {"create_run": request_payload if request_payload is not None else payload}
-            cached = await self._cached(conn, idempotency_key, value)
+            try:
+                cached = await self._cached(conn, idempotency_key, value)
+            except ConflictError:
+                if legacy_request_payload is None:
+                    raise
+                cached = await self._cached(
+                    conn, idempotency_key, {"create_run": legacy_request_payload}
+                )
+                if cached is None:
+                    raise
             if cached:
                 return cached
             run = new_run(payload)

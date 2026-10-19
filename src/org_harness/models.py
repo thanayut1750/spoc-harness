@@ -3,7 +3,7 @@
 import hashlib
 import json
 import re
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -71,10 +71,22 @@ class Constitution(Contract):
     max_revision_loops: int = Field(default=2, ge=0, le=10)
 
 
-class RunLimits(Contract):
-    max_model_calls: int = Field(default=100, ge=1, le=10000)
+MaxModelCalls = Annotated[int, Field(ge=1, le=10000)]
+WorkerModelCalls = Annotated[int, Field(ge=1, le=100)]
+
+
+class ModelCallBudget(Contract):
+    max_model_calls: MaxModelCalls = 100
+    worker_model_calls: WorkerModelCalls = 12
+
+
+class ModelCallBudgetUpdate(Contract):
+    max_model_calls: MaxModelCalls
+    worker_model_calls: WorkerModelCalls
+
+
+class RunLimits(ModelCallBudget):
     max_tool_calls: int = Field(default=200, ge=1, le=100000)
-    worker_model_calls: int = Field(default=12, ge=1, le=100)
     command_timeout: int = Field(default=300, ge=1, le=86400)
     worker_timeout: float = Field(default=3600, ge=0.01, le=3600)
 

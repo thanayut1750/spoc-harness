@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { api } from "./api";
 import { ModelPicker } from "./ModelPicker";
+import { ModelCallBudgetForm } from "./ModelCallBudgetForm";
 import { roles } from "./office";
 import { confirmsRegenesis, validModelConfig } from "./modelSettings";
 import type {
@@ -43,19 +44,33 @@ export function WorkspaceSettings({
   const [target, setTarget] = useState("all");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
+  const [budgetBusy, setBudgetBusy] = useState(false);
+  const [resetVersion, setResetVersion] = useState(0);
+  const controlsBusy = busy || budgetBusy;
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const selectedConfig = settings
+    ? target === "all"
+      ? settings.model_config
+      : (settings.agent_model_configs?.[target] ?? settings.model_config)
+    : undefined;
   useEffect(() => {
-    if (settings)
-      setDraft({
-        ...(target === "all"
-          ? settings.model_config
-          : (settings.agent_model_configs?.[target] ?? settings.model_config)),
-      });
-  }, [settings, target]);
+    if (selectedConfig) setDraft({ ...selectedConfig });
+  }, [
+    target,
+    selectedConfig?.provider,
+    selectedConfig?.model,
+    selectedConfig?.reasoning_effort,
+  ]);
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!settings || !draft || !validModelConfig(settings, draft)) return;
+    if (
+      controlsBusy ||
+      !settings ||
+      !draft ||
+      !validModelConfig(settings, draft)
+    )
+      return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -82,7 +97,7 @@ export function WorkspaceSettings({
     }
   }
   async function removeOverride() {
-    if (target === "all") return;
+    if (controlsBusy || target === "all") return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -102,7 +117,7 @@ export function WorkspaceSettings({
   }
   async function reset(event: FormEvent) {
     event.preventDefault();
-    if (!confirmsRegenesis(confirmation)) return;
+    if (controlsBusy || !confirmsRegenesis(confirmation)) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -110,6 +125,7 @@ export function WorkspaceSettings({
       const result = await onRegenesis(confirmation);
       setTarget("all");
       setDraft({ ...result.settings.model_config });
+      setResetVersion((version) => version + 1);
       setConfirmation("");
       setSection("model");
       setNotice(
@@ -144,7 +160,7 @@ export function WorkspaceSettings({
             role="tab"
             aria-selected={section === tab.id}
             key={tab.id}
-            disabled={busy}
+            disabled={controlsBusy}
             onClick={() => {
               setSection(tab.id);
               setError("");
@@ -173,83 +189,107 @@ export function WorkspaceSettings({
               Loading model settings…
             </p>
           ) : settings && draft ? (
-            <form onSubmit={save}>
-              <label>
-                Apply to
-                <select
-                  value={target}
-                  disabled={busy}
-                  onChange={(event) => {
-                    setTarget(event.target.value);
-                    setNotice("");
-                    setError("");
-                  }}
-                >
-                  <option value="all">All agents (default)</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {target === "tools_rd_lead" && (
-                <p className="agent-access-note">
-                  Only Planner or Engineering lead may call this agent.
-                </p>
-              )}
-              {["backend_coder", "system_architect"].includes(target) && (
-                <p className="agent-access-note">
-                  Dynamic Engineering specialists inherit their declared base
-                  role’s model selection.
-                </p>
-              )}
-              {target !== "all" && (
-                <div className="agent-model-inheritance">
-                  <p>
-                    {settings.agent_model_configs?.[target]
-                      ? "This agent has a custom model selection for new missions."
-                      : "This agent inherits the default model. Saving creates an override for new missions."}
+            <>
+              <form onSubmit={save}>
+                <label>
+                  Apply to
+                  <select
+                    value={target}
+                    disabled={controlsBusy}
+                    onChange={(event) => {
+                      setTarget(event.target.value);
+                      setNotice("");
+                      setError("");
+                    }}
+                  >
+                    <option value="all">All agents (default)</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {target === "tools_rd_lead" && (
+                  <p className="agent-access-note">
+                    Only Planner or Engineering lead may call this agent.
                   </p>
-                  {settings.agent_model_configs?.[target] && (
-                    <button
-                      className="text-button"
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void removeOverride()}
-                    >
-                      Use default model
-                    </button>
+                )}
+                {["backend_coder", "system_architect"].includes(target) && (
+                  <p className="agent-access-note">
+                    Dynamic Engineering specialists inherit their declared base
+                    role’s model selection.
+                  </p>
+                )}
+                {target !== "all" && (
+                  <div className="agent-model-inheritance">
+                    <p>
+                      {settings.agent_model_configs?.[target]
+                        ? "This agent has a custom model selection for new missions."
+                        : "This agent inherits the default model. Saving creates an override for new missions."}
+                    </p>
+                    {settings.agent_model_configs?.[target] && (
+                      <button
+                        className="text-button"
+                        type="button"
+                        disabled={controlsBusy}
+                        onClick={() => void removeOverride()}
+                      >
+                        Use default model
+                      </button>
+                    )}
+                  </div>
+                )}
+                <ModelPicker
+                  settings={settings}
+                  value={draft}
+                  onChange={setDraft}
+                  disabled={controlsBusy}
+                />
+                <div className="settings-runtime-note">
+                  <span>
+                    Triage:{" "}
+                    {settings.triage.configured
+                      ? settings.triage.model
+                      : "Not configured"}
+                  </span>
+                  <span>Worker timeout: {settings.worker_timeout}s</span>
+                </div>
+                <button
+                  className="primary-button"
+                  disabled={controlsBusy || !validModelConfig(settings, draft)}
+                >
+                  {busy ? (
+                    <LoaderCircle size={15} className="spin" />
+                  ) : (
+                    <Save size={15} />
                   )}
+                  {target === "all"
+                    ? "Save model settings"
+                    : "Save agent model"}
+                </button>
+              </form>
+              {settings.model_call_budget ? (
+                <ModelCallBudgetForm
+                  key={resetVersion}
+                  budget={settings.model_call_budget}
+                  disabled={busy}
+                  onSaved={onSaved}
+                  onBusyChange={setBudgetBusy}
+                />
+              ) : (
+                <div className="settings-load-error">
+                  <p>Call budget settings are unavailable.</p>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={onReload}
+                  >
+                    Reload settings
+                  </button>
                 </div>
               )}
-              <ModelPicker
-                settings={settings}
-                value={draft}
-                onChange={setDraft}
-                disabled={busy}
-              />
-              <div className="settings-runtime-note">
-                <span>
-                  Triage:{" "}
-                  {settings.triage.configured
-                    ? settings.triage.model
-                    : "Not configured"}
-                </span>
-                <span>Worker timeout: {settings.worker_timeout}s</span>
-              </div>
-              <button
-                className="primary-button"
-                disabled={busy || !validModelConfig(settings, draft)}
-              >
-                {busy ? (
-                  <LoaderCircle size={15} className="spin" />
-                ) : (
-                  <Save size={15} />
-                )}
-                {target === "all" ? "Save model settings" : "Save agent model"}
-              </button>
-            </form>
+            </>
           ) : (
             <div className="settings-load-error">
               <p>{loadError || "Model settings are unavailable."}</p>
@@ -314,7 +354,10 @@ export function WorkspaceSettings({
               the harness database.
             </li>
             <li>Harness-managed files and run workspaces on disk.</li>
-            <li>Provider and model choices return to startup defaults.</li>
+            <li>
+              Provider, model, and call budget settings return to startup
+              defaults.
+            </li>
           </ul>
           <p className="regenesis-retained">
             The app and <code>.env</code> stay in place. External workspaces you

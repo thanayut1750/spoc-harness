@@ -207,6 +207,10 @@ export interface ProviderConfig {
   default_model: string;
   reasoning_efforts: string[];
 }
+export interface ModelCallBudget {
+  max_model_calls: number;
+  worker_model_calls: number;
+}
 export interface WorkspaceSettings {
   defaults: ModelConfig;
   model_config: ModelConfig;
@@ -214,6 +218,7 @@ export interface WorkspaceSettings {
   providers: ProviderConfig[];
   triage: { model: string; configured: boolean };
   worker_timeout: number;
+  model_call_budget: ModelCallBudget;
 }
 export interface RegenesisResult {
   status: "reset";
