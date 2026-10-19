@@ -165,7 +165,11 @@ export function artifactGroup(artifact: Artifact): ArtifactGroup {
     ["source", "task_output", "output", "report"].includes(artifact.kind ?? "")
   )
     return "Task outputs";
-  if (["research", "web_source", "retrieval"].includes(artifact.kind ?? ""))
+  if (
+    ["research", "web_source", "retrieval", "mission_tool_source"].includes(
+      artifact.kind ?? "",
+    )
+  )
     return "Sources";
   if (
     [
@@ -173,11 +177,21 @@ export function artifactGroup(artifact: Artifact): ArtifactGroup {
       "command_result",
       "verification",
       "verification_log",
+      "mission_tool_use",
       "log",
     ].includes(artifact.kind ?? "")
   )
     return "Verification logs";
-  if (["deliverable", "manifest", "metadata"].includes(artifact.kind ?? ""))
+  if (
+    [
+      "deliverable",
+      "manifest",
+      "metadata",
+      "agent_assignment",
+      "mission_tool_support",
+      "mission_tool_definition",
+    ].includes(artifact.kind ?? "")
+  )
     return "Submission metadata";
   return "Other files";
 }

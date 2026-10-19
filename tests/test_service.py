@@ -535,9 +535,11 @@ async def test_real_services_complete_via_api_worker_and_persist_artifacts(tmp_p
             assert any("Local check passed" in result.text for result in stdout)
             events = await storage.events_after(0, run_id)
             assert any(
-                event["agent_id"] == "backend_coder" and event["activity"] == "executing"
+                event["agent_id"].startswith(f"specialist:{run_id}:")
+                and event["activity"] == "executing"
+                and event.get("data", {}).get("base_role") == "backend_coder"
                 for event in events
-            )
+            ), [(e["agent_id"], e["activity"], e.get("data", {}).get("base_role")) for e in events]
             assert any(event["activity"] == "completed" for event in events)
             snapshot = (await client.get("/api/office")).json()
             assert snapshot["cursor"] >= max(event["seq"] for event in events)

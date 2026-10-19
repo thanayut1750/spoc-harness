@@ -1,4 +1,29 @@
-import type { ModelConfig, WorkspaceSettings } from "./types";
+import type {
+  AgentActivity,
+  ModelConfig,
+  Run,
+  WorkspaceSettings,
+} from "./types";
+import { isExternalAgent, roleFor, roles } from "./office";
+export function agentModelSelection(
+  agent: AgentActivity,
+  run: Run | null,
+): { config: ModelConfig; inheritedFrom?: string } | undefined {
+  if (!run?.model_config || isExternalAgent(agent)) return undefined;
+  const role = roleFor(agent);
+  if (role.kind === "internal") return undefined;
+  if (role.kind === "specialist") {
+    const parent = roles.find((item) => item.id === role.model_parent);
+    return {
+      config:
+        (parent && run.agent_model_configs?.[parent.id]) || run.model_config,
+      inheritedFrom: parent?.name ?? "mission default",
+    };
+  }
+  return {
+    config: run.agent_model_configs?.[agent.agent_id] ?? run.model_config,
+  };
+}
 export function selectProvider(
   settings: WorkspaceSettings,
   providerId: string,

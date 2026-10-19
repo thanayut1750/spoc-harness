@@ -3,8 +3,9 @@ import {
   confirmsRegenesis,
   selectProvider,
   validModelConfig,
+  agentModelSelection,
 } from "./modelSettings";
-import type { WorkspaceSettings } from "./types";
+import type { AgentActivity, Run, WorkspaceSettings } from "./types";
 const settings: WorkspaceSettings = {
   defaults: {
     provider: "configured",
@@ -75,6 +76,50 @@ describe("model selection", () => {
         reasoning_effort: "max",
       }),
     ).toBe(false);
+  });
+  it("inherits the specialist base-role snapshot and supports an independent Tools R&D override", () => {
+    const specialist: AgentActivity = {
+      agent_id: "specialist:run:1234567890abcdef",
+      source: "harness",
+      activity: "writing",
+      data: {
+        agent_type: "engineering_specialist",
+        model_parent: "backend_coder",
+      },
+    };
+    const override = {
+      provider: "zai",
+      model: "specialist-model",
+      reasoning_effort: "high",
+    };
+    const run: Run = {
+      run_id: "run",
+      status: "running",
+      user_request: "Build a scene",
+      model_config: settings.model_config,
+      agent_model_configs: { backend_coder: override, tools_rd_lead: override },
+    };
+    expect(agentModelSelection(specialist, run)).toEqual({
+      config: override,
+      inheritedFrom: "Backend coder",
+    });
+    expect(
+      agentModelSelection(specialist, { ...run, agent_model_configs: {} })
+        ?.config,
+    ).toBe(run.model_config);
+    expect(
+      agentModelSelection({ ...specialist, source: "external" }, run),
+    ).toBeUndefined();
+    expect(
+      agentModelSelection(
+        { agent_id: "triage_router", source: "harness", activity: "completed" },
+        run,
+      ),
+    ).toBeUndefined();
+    expect(
+      agentModelSelection({ agent_id: "tools_rd_lead", activity: "idle" }, run)
+        ?.config,
+    ).toBe(override);
   });
 });
 it("requires the exact deliberate Regenesis confirmation", () => {

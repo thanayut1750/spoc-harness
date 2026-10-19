@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { activeActivities, activityLabels, roleFor, roles } from "./office";
+import {
+  activeActivities,
+  activityLabels,
+  handoffEndpoints,
+  officeRoster,
+  specialistsPerPage,
+  integrationsPerPage,
+} from "./office";
+import type { PositionedAgent } from "./office";
 import type { ActivityEvent, AgentActivity } from "./types";
 
 const W = 1000,
@@ -24,6 +32,7 @@ function label(
   size = 11,
   align: CanvasTextAlign = "center",
   maxWidth?: number,
+  preserveEnd = false,
 ) {
   ctx.fillStyle = color;
   ctx.font = `600 ${size}px ui-monospace, SFMono-Regular, monospace`;
@@ -31,13 +40,25 @@ function label(
   let display = text;
   if (maxWidth !== undefined && ctx.measureText(text).width > maxWidth) {
     const characters = Array.from(text);
-    while (
-      characters.length &&
-      ctx.measureText(`${characters.join("")}…`).width > maxWidth
-    ) {
-      characters.pop();
+    if (preserveEnd) {
+      let left = Math.ceil(characters.length / 2),
+        right = Math.floor(characters.length / 2);
+      const shortened = () =>
+        `${characters.slice(0, left).join("")}…${right ? characters.slice(-right).join("") : ""}`;
+      while (left + right && ctx.measureText(shortened()).width > maxWidth) {
+        if (left > right) left--;
+        else right--;
+      }
+      display = shortened();
+    } else {
+      while (
+        characters.length &&
+        ctx.measureText(`${characters.join("")}…`).width > maxWidth
+      ) {
+        characters.pop();
+      }
+      display = `${characters.join("")}…`;
     }
-    display = `${characters.join("")}…`;
   }
   ctx.fillText(display, x, y);
 }
@@ -156,7 +177,7 @@ function badgeColor(activity: string) {
 }
 function draw(
   ctx: CanvasRenderingContext2D,
-  agents: AgentActivity[],
+  positioned: PositionedAgent[],
   selected: string,
   events: ActivityEvent[],
   time: number,
@@ -209,11 +230,7 @@ function draw(
     );
   }
   label(ctx, "KNOWLEDGE LIBRARY", 174, 196, "#6c6e59", 9);
-  rect(ctx, 744, 132, 158, 38, "#9c957f");
-  rect(ctx, 738, 124, 170, 34, "#b4ad92");
-  rect(ctx, 740, 119, 166, 12, "#c1baa0");
-  rect(ctx, 738, 132, 13, 33, "#a29c84");
-  rect(ctx, 895, 132, 13, 33, "#a29c84");
+  label(ctx, "TOOLS R&D", 805, 196, "#716b79", 9);
   plant(ctx, 60, 208);
   plant(ctx, 940, 206);
   plant(ctx, 345, 75);
@@ -229,31 +246,16 @@ function draw(
   rect(ctx, 426, 422, 148, 22, "#d1bc91");
   rect(ctx, 432, 427, 136, 10, "#e5d3b0");
   label(ctx, "HUMAN REVIEW", 500, 458, "#8b7953", 9);
-  for (const [x, y] of [
-    [85, 560],
-    [225, 560],
-    [365, 560],
-    [635, 560],
-    [775, 560],
-    [915, 560],
-  ]) {
-    rect(ctx, x - 25, y - 20, 50, 22, "#baa17e");
-    rect(ctx, x - 12, y - 31, 24, 13, "#7f9284");
-    rect(ctx, x - 9, y - 28, 18, 7, "#bdd0af");
-  }
-  label(ctx, "CONNECTED WORKSPACE", 500, 600, "#847b63", 9);
+  label(ctx, "INTEGRATIONS", 225, 625, "#847b63", 9);
+  label(ctx, "ENGINEERING SPECIALISTS", 790, 625, "#536f7a", 9);
   rect(ctx, 451, 530, 98, 38, "#b6b393");
   rect(ctx, 455, 526, 90, 37, "#d2ceb0");
   label(ctx, "↟", 500, 550, "#829276", 24);
-  agents.forEach((agent, i) => {
-    const external = !roles.some((role) => role.id === agent.agent_id);
-    const externalIndex = agents
-      .filter((a) => !roles.some((role) => role.id === a.agent_id))
-      .findIndex((a) => a.agent_id === agent.agent_id);
-    const role = roleFor(agent.agent_id, externalIndex);
+  positioned.forEach(({ agent, role }, i) => {
+    const external = role.kind === "external";
     const x = role.x,
       y = Math.min(role.y, 594);
-    if (!external) desk(ctx, x, y, role.color);
+    if (role.kind !== "internal") desk(ctx, x, y, role.color);
     const active = activeActivities.has(agent.activity);
     const selectedAgent = selected === agent.agent_id;
     if (selectedAgent) {
@@ -267,7 +269,7 @@ function draw(
     const bob = active && !reduced ? Math.floor(time / 500) % 2 : 0;
     character(ctx, x, y - bob, role.color, i);
     rect(ctx, x + 13, y - 15, 7, 7, badgeColor(agent.activity));
-    if (agent.agent_id.endsWith("_gatekeeper")) {
+    if (role.kind === "fixed" && agent.agent_id.endsWith("_gatekeeper")) {
       label(
         ctx,
         agent.agent_id.startsWith("research") ? "Research" : "Engineering",
@@ -286,7 +288,8 @@ function draw(
         "#435047",
         external ? 11 : 10,
         "center",
-        external ? 112 : 140,
+        role.kind === "specialist" ? 92 : external ? 112 : 140,
+        role.kind === "specialist",
       );
     }
     if (active || agent.activity === "error" || agent.activity === "waiting") {
@@ -305,12 +308,11 @@ function draw(
   });
   // Handoffs are drawn only when an actual event identifies both agents.
   events.slice(0, 8).forEach((event) => {
-    const target = event.data?.target_agent_id ?? event.data?.to_agent_id;
-    if (typeof target !== "string") return;
+    const endpoints = handoffEndpoints(event, positioned);
+    if (!endpoints) return;
     const age = Date.now() - Date.parse(event.timestamp);
     if (age < 0 || age > 1800) return;
-    const from = roleFor(event.agent_id),
-      to = roleFor(target);
+    const { from, to } = endpoints;
     ctx.strokeStyle = "#7d9669";
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
@@ -341,14 +343,27 @@ export function OfficeCanvas({
   onSelect: (id: string) => void;
   events: ActivityEvent[];
 }) {
-  const externalIds = agents
-    .filter((agent) => !roles.some((role) => role.id === agent.agent_id))
-    .map((agent) => agent.agent_id);
-  const visibleAgents = agents.filter(
-    (agent) =>
-      roles.some((role) => role.id === agent.agent_id) ||
-      externalIds.indexOf(agent.agent_id) < 6,
-  );
+  const [specialistPage, setSpecialistPage] = useState(0);
+  const [integrationPage, setIntegrationPage] = useState(0);
+  const roster = officeRoster(agents, specialistPage, integrationPage);
+  const specialistIds = roster.specialists
+    .map((agent) => agent.agent_id)
+    .join("|");
+  const integrationIds = roster.integrations
+    .map((agent) => agent.agent_id)
+    .join("|");
+  useEffect(() => {
+    const index = roster.specialists.findIndex(
+      (agent) => agent.agent_id === selected,
+    );
+    if (index >= 0) setSpecialistPage(Math.floor(index / specialistsPerPage));
+  }, [selected, specialistIds]);
+  useEffect(() => {
+    const index = roster.integrations.findIndex(
+      (agent) => agent.agent_id === selected,
+    );
+    if (index >= 0) setIntegrationPage(Math.floor(index / integrationsPerPage));
+  }, [selected, integrationIds]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -380,7 +395,7 @@ export function OfficeCanvas({
       }
       ctx.setTransform(node.width / W, 0, 0, node.height / H, 0, 0);
       ctx.imageSmoothingEnabled = false;
-      draw(ctx, visibleAgents, selected, events, time, reduced);
+      draw(ctx, roster.positioned, selected, events, time, reduced);
     }
     render();
     const observer = new ResizeObserver(() => render());
@@ -397,19 +412,22 @@ export function OfficeCanvas({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [agents, selected, events, reduced]);
+  }, [
+    agents,
+    selected,
+    events,
+    reduced,
+    roster.specialistPage,
+    roster.integrationPage,
+  ]);
   return (
     <div className="office-canvas">
       <canvas
         ref={canvas}
         role="img"
-        aria-label="Top-down office: executive room north, research west, engineering east, quality gates center, integration desks south."
+        aria-label="Top-down office: executive room north, Tools R&D northeast, research west, engineering east, quality gates center, integrations southwest, Engineering specialist desks southeast."
       />
-      {visibleAgents.map((agent) => {
-        const role = roleFor(
-          agent.agent_id,
-          externalIds.indexOf(agent.agent_id),
-        );
+      {roster.positioned.map(({ agent, role }) => {
         return (
           <button
             key={agent.agent_id}
@@ -418,13 +436,72 @@ export function OfficeCanvas({
               left: `${(role.x / W) * 100}%`,
               top: `${(Math.min(role.y, 594) / H) * 100}%`,
             }}
-            aria-label={`${agent.display_name ?? role.name}: ${activityLabels[agent.activity]}. Inspect agent`}
+            aria-label={`${role.name}: ${activityLabels[agent.activity]}. Inspect agent`}
             aria-pressed={selected === agent.agent_id}
             onClick={() => onSelect(agent.agent_id)}
             title={`${role.name} · ${activityLabels[agent.activity]}`}
           />
         );
       })}
+      {(roster.specialists.length > 0 || roster.integrations.length > 0) && (
+        <div className="canvas-roster-controls">
+          <RosterPager
+            label="Integrations"
+            count={roster.integrations.length}
+            page={roster.integrationPage}
+            pages={roster.integrationPages}
+            perPage={integrationsPerPage}
+            onPage={setIntegrationPage}
+          />
+          <RosterPager
+            label="Engineering specialists"
+            count={roster.specialists.length}
+            page={roster.specialistPage}
+            pages={roster.specialistPages}
+            perPage={specialistsPerPage}
+            onPage={setSpecialistPage}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+function RosterPager({
+  label,
+  count,
+  page,
+  pages,
+  perPage,
+  onPage,
+}: {
+  label: string;
+  count: number;
+  page: number;
+  pages: number;
+  perPage: number;
+  onPage: (page: number) => void;
+}) {
+  if (!count) return <span />;
+  return (
+    <div className="canvas-roster-group" aria-label={`${label} desks`}>
+      <button
+        aria-label={`Previous ${label} page`}
+        disabled={page === 0}
+        onClick={() => onPage(page - 1)}
+      >
+        ‹
+      </button>
+      <span aria-live="polite">
+        {label} {page * perPage + 1}–{Math.min(count, (page + 1) * perPage)} of{" "}
+        {count}
+      </span>
+      <button
+        aria-label={`Next ${label} page`}
+        disabled={page + 1 >= pages}
+        onClick={() => onPage(page + 1)}
+      >
+        ›
+      </button>
     </div>
   );
 }

@@ -19,6 +19,7 @@ from langgraph.types import Send, interrupt
 from pydantic import TypeAdapter, ValidationError
 
 from org_harness.models import (
+    ENGINEERING_TOOL_NAMES,
     AttemptRecord,
     Constitution,
     Deliverable,
@@ -33,6 +34,8 @@ from org_harness.models import (
     StrategicObjective,
     TriageDecision,
     WorkPackage,
+    worker_agent_id,
+    worker_agent_name,
 )
 from org_harness.storage import ArtifactNotFoundError
 from org_harness.text_safety import require_json_text
@@ -233,7 +236,27 @@ def _validate_work_plan(value: Any, kr: KeyResult) -> list[WorkPackage]:
         raise ValueError("Work package IDs must be unique within a tactical plan")
     if any(p.kr_id != kr.kr_id or p.role not in ROLES[kr.target_department] for p in packages):
         raise ValueError("Tactical plan contains an invalid assignment or specialist role")
+    for package in packages:
+        if package.specialist is None:
+            continue
+        if kr.target_department != "engineering":
+            raise ValueError("Task-specific specialists are available only to Engineering")
+        if not set(package.specialist.tools) <= ENGINEERING_TOOL_NAMES:
+            raise ValueError("Specialist tools must use existing Engineering capabilities")
     return packages
+
+
+def _worker_event_data(work: WorkPackage) -> JSON:
+    if work.specialist is None:
+        return {}
+    return {
+        "display_name": worker_agent_name(work),
+        "agent_type": "engineering_specialist",
+        "parent_agent_id": "engineering_head",
+        "department": "engineering",
+        "model_parent": work.role,
+        "base_role": work.role,
+    }
 
 
 async def _validated_response[ResponseT](
@@ -445,7 +468,7 @@ def _attempt(
         execution_attempt=revision,
         stage=stage,
         work_package_id=work.work_package_id if work else None,
-        role=work.role if work else f"{kr.target_department}_head",
+        role=worker_agent_id(state["run_id"], work) if work else f"{kr.target_department}_head",
         task=(work.task if work else kr.description)[:2000],
         acceptance_criteria=tuple(
             item[:600]
@@ -772,7 +795,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             return {"escalation": escalation.model_dump(mode="json"), "approved": False}
         kr = KeyResult.model_validate(state["kr"])
         work = WorkPackage.model_validate(state["work"])
-        notes = await services.notes(work.role)
+        agent_id = worker_agent_id(state["run_id"], work)
+        agent_data = _worker_event_data(work)
+        notes = await services.notes(agent_id)
         feedback = "\n".join([state.get("feedback", ""), *notes])[-12000:]
         await services.emit(
             "triage_router"
@@ -781,9 +806,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "planning",
             f"Assign {work.work_package_id[:128]}",
             kr_id=kr.kr_id,
-            target_agent_id=work.role,
+            target_agent_id=agent_id,
         )
-        await services.emit(work.role, "executing", work.task, kr_id=kr.kr_id)
+        await services.emit(agent_id, "executing", work.task, kr_id=kr.kr_id, **agent_data)
         try:
             result = await _validated_response(
                 services.execute(
@@ -801,7 +826,9 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             kind = exc.kind
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
-            await services.emit(work.role, "error", str(exc), kr_id=kr.kr_id, kind=kind)
+            await services.emit(
+                agent_id, "error", str(exc), kr_id=kr.kr_id, kind=kind, **agent_data
+            )
             return {
                 "escalation": _escalation(state, kind, str(exc)).model_dump(mode="json"),
                 "approved": False,
@@ -809,26 +836,32 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         if (
             result.kr_id != kr.kr_id
             or result.department != kr.target_department
-            or result.worker_role != work.role
+            or result.worker_role != agent_id
         ):
+            reason = "Worker returned a deliverable for another assignment"
+            await services.emit(
+                agent_id, "error", reason, kr_id=kr.kr_id, kind="invalid_output", **agent_data
+            )
             return {
-                "escalation": _escalation(
-                    state, "invalid_output", "Worker returned a deliverable for another assignment"
-                ).model_dump(mode="json"),
+                "escalation": _escalation(state, "invalid_output", reason).model_dump(mode="json"),
                 "approved": False,
             }
         if result.fallback and work.critical:
+            reason = "A mandatory assignment returned an incomplete fallback."
+            await services.emit(
+                agent_id, "error", reason, kr_id=kr.kr_id, kind="invalid_output", **agent_data
+            )
             return {
                 "deliverable": result.model_dump(mode="json"),
                 "approved": False,
                 "escalation": _escalation(
                     state,
                     "invalid_output",
-                    "A mandatory assignment returned an incomplete fallback.",
+                    reason,
                 ).model_dump(mode="json"),
             }
         await services.emit(
-            work.role,
+            agent_id,
             "waiting" if result.fallback else "completed",
             "Optional assignment incomplete; returned to department lead"
             if result.fallback
@@ -839,6 +872,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if result.fallback
             else f"{kr.target_department}_gatekeeper",
             fallback=result.fallback,
+            **agent_data,
         )
         return {"deliverable": result.model_dump(mode="json")}
 

@@ -1924,6 +1924,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "langchain", extra = ["mcp"] },
     { name = "langchain-core" },
     { name = "langchain-typesafe" },
@@ -1951,6 +1952,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "jsonschema", specifier = ">=4.26,<5" },
     { name = "langchain", extras = ["mcp"], specifier = ">=1.4.6,<2" },
     { name = "langchain-core", specifier = ">=1.6.12,<2" },
     { name = "langchain-typesafe", specifier = "==0.0.1a3" },

@@ -147,6 +147,8 @@ export interface Artifact {
   artifact_id: string;
   name: string;
   media_type: string;
+  run_id?: string;
+  scope?: string | null;
   size?: number;
   kr_id?: string;
   kind?: string;

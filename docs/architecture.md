@@ -15,6 +15,12 @@ flowchart TD
     Schedule -->|dependency-ready / at most two| Dept[Private department subgraph]
     Dept --> Head[Department tactical plan]
     Head --> Specialist[LangChain specialist agent]
+    Head --> Dynamic[Task-specific Engineering specialists]
+    Plan -->|on demand| RD[Tools R&D lead]
+    Head -->|Engineering only / on demand| RD
+    RD --> Catalog[Tested mission tool catalog]
+    Dynamic --> Tool
+    Catalog --> Tool
     Specialist --> Tool[Journaled host or research tools]
     Tool --> Files[(Local evidence artifacts)]
     Specialist --> TacticalGate[Tactical acceptance gate]
@@ -55,7 +61,7 @@ Public model selections are immutable run snapshots; per-agent overrides select 
 
 Expected tool-input failures use `ExpectedToolInputError` at the point that interprets a model-supplied file, artifact, URL, directory or command timeout. The journal records those errors as completed results; a model can read the error and correct its call without cancelling parallel work. Unknown run records, persistence failures and raw programming exceptions retain their failure semantics. Identical parallel operation IDs share a per-host lock and reuse the recorded result; conflicting requests still stop for review.
 
-External contracts and provider messages reject U+0000 and unsupported Unicode surrogate code points before persistence. HTTP validation responses omit raw input and exception context. Valid Unicode, emoji, tabs, newlines and literal escape sequences remain supported. Text previews can explicitly escape incompatible characters while original artifact bytes remain intact; database serialization does not silently rewrite requests or evidence.
+External contracts and provider messages reject U+0000, unsupported Unicode surrogate code points, and non-finite JSON numbers before persistence. The tool journal records malformed requests using a fingerprint-only envelope and a completed input error without executing them. HTTP validation responses omit raw input and exception context. Valid Unicode, emoji, tabs, newlines and literal escape sequences remain supported. External result previews explicitly escape incompatible characters and display non-finite numbers as strings while original artifact bytes remain intact; database serialization does not silently rewrite requests or evidence.
 
 Text outputs created through host commands can be explicitly snapshotted with `publish_file`. The journal records a bounded, nonempty UTF-8 file as a source artifact under the current work package and epoch, preserving its bytes and integrity hash. Publishing does not approve the output or replace verification; replay reuses the recorded snapshot rather than reading changed bytes again.
 
@@ -74,7 +80,17 @@ Unexpected worker failures retain a class-only message and safe diagnostic frame
 
 Version 1 activity events are persisted with monotonically ordered cursors and source-scoped event IDs. Projection updates and event inserts commit together. The browser snapshots a cursor, then replays subsequent SSE events; duplicate events are ignored. Internal handoff events identify both agent endpoints and the KR, allowing animation to reflect real transfers.
 
-External webhooks update external display identities only. They cannot change run records, approvals, or reviews. The fixed office has six external desks; further agents remain available in its searchable list.
+External webhooks update external display identities only. They cannot change run records, approvals, or reviews. Engineering specialists and external integrations occupy separate paged desks, and every agent remains available in the searchable list. Canvas rendering, hit targets, and handoffs share one position resolver. Trusted specialist identity metadata survives later tool events and snapshot reloads; external metadata cannot create an internal agent identity.
+
+## Dynamic specialists and tool development
+
+Engineering tactical plans can include an immutable specialist definition in each work package: a display name, task-specific instructions, and an optional subset of existing Engineering execution tools. The core artifact protocol (`write_file`, `read_artifact`, `escalate_blocker`) remains available under narrowing; shell execution and other optional capabilities require selection. Python derives its identity from the run, KR, package, base role, and definition. The model cannot assign a privileged actor ID. The definition is persisted before execution in the department checkpoint. Notes, tool journals, handoffs, deliverables, and attempt records use the same identity; model selection inherits the saved base-role override. Research and triage retain their existing roles, and fast-track work adds no planning or R&D call.
+
+Planner and Engineering lead have a bounded tool-enabled planning loop. Its final plan is validated locally, with a repair call only when its JSON fails validation. Planning journals include a canonical hash of the invocation context: unchanged checkpoint replay reuses completed work, while revised feedback or dependency inputs receive a distinct scope even if the provider reuses a tool-call ID. Only these two actors receive the R&D consultation binding, and the server independently validates the caller. The R&D lead cannot delegate further agents. Its research or tool-development work shares the original constitution and run budgets; a report or tool definition does not approve any KR.
+
+Each specialist receives a server-authored assignment artifact with its exact identity and work definition. Verified public R&D consultation references from the current KR version or Planner accompany the assignment into review; private model history does not. Successful tool invocations record their definition, source hash, arguments, output, and execution receipts. Assignment metadata and materialized support files are excluded from substantive evidence checks. Each R&D consultation has an isolated managed workspace, including when the mission uses an external workspace.
+
+The mission tool catalog uses existing immutable artifacts and operation journals, requiring no new database table. Registration is exclusive to the private R&D actor. It validates a self-contained JSON object schema, snapshots a nonempty Python source file, and requires a successful JSON-stdin/JSON-stdout subprocess example before publishing a definition. Invocations verify the definition, source hash, test evidence, run ownership, and arguments. Source is materialized in the caller's workspace and executed through HostTools, preserving cancellation, deadlines, command receipts, and unknown-effect review. Generated Python is never loaded into the harness interpreter. Each explicit registration has an immutable tool ID, and replay returns the recorded result. Regenesis clears the catalog with managed artifacts and journals.
 
 ## Operational limits
 

@@ -11,7 +11,9 @@ from org_harness.models import ModelSelection, RunLimits
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", populate_by_name=True, allow_inf_nan=False
+    )
 
     openai_base_url: str = "https://api.z.ai/api/coding/paas/v4"
     openai_api_key: SecretStr = SecretStr("")

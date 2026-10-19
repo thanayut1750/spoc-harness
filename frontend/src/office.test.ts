@@ -8,6 +8,9 @@ import {
   parseActivityEvent,
   projectEvent,
   routingSummary,
+  roleFor,
+  officeRoster,
+  handoffEndpoints,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -26,7 +29,7 @@ const event = (
 describe("office projection", () => {
   it("starts each internal role idle and projects only supplied facts", () => {
     const agents = initialAgents();
-    expect(Object.keys(agents)).toHaveLength(10);
+    expect(Object.keys(agents)).toHaveLength(11);
     expect(Object.values(agents).every((a) => a.activity === "idle")).toBe(
       true,
     );
@@ -129,5 +132,109 @@ describe("office projection", () => {
       ),
     ).toBeNull();
     expect(parseActivityEvent(JSON.stringify(event()))?.seq).toBe(1);
+  });
+  it("recognizes named Engineering specialists only from internal metadata and retains their identity", () => {
+    const specialist = event(4, {
+      agent_id: "specialist:run:1234567890abcdef",
+      data: {
+        agent_type: "engineering_specialist",
+        display_name: "Shader specialist",
+        parent_agent_id: "engineering_head",
+        model_parent: "backend_coder",
+        department: "engineering",
+        stdout: "Previous tool output",
+      },
+    });
+    expect(roleFor(specialist)).toMatchObject({
+      name: "Shader specialist",
+      kind: "specialist",
+      department: "Engineering",
+      parent_agent_id: "engineering_head",
+      model_parent: "backend_coder",
+    });
+    const external = normalizeAgent({ ...specialist, source: "custom-office" });
+    expect(roleFor(external)).toMatchObject({
+      name: "Shader specialist",
+      kind: "external",
+      department: "Integrations",
+    });
+    const updated = projectEvent(projectEvent(initialAgents(), specialist), {
+      ...specialist,
+      seq: 5,
+      data: { tool_name: "compile" },
+      activity: "reading",
+    });
+    expect(roleFor(updated[specialist.agent_id]).name).toBe(
+      "Shader specialist",
+    );
+    expect(roleFor(updated[specialist.agent_id]).kind).toBe("specialist");
+    expect(updated[specialist.agent_id].data?.stdout).toBeUndefined();
+    expect(
+      officeRoster([{ ...specialist, agent_id: "backend_coder" }]).specialists,
+    ).toHaveLength(0);
+    expect(roleFor({ ...specialist, source: undefined }).kind).toBe("external");
+  });
+  it("pages all bounded specialists without overlapping Integration desks and resolves actual handoff positions", () => {
+    const specialists = Array.from({ length: 36 }, (_, index) =>
+      event(index + 10, {
+        agent_id: `specialist:run:${String(index).padStart(16, "0")}`,
+        data: {
+          agent_type: "engineering_specialist",
+          display_name: `Specialist ${index}`,
+          parent_agent_id: "engineering_head",
+        },
+      }),
+    );
+    const integration = normalizeAgent(event(60, { source: "external" }));
+    const agents = [
+      ...Object.values(initialAgents()),
+      ...specialists,
+      integration,
+    ];
+    const visited = new Set<string>();
+    for (let page = 0; page < officeRoster(agents).specialistPages; page++) {
+      const roster = officeRoster(agents, page);
+      const desks = roster.positioned.filter(
+        ({ role }) => role.kind === "specialist",
+      );
+      expect(desks).toHaveLength(4);
+      const coordinates = roster.positioned.map(
+        ({ role }) => `${role.x}:${role.y}`,
+      );
+      expect(new Set(coordinates).size).toBe(coordinates.length);
+      for (const { agent, role } of desks) {
+        visited.add(agent.agent_id);
+        expect(role.department).toBe("Engineering");
+        expect(role.x).toBeGreaterThan(600);
+        expect(role.y).toBeLessThan(650);
+      }
+      const target = desks[3];
+      expect(
+        handoffEndpoints(
+          event(100, {
+            agent_id: "engineering_head",
+            data: { target_agent_id: target.agent.agent_id },
+          }),
+          roster.positioned,
+        )?.to,
+      ).toBe(target.role);
+    }
+    expect(visited.size).toBe(36);
+    const first = officeRoster(agents).positioned;
+    expect(
+      handoffEndpoints(
+        event(101, {
+          agent_id: integration.agent_id,
+          source: "external",
+          data: { target_agent_id: "engineering_head" },
+        }),
+        first,
+      ),
+    ).toBeUndefined();
+    expect(roleFor("tools_rd_lead")).toMatchObject({
+      name: "Tools R&D lead",
+      kind: "fixed",
+      department: "Engineering",
+    });
   });
 });

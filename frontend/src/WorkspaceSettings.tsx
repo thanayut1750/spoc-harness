@@ -193,6 +193,17 @@ export function WorkspaceSettings({
                   ))}
                 </select>
               </label>
+              {target === "tools_rd_lead" && (
+                <p className="agent-access-note">
+                  Only Planner or Engineering lead may call this agent.
+                </p>
+              )}
+              {["backend_coder", "system_architect"].includes(target) && (
+                <p className="agent-access-note">
+                  Dynamic Engineering specialists inherit their declared base
+                  role’s model selection.
+                </p>
+              )}
               {target !== "all" && (
                 <div className="agent-model-inheritance">
                   <p>

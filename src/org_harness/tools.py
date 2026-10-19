@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import math
 import mimetypes
 import os
 import signal
@@ -17,7 +18,9 @@ import httpx
 
 from org_harness.models import EscalationSignal
 from org_harness.storage import ArtifactNotFoundError, BudgetExceeded, fingerprint
-from org_harness.text_safety import contains_invalid_json_text
+from org_harness.text_safety import contains_invalid_json_text, contains_invalid_json_value
+
+_COMMAND_PREVIEW_BYTES = 32768
 
 
 class ExpectedToolInputError(ValueError):
@@ -25,8 +28,8 @@ class ExpectedToolInputError(ValueError):
 
 
 def json_safe_display(value: Any) -> Any:
-    """Escape unsafe external text for display, preserving its reversible representation."""
-    if not contains_invalid_json_text(value):
+    """Escape external text and represent non-finite numbers explicitly as strings."""
+    if not contains_invalid_json_value(value):
         return value
     return _escaped_display(value)
 
@@ -34,6 +37,8 @@ def json_safe_display(value: Any) -> Any:
 def _escaped_display(value: Any) -> Any:
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=True)[1:-1]
+    if isinstance(value, float) and not math.isfinite(value):
+        return json.dumps(value)
     if isinstance(value, dict):
         return {_escaped_display(key): _escaped_display(item) for key, item in value.items()}
     if isinstance(value, list):
@@ -372,7 +377,7 @@ class HostTools:
         *,
         kind: str,
     ) -> dict:
-        invalid_request = contains_invalid_json_text(request)
+        invalid_request = contains_invalid_json_value(request)
         stored_request = (
             {"invalid_input": True, "request_fingerprint": fingerprint(request)}
             if invalid_request
@@ -412,7 +417,7 @@ class HostTools:
         try:
             if invalid_request:
                 raise ExpectedToolInputError(
-                    "Tool input contains null or invalid Unicode text. Use valid text inputs; "
+                    "Tool input contains invalid JSON values. Use finite numbers and valid text; "
                     "binary/image files require command verification or artifact downloads."
                 )
             result = await execute()
@@ -423,7 +428,7 @@ class HostTools:
             if exc.kind == "cancelled":
                 await self.storage.complete_operation(operation_id, {"cancelled": True})
             raise
-        if contains_invalid_json_text(result):
+        if contains_invalid_json_value(result):
             result = {**json_safe_display(result), "display_encoding": "json-string-escape"}
         await self.storage.complete_operation(operation_id, result)
         return result
@@ -605,14 +610,20 @@ class HostTools:
                 output_artifacts.append(artifact["artifact_id"])
             result = {
                 "exit_code": 124 if timed_out else process.returncode,
-                "stdout": stdout_path.read_bytes()[:32768].decode(errors="replace"),
-                "stderr": stderr_path.read_bytes()[:32768].decode(errors="replace"),
+                "stdout": stdout_path.read_bytes()[:_COMMAND_PREVIEW_BYTES].decode(
+                    errors="replace"
+                ),
+                "stderr": stderr_path.read_bytes()[:_COMMAND_PREVIEW_BYTES].decode(
+                    errors="replace"
+                ),
+                "stdout_truncated": stdout_path.stat().st_size > _COMMAND_PREVIEW_BYTES,
+                "stderr_truncated": stderr_path.stat().st_size > _COMMAND_PREVIEW_BYTES,
                 "timed_out": timed_out,
                 "cancelled": cancelled,
                 "duration_seconds": round(elapsed, 3),
                 "artifact_ids": output_artifacts,
             }
-            if contains_invalid_json_text(result):
+            if contains_invalid_json_value(result):
                 result = {**json_safe_display(result), "display_encoding": "json-string-escape"}
             receipt = await self.artifacts.save(
                 f"{log_id}.command.json",
@@ -701,7 +712,7 @@ class HostTools:
                 kr_id=self.kr_id,
                 artifact_id=artifact["artifact_id"],
             )
-            unsafe_source = contains_invalid_json_text(result)
+            unsafe_source = contains_invalid_json_value(result)
             display = json_safe_display(result)
             encoded = json.dumps(display, ensure_ascii=False, default=str)
             preview = (

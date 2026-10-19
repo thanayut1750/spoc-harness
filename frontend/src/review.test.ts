@@ -124,6 +124,30 @@ describe("artifact meaning", () => {
     expect(artifactGroup(file("task_output", 1200))).toBe("Task outputs");
     expect(artifactGroup(file("source", 1200))).toBe("Task outputs");
   });
+  it("keeps assignment and mission-tool evidence separate from requested task outputs", () => {
+    const metadata = [
+      "agent_assignment",
+      "mission_tool_support",
+      "mission_tool_definition",
+    ].map((kind) => file(kind, 1200));
+    for (const artifact of metadata)
+      expect(artifactGroup(artifact)).toBe("Submission metadata");
+    expect(artifactGroup(file("mission_tool_use", 1200))).toBe(
+      "Verification logs",
+    );
+    expect(artifactGroup(file("mission_tool_source", 1200))).toBe("Sources");
+    const files = [
+      ...metadata,
+      file("mission_tool_source", 1200),
+      file("mission_tool_use", 1200),
+      file("task_output", 2400),
+    ];
+    expect(
+      files
+        .filter((artifact) => artifactGroup(artifact) === "Task outputs")
+        .map((artifact) => artifact.kind),
+    ).toEqual(["task_output"]);
+  });
   it("distinguishes a normal empty diagnostic log from an empty generated file", () => {
     expect(artifactSizeLabel(file("command_log", 0))).toBe(
       "Empty log · no diagnostic output",

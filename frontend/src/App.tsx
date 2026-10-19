@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { api } from "./api";
 import { ArtifactFiles } from "./ArtifactFiles";
+import { scopedAgentArtifacts } from "./artifactScopes";
 import { ReviewEvidence } from "./ReviewEvidence";
 import {
   actionCtas,
@@ -50,7 +51,7 @@ import { OfficeCanvas } from "./OfficeCanvas";
 import { ModelPicker } from "./ModelPicker";
 import { WorkspaceSettings } from "./WorkspaceSettings";
 import type { SettingsSection } from "./WorkspaceSettings";
-import { validModelConfig } from "./modelSettings";
+import { agentModelSelection, validModelConfig } from "./modelSettings";
 import {
   activeActivities,
   activityLabels,
@@ -777,16 +778,18 @@ function Inspector({
   const [tab, setTab] = useState("overview");
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
-  const role = roleFor(agent.agent_id);
+  const role = roleFor(agent);
+  const model = agentModelSelection(agent, run);
   const relevant = events.filter((e) => e.agent_id === agent.agent_id);
   const outcome = agent.kr_id ? run?.outcomes?.[agent.kr_id] : undefined;
   const canGuide =
     !!run &&
     !terminalStatuses.has(run.status) &&
+    agent.agent_id !== "tools_rd_lead" &&
+    role.kind !== "internal" &&
     (!agent.source || agent.source === "harness");
-  const files = artifacts.filter(
-    (a) => !agent.kr_id || !a.kr_id || a.kr_id === agent.kr_id,
-  );
+  const fileScope = scopedAgentArtifacts(agent, artifacts, run?.run_id);
+  const files = [...fileScope.owned, ...fileScope.context];
   async function submit(event: FormEvent) {
     event.preventDefault();
     const success = await onNote(note.trim());
@@ -810,7 +813,7 @@ function Inspector({
           <span />
           <i />
         </div>
-        <h2>{agent.display_name ?? agent.name ?? role.name}</h2>
+        <h2>{role.name}</h2>
         <p>{role.title}</p>
         <Status status={agent.activity} />
       </div>
@@ -842,6 +845,29 @@ function Inspector({
                 {role.department}
               </span>
             </div>
+            {role.parent_agent_id && (
+              <div className="detail-row">
+                <span>Parent</span>
+                <span>{roleFor(role.parent_agent_id).name}</span>
+              </div>
+            )}
+            {agent.agent_id === "tools_rd_lead" && (
+              <p className="agent-access-note">
+                Only Planner or Engineering lead may call this agent.
+              </p>
+            )}
+            {model && (
+              <div className="agent-model-note">
+                <span className="eyebrow">Model snapshot</span>
+                <p>
+                  {model.config.provider} / {model.config.model} ·{" "}
+                  {model.config.reasoning_effort}
+                </p>
+                {model.inheritedFrom && (
+                  <small>Inherited from {model.inheritedFrom}</small>
+                )}
+              </div>
+            )}
             {agent.source && agent.source !== "harness" && (
               <div className="detail-row">
                 <span>Source</span>
@@ -958,7 +984,27 @@ function Inspector({
             )}
           </div>
         ) : (
-          <ArtifactFiles files={files} />
+          <>
+            {fileScope.owned.length > 0 && (
+              <section
+                className="agent-file-scope"
+                aria-label="Created by this agent"
+              >
+                <h3>Created by this agent</h3>
+                <ArtifactFiles files={fileScope.owned} />
+              </section>
+            )}
+            {fileScope.context.length > 0 && (
+              <section
+                className="agent-file-scope"
+                aria-label={fileScope.contextLabel}
+              >
+                <h3>{fileScope.contextLabel}</h3>
+                <ArtifactFiles files={fileScope.context} />
+              </section>
+            )}
+            {files.length === 0 && <ArtifactFiles files={[]} />}
+          </>
         )}
       </div>
       <form className="guidance" onSubmit={(event) => void submit(event)}>
@@ -983,9 +1029,13 @@ function Inspector({
         <small aria-live="polite">
           {sent
             ? "Guidance queued for the next agent boundary."
-            : agent.source && agent.source !== "harness"
-              ? "External activity is read-only."
-              : "Delivered at the next applicable work boundary."}
+            : agent.agent_id === "tools_rd_lead"
+              ? "Only Planner or Engineering lead may call this agent."
+              : role.kind === "internal"
+                ? "Internal routing follows the mission requirements."
+                : agent.source && agent.source !== "harness"
+                  ? "External activity is read-only."
+                  : "Delivered at the next applicable work boundary."}
         </small>
       </form>
     </>
@@ -1162,17 +1212,18 @@ export default function App() {
   const agents = allAgents.filter(
     (agent) =>
       (department === "all" ||
-        roleFor(agent.agent_id).department.toLowerCase() === department) &&
+        roleFor(agent).department.toLowerCase() === department) &&
       (!filter ||
-        (agent.display_name ?? roleFor(agent.agent_id).name)
-          .toLowerCase()
-          .includes(filter.toLowerCase())),
+        roleFor(agent).name.toLowerCase().includes(filter.toLowerCase())),
   );
   const active = allAgents.filter((agent) =>
     activeActivities.has(agent.activity),
   ).length;
   const selectedAgent =
     allAgents.find((agent) => agent.agent_id === selected) ?? allAgents[0];
+  const inspectedRun = selectedAgent?.run_id
+    ? (activityRuns.get(selectedAgent.run_id) ?? null)
+    : run;
   const events = office.events.filter(
     (event) => !runId || event.run_id === runId || !event.run_id,
   );
@@ -1585,7 +1636,7 @@ export default function App() {
                     <span>{agents.length} agents</span>
                   </div>
                   {agents.map((agent) => {
-                    const role = roleFor(agent.agent_id);
+                    const role = roleFor(agent);
                     return (
                       <button
                         className={`agent-row ${selected === agent.agent_id ? "selected" : ""}`}
@@ -1599,7 +1650,7 @@ export default function App() {
                           <Users size={15} />
                         </span>
                         <span>
-                          <strong>{agent.display_name ?? role.name}</strong>
+                          <strong>{role.name}</strong>
                           <small>{agent.summary ?? role.title}</small>
                         </span>
                         <span className="list-department">
@@ -1643,13 +1694,17 @@ export default function App() {
               key={`${officeVersion}:${selectedAgent.agent_id}`}
               agent={selectedAgent}
               events={office.events}
-              artifacts={artifacts}
-              run={run}
+              artifacts={inspectedRun?.run_id === run?.run_id ? artifacts : []}
+              run={inspectedRun}
               busy={busy}
               onNote={async (content) => {
-                if (!run) return false;
+                if (!inspectedRun) return false;
                 return perform(() =>
-                  api.note(run.run_id, content, selectedAgent.agent_id),
+                  api.note(
+                    inspectedRun.run_id,
+                    content,
+                    selectedAgent.agent_id,
+                  ),
                 );
               }}
             />
@@ -1737,25 +1792,31 @@ export default function App() {
               </div>
             ) : (
               <div className="timeline">
-                {events.slice(0, 60).map((event) => (
-                  <button
-                    key={event.seq}
-                    onClick={() => {
-                      setSelected(event.agent_id);
-                      setModal(null);
-                    }}
-                  >
-                    <Stamp date={event.timestamp} />
-                    <span className={`small-dot ${event.activity}`} />
-                    <strong>
-                      {event.display_name ?? roleFor(event.agent_id).name}
-                    </strong>
-                    <span>
-                      {event.summary ?? activityLabels[event.activity]}
-                    </span>
-                    <code>{event.kr_id ?? ""}</code>
-                  </button>
-                ))}
+                {events.slice(0, 60).map((event) => {
+                  const current = office.agents[event.agent_id];
+                  const role = roleFor({
+                    ...current,
+                    ...event,
+                    data: { ...current?.data, ...event.data },
+                  });
+                  return (
+                    <button
+                      key={event.seq}
+                      onClick={() => {
+                        setSelected(event.agent_id);
+                        setModal(null);
+                      }}
+                    >
+                      <Stamp date={event.timestamp} />
+                      <span className={`small-dot ${event.activity}`} />
+                      <strong>{role.name}</strong>
+                      <span>
+                        {event.summary ?? activityLabels[event.activity]}
+                      </span>
+                      <code>{event.kr_id ?? ""}</code>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>

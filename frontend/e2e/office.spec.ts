@@ -1481,3 +1481,351 @@ test("a rejected Regenesis leaves existing mission data intact", async ({
     }),
   ).toBeVisible();
 });
+
+test("named Engineering specialists page separately from external integrations and preserve actual identity", async ({
+  page,
+}) => {
+  const requests = await fixture(page, {
+    agent_model_configs: {
+      backend_coder: {
+        provider: "zai",
+        model: "shader-model",
+        reasoning_effort: "high",
+      },
+    },
+  });
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    for (let index = 1; index <= 8; index++)
+      emit({
+        event_id: `specialist-${index}`,
+        seq: 10 + index,
+        source: "harness",
+        agent_id: `specialist:run-fixture:${String(index).padStart(16, "0")}`,
+        run_id: "run-fixture",
+        activity: "writing",
+        summary: `Implementing shader part ${index}`,
+        data: {
+          agent_type: "engineering_specialist",
+          display_name: `Shader specialist ${index}`,
+          parent_agent_id: "engineering_head",
+          department: "engineering",
+          model_parent: "backend_coder",
+        },
+        timestamp: "2026-10-18T10:00:02Z",
+      });
+    emit({
+      event_id: "external-specialist",
+      seq: 19,
+      source: "custom-office",
+      agent_id: "specialist:run-fixture:0000000000000001",
+      run_id: "run-fixture",
+      activity: "reading",
+      summary: "Watching an external feed",
+      data: {
+        agent_type: "engineering_specialist",
+        display_name: "External shader monitor",
+        parent_agent_id: "engineering_head",
+        department: "engineering",
+        model_parent: "backend_coder",
+      },
+      timestamp: "2026-10-18T10:00:03Z",
+    });
+  });
+  await expect(
+    page.getByText("Engineering specialists 1–4 of 8", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Shader specialist 1: Writing. Inspect agent",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Shader specialist 8: Writing. Inspect agent",
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", {
+      name: "Next Engineering specialists page",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Engineering specialists 5–8 of 8", { exact: true }),
+  ).toBeVisible();
+  const specialist = page.getByRole("button", {
+    name: "Shader specialist 8: Writing. Inspect agent",
+  });
+  await specialist.click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(
+    inspector.getByRole("heading", {
+      name: "Shader specialist 8",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Department" }),
+  ).toContainText("Engineering");
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Parent" }),
+  ).toContainText("Engineering lead");
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "zai / shader-model · high",
+  );
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "Inherited from Backend coder",
+  );
+  const canvas = await page.locator(".office-canvas canvas").boundingBox();
+  const hitbox = await specialist.boundingBox();
+  expect(canvas).not.toBeNull();
+  expect(hitbox).not.toBeNull();
+  expect(
+    (hitbox!.x + hitbox!.width / 2 - canvas!.x) / canvas!.width,
+  ).toBeCloseTo(0.94, 2);
+  expect(
+    (hitbox!.y + hitbox!.height / 2 - canvas!.y) / canvas!.height,
+  ).toBeCloseTo(575 / 650, 2);
+  await page
+    .getByLabel("Send guidance", { exact: true })
+    .fill("Reuse the saved shader sources.");
+  await page.getByRole("button", { name: "Send guidance to agent" }).click();
+  await expect(
+    page.getByText("Guidance queued for the next agent boundary."),
+  ).toBeVisible();
+  expect(
+    requests.find((request) => request.path.endsWith("/notes"))?.body,
+  ).toMatchObject({
+    agent_id: "specialist:run-fixture:0000000000000008",
+    content: "Reuse the saved shader sources.",
+  });
+  await page
+    .getByRole("button", {
+      name: "External shader monitor: Reading. Inspect agent",
+    })
+    .click();
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Department" }),
+  ).toContainText("Integrations");
+  await expect(inspector.locator(".agent-model-note")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Send guidance to agent" }),
+  ).toBeDisabled();
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "specialist-status",
+      seq: 20,
+      source: "harness",
+      agent_id: "specialist:run-fixture:0000000000000008",
+      run_id: "run-fixture",
+      activity: "reading",
+      summary: "Checking shader validation",
+      data: { tool_name: "compile" },
+      timestamp: "2026-10-18T10:00:04Z",
+    });
+  });
+  await page.getByRole("button", { name: "Open activity stream" }).click();
+  const row = page
+    .getByRole("dialog")
+    .locator(".timeline > button")
+    .filter({ hasText: "Checking shader validation" });
+  await expect(row).toContainText("Shader specialist 8");
+  await row.click();
+  await expect(
+    page.getByRole("button", {
+      name: "Shader specialist 8: Reading. Inspect agent",
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Search agents" })
+    .fill("Shader specialist");
+  await expect(page.locator(".agent-list .agent-row")).toHaveCount(8);
+  await page
+    .locator(".agent-list .agent-row")
+    .filter({ hasText: "Shader specialist 1" })
+    .click();
+  await page.getByRole("button", { name: "Office", exact: true }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "Shader specialist 1: Writing. Inspect agent",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Engineering specialists 1–4 of 8", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/engineering-specialists.png",
+    fullPage: true,
+  });
+});
+
+test("Tools R&D stays caller-controlled while its fixed model setting is configurable", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page
+    .getByRole("button", { name: "Tools R&D lead: Idle. Inspect agent" })
+    .click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(inspector.locator(".agent-access-note")).toHaveText(
+    "Only Planner or Engineering lead may call this agent.",
+  );
+  await expect(
+    page.getByRole("button", { name: "Send guidance to agent" }),
+  ).toBeDisabled();
+  await page.getByRole("tab", { name: "Files" }).click();
+  await expect(inspector.getByRole("link")).toHaveCount(0);
+  await expect(
+    inspector.getByText("0 task outputs", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByRole("tab", { name: "Files", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Apply to", exact: true })
+    .selectOption("tools_rd_lead");
+  await expect(dialog.locator(".agent-access-note")).toHaveText(
+    "Only Planner or Engineering lead may call this agent.",
+  );
+  await dialog
+    .getByRole("textbox", { name: "Model", exact: true })
+    .fill("tools-research-model");
+  await dialog
+    .getByRole("combobox", { name: "Reasoning", exact: true })
+    .selectOption("high");
+  await dialog
+    .getByRole("button", { name: "Save agent model", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText("Tools R&D lead");
+  expect(
+    requests.find(
+      (request) => request.path === "/api/settings/agents/tools_rd_lead",
+    )?.body,
+  ).toEqual({
+    provider: "configured",
+    model: "tools-research-model",
+    reasoning_effort: "high",
+  });
+  await expect(
+    dialog.getByRole("option", { name: /Shader specialist/ }),
+  ).toHaveCount(0);
+});
+
+test("agent file scopes isolate same-KR authors and label legacy worker context", async ({
+  page,
+}) => {
+  const alpha = "specialist:run-fixture:aaaaaaaaaaaaaaaa";
+  const beta = "specialist:run-fixture:bbbbbbbbbbbbbbbb";
+  const file = (
+    id: string,
+    actor?: string,
+    extras: Partial<Artifact> = {},
+  ): Artifact => ({
+    artifact_id: id,
+    name: `${id}.json`,
+    media_type: "application/json",
+    run_id: runId,
+    kr_id: "KR2",
+    size: 128,
+    ...(actor ? { scope: JSON.stringify([`work-${id}`, 0, actor]) } : {}),
+    ...extras,
+  });
+  await fixture(page, {}, [
+    file("alpha-output", alpha),
+    file("beta-output", beta),
+    file("malformed-claim", undefined, {
+      scope: JSON.stringify(["work", "0", alpha]),
+    }),
+    file("legacy-context"),
+    file("mission-wide", undefined, { kr_id: undefined }),
+    file("backend-own", "backend_coder"),
+    file("foreign-run", alpha, { run_id: "other-run" }),
+  ]);
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await page
+    .getByRole("button", { name: "System architect: Idle. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Files" }).click();
+  await expect(inspector.getByRole("link")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Files" }).click();
+  await expect(
+    inspector
+      .getByRole("region", { name: "Created by this agent", exact: true })
+      .getByRole("link", { name: /backend-own.json/ }),
+  ).toBeVisible();
+  await expect(
+    inspector
+      .getByRole("region", {
+        name: "Legacy key result context · author not recorded",
+        exact: true,
+      })
+      .getByRole("link", { name: /legacy-context.json/ }),
+  ).toBeVisible();
+  await expect(inspector.getByRole("link")).toHaveCount(2);
+  await page.evaluate(
+    ({ alpha, beta }) => {
+      const emit = (
+        window as unknown as { __officeEmit: (event: unknown) => void }
+      ).__officeEmit;
+      for (const [index, id, name] of [
+        [11, alpha, "Alpha specialist"],
+        [12, beta, "Beta specialist"],
+      ] as const)
+        emit({
+          event_id: `scoped-${index}`,
+          seq: index,
+          source: "harness",
+          agent_id: id,
+          run_id: "run-fixture",
+          kr_id: "KR2",
+          activity: "writing",
+          summary: "Writing scoped output",
+          data: {
+            agent_type: "engineering_specialist",
+            display_name: name,
+            parent_agent_id: "engineering_head",
+            model_parent: "backend_coder",
+          },
+          timestamp: "2026-10-18T10:00:02Z",
+        });
+    },
+    { alpha, beta },
+  );
+  for (const [name, artifact] of [
+    ["Alpha specialist", "alpha-output.json"],
+    ["Beta specialist", "beta-output.json"],
+  ]) {
+    await page
+      .getByRole("button", {
+        name: `${name}: Writing. Inspect agent`,
+        exact: true,
+      })
+      .click();
+    await page.getByRole("tab", { name: "Files" }).click();
+    await expect(inspector.getByRole("link")).toHaveCount(1);
+    await expect(
+      inspector
+        .getByRole("region", { name: "Created by this agent", exact: true })
+        .getByRole("link", { name: new RegExp(artifact) }),
+    ).toBeVisible();
+    await expect(inspector.getByText(/Legacy key result context/)).toHaveCount(
+      0,
+    );
+    await expect(
+      inspector.getByRole("link", {
+        name: /malformed-claim|foreign-run|mission-wide/,
+      }),
+    ).toHaveCount(0);
+  }
+});

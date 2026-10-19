@@ -8,6 +8,17 @@ export interface Role {
   x: number;
   y: number;
 }
+export interface OfficeRole extends Role {
+  kind: "fixed" | "specialist" | "internal" | "external";
+  parent_agent_id?: string;
+  model_parent?: string;
+}
+export interface PositionedAgent {
+  agent: AgentActivity;
+  role: OfficeRole;
+}
+export const specialistsPerPage = 4;
+export const integrationsPerPage = 3;
 export const roles: Role[] = [
   {
     id: "planner",
@@ -62,6 +73,15 @@ export const roles: Role[] = [
     color: "#a6c9e6",
     x: 796,
     y: 300,
+  },
+  {
+    id: "tools_rd_lead",
+    name: "Tools R&D lead",
+    title: "Tool research & development",
+    department: "Engineering",
+    color: "#c1b3e0",
+    x: 805,
+    y: 145,
   },
   {
     id: "system_architect",
@@ -165,18 +185,157 @@ export function routingSummary(triage: Run["triage"]): string {
 export function pretty(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-export function roleFor(id: string, index = 0): Role {
+export function agentMetadata(
+  agent: AgentActivity,
+  key: string,
+): string | undefined {
+  const value = agent.data?.[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+export function isEngineeringSpecialist(agent: AgentActivity): boolean {
   return (
-    roles.find((role) => role.id === id) ?? {
-      id,
-      name: pretty(id.includes(":") ? id.split(":").slice(1).join(":") : id),
-      title: "Connected agent",
-      department: "Integrations",
-      color: "#d2bca4",
-      x: [85, 225, 365, 635, 775, 915][Math.max(0, index) % 6],
-      y: 575,
-    }
+    agent.source === "harness" &&
+    agent.agent_id.startsWith("specialist:") &&
+    agentMetadata(agent, "agent_type") === "engineering_specialist"
   );
+}
+export function isExternalAgent(agent: AgentActivity): boolean {
+  return (
+    (!!agent.source && agent.source !== "harness") ||
+    (!agent.source && !roles.some((role) => role.id === agent.agent_id))
+  );
+}
+export function roleFor(value: string | AgentActivity, index = 0): OfficeRole {
+  const agent =
+    typeof value === "string"
+      ? { agent_id: value, activity: "idle" as const }
+      : value;
+  const id = agent.agent_id;
+  const external = isExternalAgent(agent);
+  const name =
+    agent.display_name ?? agent.name ?? agentMetadata(agent, "display_name");
+  const fixed = !external && roles.find((role) => role.id === id);
+  if (fixed)
+    return {
+      ...fixed,
+      name: name ?? fixed.name,
+      kind: "fixed",
+      parent_agent_id: agentMetadata(agent, "parent_agent_id"),
+    };
+  if (isEngineeringSpecialist(agent))
+    return {
+      id,
+      name: name ?? "Engineering specialist",
+      title: "Engineering specialist",
+      department: "Engineering",
+      color: "#a6c9e6",
+      x: [640, 740, 840, 940][Math.max(0, index) % specialistsPerPage],
+      y: 575,
+      kind: "specialist",
+      parent_agent_id:
+        agentMetadata(agent, "parent_agent_id") ?? "engineering_head",
+      model_parent:
+        agentMetadata(agent, "model_parent") ??
+        agentMetadata(agent, "base_role"),
+    };
+  if (!external)
+    return {
+      id,
+      name: name ?? pretty(id),
+      title:
+        id === "triage_router"
+          ? "Workflow routing · TypeSafe Jev"
+          : "Internal coordinator",
+      department: "Executive",
+      color: "#d9bbf3",
+      x: 500,
+      y: 225,
+      kind: "internal",
+    };
+  return {
+    id,
+    name:
+      name ?? pretty(id.includes(":") ? id.split(":").slice(1).join(":") : id),
+    title: "Connected agent",
+    department: "Integrations",
+    color: "#d2bca4",
+    x: [85, 225, 365][Math.max(0, index) % integrationsPerPage],
+    y: 575,
+    kind: "external",
+  };
+}
+export function officeRoster(
+  agents: AgentActivity[],
+  specialistPage = 0,
+  integrationPage = 0,
+) {
+  const ordered = [...agents].sort((a, b) =>
+    a.agent_id.localeCompare(b.agent_id),
+  );
+  const specialists = ordered.filter(isEngineeringSpecialist);
+  const integrations = ordered.filter(isExternalAgent);
+  const specialistPages = Math.max(
+    1,
+    Math.ceil(specialists.length / specialistsPerPage),
+  );
+  const integrationPages = Math.max(
+    1,
+    Math.ceil(integrations.length / integrationsPerPage),
+  );
+  const currentSpecialistPage = Math.max(
+    0,
+    Math.min(specialistPage, specialistPages - 1),
+  );
+  const currentIntegrationPage = Math.max(
+    0,
+    Math.min(integrationPage, integrationPages - 1),
+  );
+  const positioned: PositionedAgent[] = [
+    ...agents
+      .filter(
+        (agent) => !isExternalAgent(agent) && !isEngineeringSpecialist(agent),
+      )
+      .map((agent) => ({ agent, role: roleFor(agent) })),
+    ...specialists
+      .slice(
+        currentSpecialistPage * specialistsPerPage,
+        (currentSpecialistPage + 1) * specialistsPerPage,
+      )
+      .map((agent, index) => ({ agent, role: roleFor(agent, index) })),
+    ...integrations
+      .slice(
+        currentIntegrationPage * integrationsPerPage,
+        (currentIntegrationPage + 1) * integrationsPerPage,
+      )
+      .map((agent, index) => ({ agent, role: roleFor(agent, index) })),
+  ];
+  return {
+    positioned,
+    specialists,
+    integrations,
+    specialistPages,
+    integrationPages,
+    specialistPage: currentSpecialistPage,
+    integrationPage: currentIntegrationPage,
+  };
+}
+export function handoffEndpoints(
+  event: ActivityEvent,
+  positioned: PositionedAgent[],
+) {
+  const raw = event.data?.target_agent_id ?? event.data?.to_agent_id;
+  if (typeof raw !== "string") return undefined;
+  const target =
+    event.source &&
+    event.source !== "harness" &&
+    !raw.startsWith(`${event.source}:`)
+      ? `${event.source}:${raw}`
+      : raw;
+  const from = positioned.find(
+    ({ agent }) => agent.agent_id === event.agent_id,
+  )?.role;
+  const to = positioned.find(({ agent }) => agent.agent_id === target)?.role;
+  return from && to ? { from, to } : undefined;
 }
 export function normalizeAgent<T extends AgentActivity>(agent: T): T {
   if (!agent.source || agent.source === "harness") return agent;
@@ -201,7 +360,31 @@ export function projectEvent(
   if (!event.agent_id) return agents;
   const current = agents[event.agent_id];
   if (current?.seq !== undefined && current.seq >= event.seq) return agents;
-  return { ...agents, [event.agent_id]: { ...current, ...event } };
+  const retainedIdentity =
+    current?.source === "harness" &&
+    event.source === "harness" &&
+    current.run_id === event.run_id
+      ? Object.fromEntries(
+          [
+            "agent_type",
+            "display_name",
+            "parent_agent_id",
+            "department",
+            "model_parent",
+            "base_role",
+          ].flatMap((key) =>
+            current.data?.[key] === undefined ? [] : [[key, current.data[key]]],
+          ),
+        )
+      : {};
+  return {
+    ...agents,
+    [event.agent_id]: {
+      ...current,
+      ...event,
+      data: { ...retainedIdentity, ...event.data },
+    },
+  };
 }
 export function appendEvent(
   events: ActivityEvent[],

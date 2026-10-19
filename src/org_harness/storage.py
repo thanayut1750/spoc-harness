@@ -13,6 +13,53 @@ from typing import Any, cast
 from uuid import uuid4
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
+_AGENT_IDENTITY_FIELDS = (
+    "agent_type",
+    "display_name",
+    "parent_agent_id",
+    "department",
+    "model_parent",
+    "base_role",
+)
+
+
+def _internal_agent_type(event: dict) -> str | None:
+    if event.get("source") != "harness" or not isinstance(event.get("data"), dict):
+        return None
+    agent_id = event.get("agent_id", "")
+    agent_type = event["data"].get("agent_type")
+    if (
+        isinstance(agent_id, str)
+        and agent_id.startswith("specialist:")
+        and agent_type == "engineering_specialist"
+    ) or (agent_id == "tools_rd_lead" and agent_type == "tools_rd_lead"):
+        return agent_type
+    return None
+
+
+def _retain_internal_agent_identity(event: dict, previous: dict | None) -> None:
+    """Keep public identity through status events without carrying old work evidence."""
+    if event.get("source") != "harness" or not isinstance(event.get("data"), dict):
+        return
+    if (
+        previous
+        and isinstance(event.get("run_id"), str)
+        and event["run_id"]
+        and event["run_id"] == previous.get("run_id")
+        and event.get("agent_id") == previous.get("agent_id")
+        and (previous_type := _internal_agent_type(previous))
+        and event["data"].get("agent_type", previous_type) == previous_type
+    ):
+        event["data"] = {
+            **{
+                key: value
+                for key, value in previous["data"].items()
+                if key in _AGENT_IDENTITY_FIELDS and isinstance(value, str)
+            },
+            **event["data"],
+        }
+    if _internal_agent_type(event) and isinstance(event["data"].get("display_name"), str):
+        event["display_name"] = event["data"]["display_name"]
 
 
 class NotFoundError(LookupError):
@@ -340,9 +387,10 @@ class MemoryStorage:
             event.setdefault("timestamp", timestamp())
             event.setdefault("data", {})
             event.setdefault("summary", "")
+            projection_key = f"{event['source']}:{event['agent_id']}"
+            _retain_internal_agent_identity(event, self.projection.get(projection_key))
             self.events.append(event)
             self.event_ids[key] = event
-            projection_key = f"{event['source']}:{event['agent_id']}"
             self.projection[projection_key] = event
             return copy.deepcopy(event)
 
@@ -774,6 +822,13 @@ class PostgresStorage:
             ).fetchone()
             if row:
                 return {"schema_version": 1, **row["data"], "seq": row["seq"]}
+            projection_key = f"{event['source']}:{event['agent_id']}"
+            previous = await (
+                await conn.execute(
+                    "SELECT data FROM harness_projection WHERE agent_key=%s", (projection_key,)
+                )
+            ).fetchone()
+            _retain_internal_agent_identity(event, previous["data"] if previous else None)
             row = await (
                 await conn.execute(
                     "INSERT INTO harness_events(source,event_id,run_id,data) VALUES(%s,%s,%s,%s) RETURNING seq",
@@ -784,7 +839,7 @@ class PostgresStorage:
             event["seq"] = row["seq"]
             await conn.execute(
                 "INSERT INTO harness_projection(agent_key,data) VALUES(%s,%s) ON CONFLICT(agent_key) DO UPDATE SET data=excluded.data",
-                (f"{event['source']}:{event['agent_id']}", self._json(event)),
+                (projection_key, self._json(event)),
             )
             return event
 

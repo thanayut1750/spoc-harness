@@ -161,6 +161,33 @@ async def test_silent_command_has_receipt_instead_of_empty_output_artifacts(tmp_
     assert json.loads(content)["exit_code"] == 0
 
 
+@pytest.mark.parametrize(("stdout_size", "stderr_size"), [(32768, 32769), (32769, 32768)])
+async def test_command_preview_marks_truncation_and_preserves_full_logs(
+    tmp_path, stdout_size, stderr_size
+):
+    storage, run, artifacts, host = await make_host(tmp_path)
+    command = (
+        'python3 -c "import sys; '
+        f"sys.stdout.write('x' * {stdout_size}); sys.stderr.write('y' * {stderr_size})\""
+    )
+    result = await host.run_command("bounded-preview", command)
+    assert result["exit_code"] == 0
+    assert result["stdout"] == "x" * 32768
+    assert result["stderr"] == "y" * 32768
+    assert result["stdout_truncated"] is (stdout_size > 32768)
+    assert result["stderr_truncated"] is (stderr_size > 32768)
+    assert await host.run_command("bounded-preview", command) == result
+    saved = await storage.list_artifacts(run["run_id"])
+    for suffix, size, byte in (("stdout", stdout_size, b"x"), ("stderr", stderr_size, b"y")):
+        log = next(item for item in saved if item["name"].endswith(f".{suffix}.txt"))
+        assert log["size"] == size
+        assert Path(log["path"]).read_bytes() == byte * size
+    receipt = next(item for item in saved if item["kind"] == "command_result")
+    _, content = await artifacts.read(receipt["artifact_id"], limit=None)
+    assert json.loads(content)["stdout_truncated"] is result["stdout_truncated"]
+    assert json.loads(content)["stderr_truncated"] is result["stderr_truncated"]
+
+
 async def test_cached_operation_rejects_a_different_request(tmp_path):
     _, _, _, host = await make_host(tmp_path)
     await host.run_command("reused-id", "true")

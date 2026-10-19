@@ -1,6 +1,9 @@
 """Immutable boundary contracts for graph execution, tools, and HTTP clients."""
 
-from typing import Any, Literal
+import hashlib
+import json
+import re
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,7 +34,23 @@ ConfigurableAgent = Literal[
     "data_analyst",
     "system_architect",
     "backend_coder",
+    "tools_rd_lead",
 ]
+
+EngineeringToolName = Literal[
+    "read_file",
+    "write_file",
+    "publish_file",
+    "read_artifact",
+    "read_web_page",
+    "run_command",
+    "validate_code_syntax",
+    "run_mission_tool",
+]
+ENGINEERING_TOOL_NAMES = frozenset(get_args(EngineeringToolName))
+# Task-specific selections narrow optional capabilities. Every specialist still
+# needs the artifact protocol to read evidence, save outputs, and report blockers.
+ENGINEERING_CORE_TOOL_NAMES = frozenset({"write_file", "read_artifact", "escalate_blocker"})
 
 
 class Contract(BaseModel):
@@ -95,6 +114,22 @@ class StrategicPlan(Contract):
     objectives: tuple[StrategicObjective, ...] = Field(min_length=1, max_length=3)
 
 
+class EngineeringSpecialistSpec(Contract):
+    """Task instructions and optional capabilities; core artifact tools always remain available."""
+
+    name: str = Field(min_length=1, max_length=80)
+    instructions: str = Field(min_length=1, max_length=12000)
+    tools: tuple[EngineeringToolName, ...] = ()
+
+    @model_validator(mode="after")
+    def valid_specialist(self) -> "EngineeringSpecialistSpec":
+        if not self.name.strip() or not self.instructions.strip():
+            raise ValueError("Specialist name and instructions must not be blank")
+        if len(set(self.tools)) != len(self.tools):
+            raise ValueError("Specialist tool names must be unique")
+        return self
+
+
 class WorkPackage(Contract):
     work_package_id: str = Field(min_length=1)
     kr_id: str = Field(min_length=1)
@@ -103,6 +138,25 @@ class WorkPackage(Contract):
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
     execution_attempt: int = Field(default=0, ge=0)
     critical: bool = True
+    specialist: EngineeringSpecialistSpec | None = None
+
+
+def worker_agent_id(run_id: str, work: WorkPackage) -> str:
+    """Derive a stable identity; model output cannot impersonate another agent."""
+    if work.specialist is None:
+        return work.role
+    scope = (
+        run_id
+        if re.fullmatch(r"[a-zA-Z0-9-]{1,40}", run_id)
+        else hashlib.sha256(run_id.encode()).hexdigest()[:32]
+    )
+    definition = [run_id, work.kr_id, work.work_package_id, work.role, work.specialist.model_dump()]
+    digest = hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest()[:16]
+    return f"specialist:{scope}:{digest}"
+
+
+def worker_agent_name(work: WorkPackage) -> str:
+    return work.specialist.name if work.specialist else work.role.replace("_", " ").title()
 
 
 class TacticalPlan(Contract):
