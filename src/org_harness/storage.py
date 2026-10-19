@@ -7,13 +7,14 @@ import copy
 import hashlib
 import json
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from itertools import islice
 from typing import Any, cast
 from uuid import uuid4
 
+from org_harness.models import RunBudgetUpdate
 from org_harness.text_safety import require_json_text
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
@@ -169,9 +170,28 @@ def new_run(payload: dict) -> dict:
 def apply_command(run: dict, kind: str, payload: dict) -> dict:
     """Validate lifecycle changes in one place for memory and SQL transactions."""
     status = run["status"]
-    if status in TERMINAL and not (status == "failed" and kind == "retry"):
+    if status in TERMINAL and not (status == "failed" and kind in {"retry", "budgets"}):
         raise ConflictError(f"Run is already {status}")
-    if kind == "retry":
+    if kind == "budgets":
+        if status not in {"paused", "review", "failed"} or run.get("cancel_requested"):
+            raise ConflictError("Only paused, review, or failed runs can update budgets")
+        changes = RunBudgetUpdate.model_validate(payload).model_dump(
+            mode="json", exclude_unset=True
+        )
+        before = copy.deepcopy(run.get("limits", {}))
+        run.setdefault("original_limits", before)
+        run["limits"] = {**before, **changes}
+        run["budget_history"] = [
+            *run.get("budget_history", []),
+            {
+                "updated_at": timestamp(),
+                "changes": changes,
+                "previous_limits": before,
+                "model_calls": run.get("model_calls", 0),
+                "tool_calls": run.get("tool_calls", 0),
+            },
+        ]
+    elif kind == "retry":
         if status != "failed":
             raise ConflictError("Only failed runs can retry execution")
         history = list(run.get("failure_history", []))
@@ -265,12 +285,22 @@ class MemoryStorage:
             return copy.deepcopy(self.settings.get(key))
 
     async def save_setting(self, key: str, value: dict) -> None:
-        async with self.lock:
-            self.settings[key] = copy.deepcopy(value)
+        await self.update_setting(key, lambda _: value)
 
     async def delete_setting(self, key: str) -> None:
+        await self.update_setting(key, lambda _: None)
+
+    async def update_setting(
+        self, key: str, transform: Callable[[dict | None], dict | None]
+    ) -> dict | None:
+        """Apply one synchronous setting transform without losing sibling fields."""
         async with self.lock:
-            self.settings.pop(key, None)
+            updated = transform(copy.deepcopy(self.settings.get(key)))
+            if updated is None:
+                self.settings.pop(key, None)
+            else:
+                self.settings[key] = copy.deepcopy(updated)
+            return copy.deepcopy(updated)
 
     async def get_reset_generation(self) -> str:
         return self.reset_generation
@@ -339,18 +369,24 @@ class MemoryStorage:
         idempotency_key: str | None = None,
         *,
         request_payload: dict | None = None,
+        previous_request_payload: dict | None = None,
         legacy_request_payload: dict | None = None,
     ) -> dict:
         async with self.lock:
             value = {"create_run": request_payload if request_payload is not None else payload}
-            try:
-                cached = self._cached(idempotency_key, value)
-            except ConflictError:
-                if legacy_request_payload is None:
-                    raise
-                cached = self._cached(idempotency_key, {"create_run": legacy_request_payload})
-                if cached is None:
-                    raise
+            candidates = [value] + [
+                {"create_run": compatible}
+                for compatible in (previous_request_payload, legacy_request_payload)
+                if compatible is not None
+            ]
+            cached = None
+            for index, candidate in enumerate(candidates):
+                try:
+                    cached = self._cached(idempotency_key, candidate)
+                    break
+                except ConflictError:
+                    if index == len(candidates) - 1:
+                        raise
             if cached:
                 return cached
             run = new_run(copy.deepcopy(payload))
@@ -397,6 +433,10 @@ class MemoryStorage:
             cached = self._cached(idempotency_key, value)
             if cached:
                 return cached
+            # The memory critical section has no suspension points after this
+            # check, so a worker cannot acquire its guard before the write ends.
+            if kind == "budgets" and self.worker_guard.locked():
+                raise ConflictError("Cannot update budgets while a worker is executing")
             if run_id not in self.runs:
                 raise RunNotFoundError("Run not found")
             run = apply_command(copy.deepcopy(self.runs[run_id]), kind, payload)
@@ -417,7 +457,11 @@ class MemoryStorage:
                     operation_id = (run.get("review") or {}).get("operation_id")
                     if operation_id in self.operations:
                         self.operations[operation_id]["status"] = "retry_approved"
-            result = {"run_id": run_id, "status": run["status"]}
+            result = (
+                copy.deepcopy(run)
+                if kind == "budgets"
+                else {"run_id": run_id, "status": run["status"]}
+            )
             self._save(idempotency_key, value, result)
             return result
 
@@ -548,7 +592,7 @@ class MemoryStorage:
             run = self.runs[run_id]
             field = f"{kind}_calls"
             limit = run.get("limits", {}).get(f"max_{kind}_calls", 100 if kind == "model" else 200)
-            unlimited = kind == "model" and limit is None
+            unlimited = limit is None
             if not unlimited and run[field] + amount > limit:
                 raise BudgetExceeded(f"Run {kind} call budget exhausted")
             run[field] += amount
@@ -729,15 +773,32 @@ class PostgresStorage:
             return row["data"] if row else None
 
     async def save_setting(self, key: str, value: dict) -> None:
-        async with self.pool.connection() as conn:
-            await conn.execute(
-                "INSERT INTO harness_settings(key,data) VALUES (%s,%s) ON CONFLICT(key) DO UPDATE SET data=excluded.data",
-                (key, self._json(value)),
-            )
+        await self.update_setting(key, lambda _: value)
 
     async def delete_setting(self, key: str) -> None:
-        async with self.pool.connection() as conn:
-            await conn.execute("DELETE FROM harness_settings WHERE key=%s", (key,))
+        await self.update_setting(key, lambda _: None)
+
+    async def update_setting(
+        self, key: str, transform: Callable[[dict | None], dict | None]
+    ) -> dict | None:
+        async with self.pool.connection() as conn, conn.transaction():
+            # Unlike a row lock, this also serializes the first creation of a
+            # setting. Replacements and deletions use this same key namespace.
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,2))", (key,))
+            row = await (
+                await conn.execute(
+                    "SELECT data FROM harness_settings WHERE key=%s FOR UPDATE", (key,)
+                )
+            ).fetchone()
+            updated = transform(row["data"] if row else None)
+            if updated is None:
+                await conn.execute("DELETE FROM harness_settings WHERE key=%s", (key,))
+            else:
+                await conn.execute(
+                    "INSERT INTO harness_settings(key,data) VALUES (%s,%s) ON CONFLICT(key) DO UPDATE SET data=excluded.data",
+                    (key, self._json(updated)),
+                )
+            return updated
 
     async def get_reset_generation(self) -> str:
         value = await self.get_setting("reset_generation")
@@ -818,20 +879,24 @@ class PostgresStorage:
         idempotency_key: str | None = None,
         *,
         request_payload: dict | None = None,
+        previous_request_payload: dict | None = None,
         legacy_request_payload: dict | None = None,
     ) -> dict:
         async with self.pool.connection() as conn, conn.transaction():
             value = {"create_run": request_payload if request_payload is not None else payload}
-            try:
-                cached = await self._cached(conn, idempotency_key, value)
-            except ConflictError:
-                if legacy_request_payload is None:
-                    raise
-                cached = await self._cached(
-                    conn, idempotency_key, {"create_run": legacy_request_payload}
-                )
-                if cached is None:
-                    raise
+            candidates = [value] + [
+                {"create_run": compatible}
+                for compatible in (previous_request_payload, legacy_request_payload)
+                if compatible is not None
+            ]
+            cached = None
+            for index, candidate in enumerate(candidates):
+                try:
+                    cached = await self._cached(conn, idempotency_key, candidate)
+                    break
+                except ConflictError:
+                    if index == len(candidates) - 1:
+                        raise
             if cached:
                 return cached
             run = new_run(payload)
@@ -893,6 +958,15 @@ class PostgresStorage:
             cached = await self._cached(conn, idempotency_key, value)
             if cached:
                 return cached
+            if kind == "budgets":
+                # Same advisory identity as worker_lock, scoped to this atomic
+                # command. Cached replays above remain safe during execution.
+                guard = await (
+                    await conn.execute("SELECT pg_try_advisory_xact_lock(73910404) AS acquired")
+                ).fetchone()
+                assert guard is not None
+                if not guard["acquired"]:
+                    raise ConflictError("Cannot update budgets while a worker is executing")
             row = await (
                 await conn.execute(
                     "SELECT data FROM harness_runs WHERE run_id=%s FOR UPDATE", (run_id,)
@@ -925,7 +999,11 @@ class PostgresStorage:
                 await conn.execute(
                     "UPDATE harness_jobs SET owner=NULL,lease_until=NULL WHERE run_id=%s", (run_id,)
                 )
-            result = {"run_id": run_id, "status": run["status"]}
+            result = (
+                copy.deepcopy(run)
+                if kind == "budgets"
+                else {"run_id": run_id, "status": run["status"]}
+            )
             await self._save(conn, idempotency_key, value, result)
             return result
 
@@ -1130,7 +1208,7 @@ class PostgresStorage:
             run = row["data"]
             field = f"{kind}_calls"
             limit = run.get("limits", {}).get(f"max_{kind}_calls", 100 if kind == "model" else 200)
-            unlimited = kind == "model" and limit is None
+            unlimited = limit is None
             if not unlimited and run[field] + amount > limit:
                 raise BudgetExceeded(f"Run {kind} call budget exhausted")
             run[field] += amount

@@ -161,7 +161,11 @@ it("rejects malformed history and nonadvancing pagination instead of silently hi
   await expect(api.history({})).rejects.toThrow("invalid activity history");
 });
 it("saves only workspace call budgets through a separate endpoint and preserves model settings in the response", async () => {
-  const budget = { max_model_calls: 240, worker_model_calls: 24 };
+  const budget = {
+    max_model_calls: 240,
+    worker_model_calls: 24,
+    max_tool_calls: 500,
+  };
   const selection = {
     provider: "configured",
     model: "saved-model",
@@ -185,11 +189,11 @@ it("saves only workspace call budgets through a separate endpoint and preserves 
   });
 });
 it.each([
-  { max_model_calls: null, worker_model_calls: 12 },
-  { max_model_calls: 100, worker_model_calls: null },
-  { max_model_calls: null, worker_model_calls: null },
+  { max_model_calls: null, worker_model_calls: 12, max_tool_calls: 200 },
+  { max_model_calls: 100, worker_model_calls: null, max_tool_calls: null },
+  { max_model_calls: null, worker_model_calls: null, max_tool_calls: null },
 ])(
-  "sends both budget keys including explicit unlimited values: %j",
+  "sends all budget keys including independent unlimited values: %j",
   async (budget) => {
     const fetch = vi
       .fn()
@@ -202,7 +206,66 @@ it.each([
     });
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(budget);
     expect(Object.keys(JSON.parse(fetch.mock.calls[0][1].body)).sort()).toEqual(
-      ["max_model_calls", "worker_model_calls"],
+      ["max_model_calls", "max_tool_calls", "worker_model_calls"],
     );
   },
 );
+it("sends the legacy tool default explicitly without changing either model cap", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ model_call_budget: {} })));
+  vi.stubGlobal("fetch", fetch);
+  await api.saveCallBudget({ max_model_calls: null, worker_model_calls: null });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    max_model_calls: null,
+    worker_model_calls: null,
+    max_tool_calls: 200,
+  });
+});
+it("updates one mission's saved budgets without a lifecycle action or counter reset", async () => {
+  const budget = {
+    max_model_calls: null,
+    worker_model_calls: null,
+    max_tool_calls: null,
+  };
+  const updated = {
+    run_id: "run/one",
+    status: "review",
+    user_request: "Finish the visualization",
+    limits: { ...budget, worker_timeout: 3600 },
+    model_calls: 118,
+    tool_calls: 200,
+    review: { interrupt_id: "original-review", kind: "blocked" },
+  };
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify(updated)));
+  vi.stubGlobal("fetch", fetch);
+  await expect(api.updateRunBudgets("run/one", budget)).resolves.toEqual(
+    updated,
+  );
+  expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/runs/run%2Fone/budgets", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(budget),
+  });
+});
+it("surfaces a mission budget conflict without retrying or resuming it", async () => {
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({ detail: "An active worker is still running" }),
+      {
+        status: 409,
+      },
+    ),
+  );
+  vi.stubGlobal("fetch", fetch);
+  await expect(
+    api.updateRunBudgets("run", {
+      max_model_calls: null,
+      worker_model_calls: null,
+      max_tool_calls: null,
+    }),
+  ).rejects.toThrow("An active worker is still running");
+  expect(fetch).toHaveBeenCalledOnce();
+});

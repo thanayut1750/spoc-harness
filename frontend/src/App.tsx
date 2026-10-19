@@ -1801,6 +1801,18 @@ export default function App() {
             loadError={settingsError}
             initialSection={settingsSection}
             onSaved={setSettings}
+            selectedRun={run}
+            onRunUpdated={(updated) => {
+              if (selectedRun.current !== updated.run_id) return;
+              dataEpoch.current += 1;
+              setRun(updated);
+              setRuns((current) =>
+                current.map((item) =>
+                  item.run_id === updated.run_id ? updated : item,
+                ),
+              );
+              void refreshRuns();
+            }}
             onRegenesis={regenesis}
             onReload={() => void reloadSettings()}
           />

@@ -73,20 +73,36 @@ class Constitution(Contract):
 
 MaxModelCalls = Annotated[int, Field(ge=1, le=10000)] | None
 WorkerModelCalls = Annotated[int, Field(ge=1, le=100)] | None
+MaxToolCalls = Annotated[int, Field(ge=1, le=100000)] | None
 
 
 class ModelCallBudget(Contract):
     max_model_calls: MaxModelCalls = 100
     worker_model_calls: WorkerModelCalls = 12
+    max_tool_calls: MaxToolCalls = 200
 
 
 class ModelCallBudgetUpdate(Contract):
     max_model_calls: MaxModelCalls
     worker_model_calls: WorkerModelCalls
+    # Older clients send only the two model fields. The API preserves the saved
+    # tool limit when this field is omitted, including an existing unlimited cap.
+    max_tool_calls: MaxToolCalls = 200
+
+
+class RunBudgetUpdate(Contract):
+    max_model_calls: MaxModelCalls = None
+    worker_model_calls: WorkerModelCalls = None
+    max_tool_calls: MaxToolCalls = None
+
+    @model_validator(mode="after")
+    def nonempty_update(self) -> "RunBudgetUpdate":
+        if not self.model_fields_set:
+            raise ValueError("At least one budget field is required")
+        return self
 
 
 class RunLimits(ModelCallBudget):
-    max_tool_calls: int = Field(default=200, ge=1, le=100000)
     command_timeout: int = Field(default=300, ge=1, le=86400)
     worker_timeout: float = Field(default=3600, ge=0.01, le=3600)
 

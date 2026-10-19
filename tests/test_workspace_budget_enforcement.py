@@ -64,8 +64,11 @@ async def test_workspace_budget_controls_real_seventeen_turn_worker_and_global_e
             saved_budget = {"max_model_calls": mission_budget, "worker_model_calls": 17}
             saved = await client.put("/api/settings/budgets", json=saved_budget)
             assert saved.status_code == 200
-            assert saved.json()["model_call_budget"] == saved_budget
-            assert (await client.get("/api/settings")).json()["model_call_budget"] == saved_budget
+            assert saved.json()["model_call_budget"] == {**saved_budget, "max_tool_calls": 200}
+            assert (await client.get("/api/settings")).json()["model_call_budget"] == {
+                **saved_budget,
+                "max_tool_calls": 200,
+            }
             response = await client.post(
                 "/api/runs",
                 json={

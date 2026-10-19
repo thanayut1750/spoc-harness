@@ -17,6 +17,8 @@ from org_harness.storage import MemoryStorage
         {"max_model_calls": None, "worker_model_calls": 17},
         {"max_model_calls": 500, "worker_model_calls": None},
         {"max_model_calls": None, "worker_model_calls": None},
+        {"max_model_calls": None, "worker_model_calls": None, "max_tool_calls": None},
+        {"max_model_calls": 500, "worker_model_calls": 17, "max_tool_calls": 900},
     ],
 )
 async def test_cli_submission_uses_saved_budgets_without_baking_in_schema_defaults(

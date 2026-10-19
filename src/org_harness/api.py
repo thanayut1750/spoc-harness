@@ -25,6 +25,7 @@ from org_harness.models import (
     ModelCallBudgetUpdate,
     ModelSelection,
     ReviewDecision,
+    RunBudgetUpdate,
     RunCreate,
 )
 from org_harness.storage import ConflictError, MemoryStorage, NotFoundError, create_storage
@@ -202,9 +203,16 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
         # optional request fields preserve their existing omitted representation.
         payload["limits"] = body.limits.model_dump(mode="json")
         legacy_request_payload = dict(payload)
-        request_payload = {
+        previous_request_payload = {
             "fingerprint_version": 2,
             "request": legacy_request_payload,
+            "explicit_budget_fields": sorted(
+                body.limits.model_fields_set & {"max_model_calls", "worker_model_calls"}
+            ),
+        }
+        request_payload = {
+            **previous_request_payload,
+            "fingerprint_version": 3,
             "explicit_budget_fields": sorted(
                 body.limits.model_fields_set & ModelCallBudget.model_fields.keys()
             ),
@@ -262,6 +270,7 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             payload,
             idempotency_key,
             request_payload=request_payload,
+            previous_request_payload=previous_request_payload,
             legacy_request_payload=legacy_request_payload,
         )
         await storage.emit(
@@ -287,7 +296,14 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
 
     @app.put("/api/settings/budgets")
     async def save_model_call_budget(body: ModelCallBudgetUpdate):
-        await storage.save_setting("model_call_budget", body.model_dump(mode="json"))
+        def patch(current: dict | None) -> dict:
+            budget = ModelCallBudget.model_validate(current or {})
+            return {
+                **budget.model_dump(mode="json"),
+                **body.model_dump(mode="json", exclude_unset=True),
+            }
+
+        await storage.update_setting("model_call_budget", patch)
         return await get_settings()
 
     @app.put("/api/settings/model")
@@ -305,19 +321,20 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
             settings.validate_model_selection(body)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
-        selections = await storage.get_setting("agent_model_configs") or {}
-        selections[agent_id] = body.model_dump(mode="json")
-        await storage.save_setting("agent_model_configs", selections)
+        await storage.update_setting(
+            "agent_model_configs",
+            lambda current: {**(current or {}), agent_id: body.model_dump(mode="json")},
+        )
         return await get_settings()
 
     @app.delete("/api/settings/agents/{agent_id}")
     async def inherit_agent_model(agent_id: ConfigurableAgent):
-        selections = await storage.get_setting("agent_model_configs") or {}
-        selections.pop(agent_id, None)
-        if selections:
-            await storage.save_setting("agent_model_configs", selections)
-        else:
-            await storage.delete_setting("agent_model_configs")
+        def remove(current: dict | None) -> dict | None:
+            selections = dict(current or {})
+            selections.pop(agent_id, None)
+            return selections or None
+
+        await storage.update_setting("agent_model_configs", remove)
         return await get_settings()
 
     @app.post("/api/regenesis")
@@ -337,6 +354,16 @@ def create_app(settings: Settings | None = None, storage: Any = None) -> FastAPI
     @app.get("/api/runs/{run_id}")
     async def run_detail(run_id: str):
         return await reviewed_run_view(storage, await storage.get_run(run_id))
+
+    @app.put("/api/runs/{run_id}/budgets")
+    async def update_run_budgets(
+        run_id: str, body: RunBudgetUpdate, idempotency_key: str | None = Header(default=None)
+    ):
+        result = await storage.command(
+            run_id, "budgets", body.model_dump(mode="json", exclude_unset=True), idempotency_key
+        )
+        await activity(run_id, "budgets updated", idempotency_key)
+        return await reviewed_run_view(storage, result)
 
     @app.post("/api/runs/{run_id}/pause")
     async def pause(run_id: str, idempotency_key: str | None = Header(default=None)):

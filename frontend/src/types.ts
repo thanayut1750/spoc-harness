@@ -158,6 +158,13 @@ export interface Run {
   review?: Review;
   report?: string;
   error?: string | null;
+  limits?: Partial<ModelCallBudget> & {
+    worker_timeout?: number;
+    command_timeout?: number;
+  };
+  model_calls?: number;
+  tool_calls?: number;
+  cancel_requested?: boolean;
 }
 export interface Artifact {
   artifact_id: string;
@@ -210,6 +217,8 @@ export interface ProviderConfig {
 export interface ModelCallBudget {
   max_model_calls: number | null;
   worker_model_calls: number | null;
+  /** Older settings responses omit the tool cap; their default is 200. */
+  max_tool_calls?: number | null;
 }
 export interface WorkspaceSettings {
   defaults: ModelConfig;

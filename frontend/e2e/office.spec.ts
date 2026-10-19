@@ -51,7 +51,11 @@ const defaultSettings: WorkspaceSettings = {
   ],
   triage: { model: "jev-1.13.0", configured: true },
   worker_timeout: 3600,
-  model_call_budget: { max_model_calls: 100, worker_model_calls: 12 },
+  model_call_budget: {
+    max_model_calls: 100,
+    worker_model_calls: 12,
+    max_tool_calls: 200,
+  },
   web_search: { provider: "exa", configured: true },
   agent_model_configs: {},
 };
@@ -85,6 +89,15 @@ const initialRun: Run = {
   ],
   progress: { KR1: "passed", KR2: "running" },
   outcomes: {},
+  limits: {
+    max_model_calls: 100,
+    worker_model_calls: 12,
+    max_tool_calls: 200,
+    worker_timeout: 3600,
+    command_timeout: 300,
+  },
+  model_calls: 10,
+  tool_calls: 5,
 
   constitution: { mission_statement: "Create practical tools with evidence." },
 };
@@ -100,13 +113,14 @@ async function fixture(
       kr_id: "KR2",
     },
   ],
+  settingsOverrides: Partial<WorkspaceSettings> = {},
 ) {
   let run: Run = {
     ...initialRun,
     model_config: defaultSettings.defaults,
     ...overrides,
   };
-  let settings = structuredClone(defaultSettings);
+  let settings = { ...structuredClone(defaultSettings), ...settingsOverrides };
   let didReset = false;
   const requests: { path: string; body: Record<string, unknown> }[] = [];
   await page.addInitScript(() => {
@@ -239,6 +253,17 @@ async function fixture(
       });
     }
     if (path === `/api/runs/${runId}`) return route.fulfill({ json: run });
+    if (path === `/api/runs/${runId}/budgets` && method === "PUT") {
+      const body = route.request().postDataJSON();
+      requests.push({ path, body });
+      if (!["paused", "review", "failed"].includes(run.status))
+        return route.fulfill({
+          status: 409,
+          json: { detail: "Pause the mission before changing its budgets." },
+        });
+      run = { ...run, limits: { ...run.limits, ...body } };
+      return route.fulfill({ json: run });
+    }
     if (path.endsWith("/artifacts")) return route.fulfill({ json: files });
     if (method === "POST") {
       const body = route.request().postDataJSON() ?? {};
@@ -2084,7 +2109,11 @@ test("workspace call budgets persist independently of model drafts and agent ove
   ).toHaveLength(1);
   expect(
     requests.find((request) => request.path === "/api/settings/budgets")?.body,
-  ).toEqual({ max_model_calls: 240, worker_model_calls: 24 });
+  ).toEqual({
+    max_model_calls: 240,
+    worker_model_calls: 24,
+    max_tool_calls: 200,
+  });
   await mission.fill("300");
   const workerUnlimited = dialog.getByRole("checkbox", {
     name: "No limit for agent model turns per invocation",
@@ -2171,7 +2200,7 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
   await workerUnlimited.check();
   await expect(save).toBeEnabled();
   await expect(
-    dialog.getByText(/timeouts, tool-call and revision limits still apply/),
+    dialog.getByText(/timeouts.*revision limits still apply/i),
   ).toBeVisible();
   let rejectSave = true;
   await page.route("**/api/settings/budgets", (route) =>
@@ -2184,7 +2213,7 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
   );
   await save.click();
   const budget = dialog.getByRole("region", {
-    name: "Model call budget",
+    name: "Call budgets",
     exact: true,
   });
   await expect(budget.getByRole("alert")).toContainText(
@@ -2200,7 +2229,11 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
     requests
       .filter((request) => request.path === "/api/settings/budgets")
       .at(-1)?.body,
-  ).toEqual({ max_model_calls: null, worker_model_calls: null });
+  ).toEqual({
+    max_model_calls: null,
+    worker_model_calls: null,
+    max_tool_calls: 200,
+  });
   await missionUnlimited.uncheck();
   await expect(mission).toHaveValue("240");
   await missionUnlimited.check();
@@ -2221,7 +2254,11 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
     requests
       .filter((request) => request.path === "/api/settings/budgets")
       .at(-1)?.body,
-  ).toEqual({ max_model_calls: 100, worker_model_calls: null });
+  ).toEqual({
+    max_model_calls: 100,
+    worker_model_calls: null,
+    max_tool_calls: 200,
+  });
   await page.reload();
   await page.getByRole("button", { name: "Workspace settings" }).click();
   await expect(missionUnlimited).not.toBeChecked();
@@ -2235,7 +2272,11 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
     requests
       .filter((request) => request.path === "/api/settings/budgets")
       .at(-1)?.body,
-  ).toEqual({ max_model_calls: null, worker_model_calls: 12 });
+  ).toEqual({
+    max_model_calls: null,
+    worker_model_calls: 12,
+    max_tool_calls: 200,
+  });
   await page.reload();
   await page.getByRole("button", { name: "Workspace settings" }).click();
   await expect(missionUnlimited).toBeChecked();
@@ -2245,6 +2286,170 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
     requests.some((request) => request.path === "/api/settings/model"),
   ).toBe(false);
 });
+test("tool No limit can be saved and explicitly applied to the exhausted mission without resuming it", async ({
+  page,
+}) => {
+  const recordedReview = {
+    interrupt_id: "budget-review",
+    kind: "blocked",
+    reason: "Run tool call budget exhausted",
+  };
+  const requests = await fixture(
+    page,
+    {
+      status: "review",
+      review: recordedReview,
+      model_calls: 110,
+      tool_calls: 200,
+      limits: {
+        max_model_calls: null,
+        worker_model_calls: null,
+        max_tool_calls: 200,
+        worker_timeout: 3600,
+        command_timeout: 300,
+      },
+    },
+    undefined,
+    {
+      // Existing two-field saved preferences did not remove the tool cap.
+      model_call_budget: {
+        max_model_calls: null,
+        worker_model_calls: null,
+      },
+    },
+  );
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const dialog = page.getByRole("dialog");
+  const budget = dialog.getByRole("region", {
+    name: "Call budgets",
+    exact: true,
+  });
+  const selected = budget.getByRole("region", {
+    name: "Selected mission call budgets",
+    exact: true,
+  });
+  const tools = budget.getByRole("spinbutton", {
+    name: "Tool calls per mission",
+    exact: true,
+  });
+  const toolUnlimited = budget.getByRole("checkbox", {
+    name: "No limit for tool calls per mission",
+    exact: true,
+  });
+  const apply = selected.getByRole("button", {
+    name: "Apply saved budgets to this mission",
+    exact: true,
+  });
+  await expect(tools).toHaveValue("200");
+  await expect(toolUnlimited).not.toBeChecked();
+  await expect(selected.getByText("200 used · limit: 200")).toBeVisible();
+  await expect(selected.getByText("110 used · limit: No limit")).toBeVisible();
+  await dialog
+    .getByRole("textbox", { name: "Model", exact: true })
+    .fill("unsaved-model-draft");
+  await toolUnlimited.check();
+  await expect(tools).toBeDisabled();
+  await expect(tools).toHaveValue("");
+  await expect(apply).toBeDisabled();
+  await expect(
+    selected.getByText("Save changes before applying them to this mission."),
+  ).toBeVisible();
+  await budget
+    .getByRole("button", { name: "Save call budget", exact: true })
+    .click();
+  await expect(apply).toBeEnabled();
+  expect(
+    requests.find((request) => request.path === "/api/settings/budgets")?.body,
+  ).toEqual({
+    max_model_calls: null,
+    worker_model_calls: null,
+    max_tool_calls: null,
+  });
+  // Saving defaults never silently changes a mission's recorded limits.
+  await expect(selected.getByText("200 used · limit: 200")).toBeVisible();
+  let rejectApply = true;
+  await page.route(`**/api/runs/${runId}/budgets`, (route) =>
+    rejectApply
+      ? route.fulfill({
+          status: 409,
+          json: { detail: "The worker is still finishing its current step." },
+        })
+      : route.fallback(),
+  );
+  await apply.click();
+  await expect(selected.getByRole("alert")).toContainText(
+    "worker is still finishing",
+  );
+  await expect(selected.getByText("200 used · limit: 200")).toBeVisible();
+  rejectApply = false;
+  await apply.click();
+  await expect(selected.getByRole("alert")).toHaveCount(0);
+  await expect(selected.getByRole("status")).toContainText(
+    "mission has not resumed",
+  );
+  await expect(selected.getByText("200 used · limit: No limit")).toBeVisible();
+  await expect(
+    dialog.getByRole("textbox", { name: "Model", exact: true }),
+  ).toHaveValue("unsaved-model-draft");
+  const current = await page.evaluate(
+    async (id) => (await fetch(`/api/runs/${id}`)).json(),
+    runId,
+  );
+  expect(current).toMatchObject({
+    status: "review",
+    review: recordedReview,
+    model_calls: 110,
+    tool_calls: 200,
+    limits: {
+      max_model_calls: null,
+      worker_model_calls: null,
+      max_tool_calls: null,
+      worker_timeout: 3600,
+      command_timeout: 300,
+    },
+  });
+  expect(
+    requests.find((request) => request.path === `/api/runs/${runId}/budgets`)
+      ?.body,
+  ).toEqual({
+    max_model_calls: null,
+    worker_model_calls: null,
+    max_tool_calls: null,
+  });
+  expect(
+    requests.some((request) => /\/(resume|retry)$/.test(request.path)),
+  ).toBe(false);
+  await toolUnlimited.uncheck();
+  await expect(tools).toHaveValue("200");
+  await expect(apply).toBeDisabled();
+  // Unsaved edits cannot reapply the old finite value by accident.
+  await expect(selected.getByText("200 used · limit: No limit")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/tool-budget-recovery.png",
+    fullPage: true,
+  });
+});
+
+test("running missions expose actual usage without allowing a live budget replacement", async ({
+  page,
+}) => {
+  const requests = await fixture(page);
+  await page.getByRole("button", { name: "Workspace settings" }).click();
+  const selected = page.getByRole("region", {
+    name: "Selected mission call budgets",
+    exact: true,
+  });
+  await expect(selected.getByText("5 used · limit: 200")).toBeVisible();
+  await expect(
+    selected.getByRole("button", {
+      name: "Apply saved budgets to this mission",
+    }),
+  ).toHaveCount(0);
+  expect(requests.some((request) => request.path.endsWith("/budgets"))).toBe(
+    false,
+  );
+});
+
 test("call budget validation prevents invalid writes and failed saves can be retried on mobile", async ({
   page,
 }) => {
@@ -2281,6 +2486,17 @@ test("call budget validation prevents invalid writes and failed saves can be ret
     requests.some((request) => request.path === "/api/settings/budgets"),
   ).toBe(false);
   await worker.fill("24");
+  const tools = dialog.getByRole("spinbutton", {
+    name: "Tool calls per mission",
+    exact: true,
+  });
+  for (const invalid of ["", "0", "-1", "1.5", "100001"]) {
+    await tools.fill(invalid);
+    await expect(tools).toHaveAttribute("aria-invalid", "true");
+    await expect(save).toBeDisabled();
+    await tools.press("Enter");
+  }
+  await tools.fill("450");
   let rejectSave = true;
   let attempts = 0;
   await page.route("**/api/settings/budgets", (route) => {
@@ -2294,7 +2510,7 @@ test("call budget validation prevents invalid writes and failed saves can be ret
   });
   await save.click();
   const budget = dialog.getByRole("region", {
-    name: "Model call budget",
+    name: "Call budgets",
     exact: true,
   });
   await expect(budget.getByRole("alert")).toContainText(

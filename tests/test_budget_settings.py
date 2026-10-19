@@ -19,7 +19,11 @@ async def exercise_budget_settings(storage, tmp_path):
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
         initial = (await client.get("/api/settings")).json()
-        assert initial["model_call_budget"] == {"max_model_calls": 100, "worker_model_calls": 12}
+        assert initial["model_call_budget"] == {
+            "max_model_calls": 100,
+            "worker_model_calls": 12,
+            "max_tool_calls": 200,
+        }
         assert await storage.get_setting("model_call_budget") is None
         for invalid in (
             {},
@@ -29,7 +33,7 @@ async def exercise_budget_settings(storage, tmp_path):
             {"max_model_calls": 10, "worker_model_calls": 0},
             {"max_model_calls": 10, "worker_model_calls": 101},
             {"max_model_calls": 1.5, "worker_model_calls": 2},
-            {"max_model_calls": 10, "worker_model_calls": 2, "max_tool_calls": 4},
+            {"max_model_calls": 10, "worker_model_calls": 2, "max_tool_calls": 0},
         ):
             assert (await client.put("/api/settings/budgets", json=invalid)).status_code == 422
         assert (await client.get("/api/settings")).json() == initial
@@ -52,7 +56,11 @@ async def exercise_budget_settings(storage, tmp_path):
         assert saved.status_code == 200
         assert saved.json() == {
             **initial,
-            "model_call_budget": {"max_model_calls": 10, "worker_model_calls": 2},
+            "model_call_budget": {
+                "max_model_calls": 10,
+                "worker_model_calls": 2,
+                "max_tool_calls": 200,
+            },
         }
         snapshots = []
         for request, expected in (

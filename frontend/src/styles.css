@@ -3363,6 +3363,49 @@ main {
   flex-shrink: 0;
   accent-color: #b9e98b;
 }
+.mission-call-budget {
+  border-top: 1px solid #3c4f31;
+  margin-top: 23px;
+  padding-top: 18px;
+}
+.mission-call-budget h4 {
+  color: #c3d9b2;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.mission-call-budget p {
+  color: #8faa7c;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.mission-call-budget .budget-mission-name {
+  color: #b6caa8;
+  overflow-wrap: anywhere;
+}
+.mission-call-budget dl {
+  display: grid;
+  gap: 9px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.mission-call-budget dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px 16px;
+}
+.mission-call-budget dt {
+  color: #8faa7c;
+}
+.mission-call-budget dd {
+  margin: 0;
+  color: #c3d9b2;
+}
+.mission-call-budget button {
+  min-height: 44px;
+  margin-top: 6px;
+  font-size: 12px;
+}
 .settings-notice {
   display: flex;
   align-items: flex-start;

@@ -12,6 +12,7 @@ import type {
   ModelCallBudget,
 } from "./types";
 import { normalizeAgent, parseActivityEvent } from "./office";
+import { normalizeCallBudget } from "./modelCallBudget";
 async function responseFor(
   path: string,
   body?: unknown,
@@ -79,7 +80,17 @@ export const api = {
   saveModel: (config: ModelConfig) =>
     request<WorkspaceSettings>("/settings/model", config, "PUT"),
   saveCallBudget: (budget: ModelCallBudget) =>
-    request<WorkspaceSettings>("/settings/budgets", budget, "PUT"),
+    request<WorkspaceSettings>(
+      "/settings/budgets",
+      normalizeCallBudget(budget),
+      "PUT",
+    ),
+  updateRunBudgets: (id: string, budget: ModelCallBudget) =>
+    request<Run>(
+      `/runs/${encodeURIComponent(id)}/budgets`,
+      normalizeCallBudget(budget),
+      "PUT",
+    ),
   saveAgentModel: (agentId: string, config: ModelConfig) =>
     request<WorkspaceSettings>(
       `/settings/agents/${encodeURIComponent(agentId)}`,

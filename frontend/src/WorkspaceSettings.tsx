@@ -17,6 +17,7 @@ import { confirmsRegenesis, validModelConfig } from "./modelSettings";
 import type {
   ModelConfig,
   RegenesisResult,
+  Run,
   WorkspaceSettings as Settings,
 } from "./types";
 export type SettingsSection = "model" | "connections" | "regenesis";
@@ -28,6 +29,8 @@ export function WorkspaceSettings({
   onSaved,
   onRegenesis,
   onReload,
+  selectedRun,
+  onRunUpdated,
 }: {
   settings: Settings | null;
   loading: boolean;
@@ -36,6 +39,8 @@ export function WorkspaceSettings({
   onSaved: (settings: Settings) => void;
   onRegenesis: (confirmation: string) => Promise<RegenesisResult>;
   onReload: () => void;
+  selectedRun?: Run | null;
+  onRunUpdated?: (run: Run) => void;
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [draft, setDraft] = useState<ModelConfig | undefined>(
@@ -282,6 +287,8 @@ export function WorkspaceSettings({
                   disabled={busy}
                   onSaved={onSaved}
                   onBusyChange={setBudgetBusy}
+                  selectedRun={selectedRun}
+                  onRunUpdated={onRunUpdated}
                 />
               ) : (
                 <div className="settings-load-error">

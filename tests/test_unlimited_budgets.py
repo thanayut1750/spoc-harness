@@ -16,8 +16,11 @@ from org_harness.storage import BudgetExceeded, MemoryStorage, PostgresStorage
 @pytest.mark.parametrize("worker_budget", [None, 1, 100])
 def test_nullable_model_budget_contracts_share_existing_finite_bounds(model_budget, worker_budget):
     values = {"max_model_calls": model_budget, "worker_model_calls": worker_budget}
-    assert ModelCallBudget(**values).model_dump(mode="json") == values
-    assert ModelCallBudgetUpdate(**values).model_dump(mode="json") == values
+    assert ModelCallBudget(**values).model_dump(mode="json") == {**values, "max_tool_calls": 200}
+    assert ModelCallBudgetUpdate(**values).model_dump(mode="json") == {
+        **values,
+        "max_tool_calls": 200,
+    }
     assert RunLimits(**values).model_dump(mode="json") == {
         **values,
         "max_tool_calls": 200,
@@ -27,6 +30,7 @@ def test_nullable_model_budget_contracts_share_existing_finite_bounds(model_budg
     assert ModelCallBudget().model_dump(mode="json") == {
         "max_model_calls": 100,
         "worker_model_calls": 12,
+        "max_tool_calls": 200,
     }
 
 
@@ -47,7 +51,7 @@ def test_both_nullable_update_fields_remain_required_and_finite_bounds_remain(in
     with pytest.raises(ValidationError):
         ModelCallBudgetUpdate(**invalid)
     with pytest.raises(ValidationError):
-        RunLimits(max_tool_calls=None)
+        RunLimits(max_tool_calls=0)
 
 
 async def exercise_nullable_api(storage, tmp_path):
@@ -57,7 +61,10 @@ async def exercise_nullable_api(storage, tmp_path):
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
         defaults = {"max_model_calls": 100, "worker_model_calls": 12}
-        assert (await client.get("/api/settings")).json()["model_call_budget"] == defaults
+        assert (await client.get("/api/settings")).json()["model_call_budget"] == {
+            **defaults,
+            "max_tool_calls": 200,
+        }
         # Seed the exact pre-null version2 fingerprint, including the finite
         # expanded limits, to prove the submission normalization stays compatible.
         old_runs = []
@@ -82,8 +89,11 @@ async def exercise_nullable_api(storage, tmp_path):
         both_null = {"max_model_calls": None, "worker_model_calls": None}
         saved = await client.put("/api/settings/budgets", json=both_null)
         assert saved.status_code == 200
-        assert saved.json()["model_call_budget"] == both_null
-        assert await storage.get_setting("model_call_budget") == both_null
+        assert saved.json()["model_call_budget"] == {**both_null, "max_tool_calls": 200}
+        assert await storage.get_setting("model_call_budget") == {
+            **both_null,
+            "max_tool_calls": 200,
+        }
         inherited_request = {"user_request": "Replay inherited unlimited defaults"}
         inherited_headers = {"Idempotency-Key": "inherited-null-snapshot"}
         inherited = await client.post(
@@ -158,17 +168,18 @@ async def exercise_nullable_api(storage, tmp_path):
         ).status_code == 409
         for run in snapshots:
             assert (await storage.get_run(run["run_id"]))["limits"] == run["limits"]
-        # A nullable global budget never makes tool limits nullable.
+        # Tool budgets retain their finite bounds independently of model budgets.
         assert (
             await client.post(
                 "/api/runs",
-                json={"user_request": "Invalid tools", "limits": {"max_tool_calls": None}},
+                json={"user_request": "Invalid tools", "limits": {"max_tool_calls": 0}},
             )
         ).status_code == 422
         reset = await client.post("/api/regenesis", json={"confirmation": "REGENESIS"})
-        assert (
-            reset.status_code == 200 and reset.json()["settings"]["model_call_budget"] == defaults
-        )
+        assert reset.status_code == 200 and reset.json()["settings"]["model_call_budget"] == {
+            **defaults,
+            "max_tool_calls": 200,
+        }
         assert await storage.get_setting("model_call_budget") is None
         await client.put("/api/settings/budgets", json=both_null)
         created = await client.post("/api/runs", json={"user_request": "Persist unlimited"})
@@ -231,6 +242,7 @@ async def test_postgres_unlimited_budgets_survive_reopen_with_atomic_usage(tmp_p
         assert await reopened.get_setting("model_call_budget") == {
             "max_model_calls": None,
             "worker_model_calls": None,
+            "max_tool_calls": 200,
         }
         assert (await reopened.get_run(snapshot["run_id"]))["limits"] == snapshot["limits"]
         assert (await reopened.get_run(counted["run_id"]))["model_calls"] == 130
