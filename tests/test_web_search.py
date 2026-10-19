@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from org_harness.config import Settings
 from org_harness.tools import ExpectedToolInputError
-from org_harness.web_search import ExaSearchError, ExaWebClient
+from org_harness.web_search import ExaContentUnavailable, ExaSearchError, ExaWebClient
 
 KEY = "private-exa-key-do-not-disclose"
 URL = "https://example.com/ภาษาไทย"
@@ -132,12 +132,13 @@ async def test_empty_search_is_valid_but_empty_content_is_a_typed_failure():
     ) as http:
         client = ExaWebClient(settings(), client=http)
         assert (await client.search("No matches"))["results"] == []
-        with pytest.raises(ExaSearchError, match="no readable"):
+        with pytest.raises(ExaContentUnavailable, match="no readable"):
             await client.read(URL)
 
 
 @pytest.mark.parametrize("status", [301, 400, 401, 402, 403, 429, 500, 503])
-async def test_http_failures_never_echo_bodies_or_follow_auth_redirects(status):
+@pytest.mark.parametrize("method", ["search", "read"])
+async def test_http_failures_never_echo_bodies_or_follow_auth_redirects(status, method):
     calls = []
 
     def response(request):
@@ -152,7 +153,7 @@ async def test_http_failures_never_echo_bodies_or_follow_auth_redirects(status):
         transport=httpx.MockTransport(response), follow_redirects=True
     ) as http:
         with pytest.raises(ExaSearchError) as caught:
-            await ExaWebClient(settings(), client=http).search("private query")
+            await getattr(ExaWebClient(settings(), client=http), method)(URL)
     assert str(status) in str(caught.value)
     assert KEY not in str(caught.value) and "PRIVATE" not in str(caught.value)
     assert len(calls) == 1
@@ -194,9 +195,29 @@ async def test_non_json_success_bodies_are_typed_failures(body):
 
 
 @pytest.mark.parametrize(
-    "statuses", [None, {}, [], [{}], [{"status": "error", "error": {"tag": KEY}}]]
+    "statuses",
+    [
+        None,
+        {},
+        [],
+        [{}],
+        [{"status": "error", "error": {"tag": KEY}}],
+        [{"id": URL, "status": "pending"}],
+        [{"id": URL, "status": []}],
+        [{"id": URL, "status": "error", "error": "malformed"}],
+        [{"id": URL, "status": "error", "error": {"tag": 123}}],
+        [{"id": URL, "status": "error", "error": {"httpStatusCode": "404"}}],
+        [{"id": URL, "status": "error", "error": {"httpStatusCode": True}}],
+        [{"id": URL, "status": "error", "error": {"httpStatusCode": 999}}],
+        [{"id": URL, "status": "success", "error": {}}],
+        [{"id": URL, "status": "success", "error": {"tag": "CRAWL_NOT_FOUND"}}],
+        [
+            {"id": URL, "status": "error", "error": {"tag": "CRAWL_NOT_FOUND"}},
+            {"id": URL, "status": "not-a-status"},
+        ],
+    ],
 )
-async def test_content_status_failures_do_not_return_a_false_success(statuses):
+async def test_malformed_or_contradictory_statuses_remain_provider_failures(statuses):
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(
             lambda _: httpx.Response(
@@ -204,7 +225,7 @@ async def test_content_status_failures_do_not_return_a_false_success(statuses):
             )
         )
     ) as http:
-        with pytest.raises(ExaSearchError, match="could not retrieve") as caught:
+        with pytest.raises(ExaSearchError, match="content statuses") as caught:
             await ExaWebClient(settings(), client=http).read(URL)
     assert KEY not in str(caught.value)
 
@@ -216,18 +237,83 @@ async def test_reader_requires_actual_nonempty_text(text):
             lambda _: httpx.Response(200, json={"results": [{"url": URL, "text": text}]})
         )
     ) as http:
-        with pytest.raises(ExaSearchError, match="no readable"):
+        with pytest.raises(ExaContentUnavailable, match="no readable"):
             await ExaWebClient(settings(), client=http).read(URL)
 
 
+@pytest.mark.parametrize(
+    "tag",
+    [
+        "CRAWL_NOT_FOUND",
+        "CRAWL_HTTP_403",
+        "CRAWL_TIMEOUT",
+        "CRAWL_LIVECRAWL_TIMEOUT",
+        "SOURCE_NOT_AVAILABLE",
+        "UNSUPPORTED_URL",
+        "CRAWL_UNKNOWN_ERROR",
+        KEY,
+    ],
+)
+async def test_url_level_failures_are_actionable_tool_input_errors_without_fallback(tag):
+    calls = []
+    failed_url = "https://github.com/advisories/GHSA-r2gr-w3c8-wvqv"
+
+    def response(request):
+        calls.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "results": [],
+                "statuses": [
+                    {
+                        "id": failed_url,
+                        "status": "error",
+                        "error": {"tag": tag, "httpStatusCode": 404},
+                    }
+                ],
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as http:
+        with pytest.raises(ExaContentUnavailable) as caught:
+            await ExaWebClient(settings(), client=http).read(failed_url)
+    assert isinstance(caught.value, ExpectedToolInputError)
+    assert not isinstance(caught.value, ExaSearchError)
+    assert "canonical public URL" in str(caught.value)
+    assert "previously stored source artifact" in str(caught.value)
+    assert "not source evidence" in str(caught.value)
+    assert KEY not in str(caught.value)
+    if tag != KEY:
+        assert tag in str(caught.value)
+    assert len(calls) == 1 and calls[0].url.host == "api.exa.ai"
+    assert json.loads(calls[0].content)["urls"] == [failed_url]
+
+
+async def test_successful_content_status_with_nullable_error_is_valid():
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                200,
+                json={
+                    "results": [{"url": URL, "text": "Source evidence"}],
+                    "statuses": [{"id": URL, "status": "success", "error": None}],
+                },
+            )
+        )
+    ) as http:
+        result = await ExaWebClient(settings(), client=http).read(URL)
+    assert result["results"][0]["text"] == "Source evidence"
+
+
 @pytest.mark.parametrize("kind", [httpx.ConnectError, httpx.ReadTimeout])
-async def test_network_errors_are_sanitized(kind):
+@pytest.mark.parametrize("method", ["search", "read"])
+async def test_network_errors_are_sanitized(kind, method):
     def fail(request):
         raise kind(f"PRIVATE network exception {KEY}", request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(fail)) as http:
         with pytest.raises(ExaSearchError) as caught:
-            await ExaWebClient(settings(), client=http).search("query")
+            await getattr(ExaWebClient(settings(), client=http), method)(URL)
     assert KEY not in str(caught.value) and "PRIVATE" not in str(caught.value)
 
 

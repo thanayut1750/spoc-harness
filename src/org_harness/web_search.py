@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -19,6 +20,62 @@ _MAX_RESPONSE_BYTES = 2_000_000
 
 class ExaSearchError(Exception):
     """An Exa configuration, service, or response failure safe to display publicly."""
+
+
+class ExaContentUnavailable(ExpectedToolInputError):
+    """A single source could not be read; the agent can select another source."""
+
+
+_CONTENT_ERROR_TAGS = {
+    "CRAWL_NOT_FOUND",
+    "CRAWL_TIMEOUT",
+    "CRAWL_LIVECRAWL_TIMEOUT",
+    "SOURCE_NOT_AVAILABLE",
+    "UNSUPPORTED_URL",
+    "CRAWL_UNKNOWN_ERROR",
+}
+
+
+def _content_error_tag(statuses: Any) -> str | None:
+    if not isinstance(statuses, list) or not statuses:
+        raise ExaSearchError("Exa returned invalid content statuses")
+    failures = []
+    for item in statuses:
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("id"), str)
+            or not item["id"].strip()
+            or not isinstance(item.get("status"), str)
+            or item.get("status") not in {"success", "error"}
+            or item.get("source") is not None
+            and not isinstance(item["source"], str)
+        ):
+            raise ExaSearchError("Exa returned invalid content statuses")
+        error = item.get("error")
+        if error is not None and (
+            not isinstance(error, dict)
+            or "tag" in error
+            and not isinstance(error["tag"], str)
+            or error.get("httpStatusCode") is not None
+            and (
+                type(error["httpStatusCode"]) is not int
+                or not 100 <= error["httpStatusCode"] <= 599
+            )
+        ):
+            raise ExaSearchError("Exa returned invalid content statuses")
+        if item["status"] == "success" and error is not None:
+            raise ExaSearchError("Exa returned contradictory content statuses")
+        if item["status"] == "error":
+            tag = error.get("tag", "") if error else ""
+            # Exa's tag set is open-ended. Display only documented tag names;
+            # unknown tags still describe a page-level failure, without echoing
+            # untrusted provider details or source material.
+            failures.append(
+                tag
+                if tag in _CONTENT_ERROR_TAGS or re.fullmatch(r"CRAWL_HTTP_[1-5][0-9]{2}", tag)
+                else "CONTENT_UNAVAILABLE"
+            )
+    return failures[0] if failures else None
 
 
 def _valid_url(value: Any) -> bool:
@@ -135,21 +192,20 @@ class ExaWebClient:
                 "Reference URL must be a valid HTTP or HTTPS URL within 2048 characters"
             )
         result = await self._post("/contents", {"urls": [url], "text": {"maxCharacters": 20000}})
-        statuses = result.get("statuses")
-        if "statuses" in result and (
-            not isinstance(statuses, list)
-            or not statuses
-            or any(
-                not isinstance(item, dict) or item.get("status") != "success" or item.get("error")
-                for item in statuses
+        if "statuses" in result and (tag := _content_error_tag(result["statuses"])):
+            raise ExaContentUnavailable(
+                f"Exa could not retrieve the requested page content ({tag}). "
+                "Verify the URL, choose another canonical public URL, or use a previously stored "
+                "source artifact. This failed fetch is not source evidence."
             )
-        ):
-            raise ExaSearchError("Exa could not retrieve the requested page content")
         if not result["results"] or any(
             not isinstance(item.get("text"), str) or not item["text"].strip()
             for item in result["results"]
         ):
-            raise ExaSearchError("Exa returned no readable page content")
+            raise ExaContentUnavailable(
+                "Exa returned no readable page content. Choose another canonical public URL or "
+                "use a previously stored source artifact; empty content is not source evidence."
+            )
         return {
             **result,
             "requested_url": url,

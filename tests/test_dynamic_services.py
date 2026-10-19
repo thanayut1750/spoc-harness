@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from test_agent_services import approve, assignment, services_with_provider, tool_call
 
+from org_harness import agent_services
 from org_harness.agent_services import ToolsResearchResult, WorkerHostTools
 from org_harness.models import (
     ENGINEERING_CORE_TOOL_NAMES,
@@ -32,6 +33,39 @@ def extracted_deliverable(body):
             summary="Completed the assigned output using recorded tool evidence.",
         ).model_dump_json()
     }
+
+
+def expire_parent_deadline_after(monkeypatch, started):
+    """Expire the actual outer wait only after its nested work reached the test gate.
+
+    Agent/model setup can take arbitrarily long under concurrent test load. Keep
+    the real planning and cancellation stack, but control the timer's firing
+    point instead of depending on setup fitting inside a few milliseconds.
+    Nested R&D deadlines stay inactive here to isolate the parent deadline.
+    """
+    deadlines = []
+
+    class ControlledDeadline:
+        def __getattr__(self, name):
+            return getattr(asyncio, name)
+
+        async def wait_for(self, awaitable, timeout):
+            deadlines.append(timeout)
+            if len(deadlines) != 1:
+                return await awaitable
+            task = asyncio.create_task(awaitable)
+            try:
+                await asyncio.wait_for(started(), timeout=5)
+                return await asyncio.wait_for(task, timeout=0)
+            finally:
+                if not task.done():
+                    task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    # Patching this module reference leaves the real asyncio timers used by
+    # HostTools, subprocess cleanup, provider transports, and this gate intact.
+    monkeypatch.setattr(agent_services, "asyncio", ControlledDeadline())
+    return deadlines
 
 
 async def test_engineering_lead_creates_real_task_specific_worker_in_one_planning_call(tmp_path):
@@ -180,6 +214,7 @@ async def test_planning_limits_parallel_rd_consultations_to_two(tmp_path, monkey
 
 async def test_planning_deadline_cancels_nested_rd_work(tmp_path, monkeypatch):
     kr, _ = assignment()
+    started = asyncio.Event()
     cancelled = asyncio.Event()
 
     def script(body, requests):
@@ -195,16 +230,19 @@ async def test_planning_deadline_cancels_nested_rd_work(tmp_path, monkeypatch):
 
         async def blocked(*args, **kwargs):
             try:
+                started.set()
                 await asyncio.Event().wait()
             finally:
                 cancelled.set()
 
         monkeypatch.setattr(services, "consult_tools_rd", blocked)
+        deadlines = expire_parent_deadline_after(monkeypatch, started.wait)
         with pytest.raises(EscalationSignal) as error:
             await services.plan_work(kr, Constitution(), [], "")
         assert error.value.kind == "worker_timeout"
         assert cancelled.is_set()
         assert len(requests) == 1
+        assert deadlines == [0.2]
 
 
 async def test_research_only_rd_returns_recorded_report_without_registration(tmp_path, monkeypatch):
@@ -341,7 +379,9 @@ async def test_build_mode_cannot_claim_success_without_tested_registration(tmp_p
         assert not await services.mission_tools().list_tools()
 
 
-async def test_parent_deadline_preserves_nested_rd_command_side_effect_review(tmp_path):
+async def test_parent_deadline_preserves_nested_rd_command_side_effect_review(
+    tmp_path, monkeypatch
+):
     kr, _ = assignment()
 
     def script(body, requests):
@@ -369,10 +409,25 @@ async def test_parent_deadline_preserves_nested_rd_command_side_effect_review(tm
         requests,
         _,
     ):
+        marker_paths = []
+
+        async def command_started():
+            private_root = services.settings.data_dir / "workspaces" / run["run_id"] / "tools-rd"
+            while True:
+                markers = list(private_root.rglob("nested.txt"))
+                if markers and markers[0].read_text() == "started":
+                    break
+                await asyncio.sleep(0.01)
+            marker_paths.extend(markers)
+            assert len(markers) == 1 and markers[0].read_text() == "started"
+
+        deadlines = expire_parent_deadline_after(monkeypatch, command_started)
         with pytest.raises(EscalationSignal) as error:
             await services.plan_work(kr, Constitution(), [], "")
         assert error.value.kind == "unknown_operation"
         assert len(requests) == 2
+        assert deadlines == [0.15, 0.15]
+        assert marker_paths[0].read_text() == "started"
         pending = await storage.uncertain_operations(run["run_id"])
         assert len(pending) == 1 and pending[0]["status"] == "pending"
 

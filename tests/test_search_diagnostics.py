@@ -44,8 +44,9 @@ def diagnostic_model(monkeypatch):
 
 
 @pytest.mark.parametrize("search_fails", [False, True])
+@pytest.mark.parametrize("read_unavailable", [False, True])
 async def test_exa_diagnostics_skip_mcp_and_report_partial_failure(
-    monkeypatch, diagnostic_model, search_fails
+    monkeypatch, diagnostic_model, search_fails, read_unavailable
 ):
     import langchain.mcp
 
@@ -65,6 +66,8 @@ async def test_exa_diagnostics_skip_mcp_and_report_partial_failure(
 
         async def read(self, url):
             calls.append("reader")
+            if read_unavailable:
+                raise web_search.ExaContentUnavailable("Exa could not read this source page")
             return {"results": [{"text": "JSON documentation"}]}
 
         async def close(self):
@@ -78,11 +81,13 @@ async def test_exa_diagnostics_skip_mcp_and_report_partial_failure(
     result = await cli.live_diagnostics(Settings(_env_file=None, exa_api_key="private-fixture"))
     assert result["web_search_provider"] == "exa"
     assert result["web_search"] is (not search_fails)
-    assert result["web_reader"] is True
+    assert result["web_reader"] is (not read_unavailable)
     assert result["provider_json"] is True and result["provider_tool_roundtrip"] is True
     assert "search_mcp" not in result and "reader_mcp" not in result
     if search_fails:
         assert result["web_search_error"] == "ExaSearchError"
+    if read_unavailable:
+        assert result["web_reader_error"] == "ExaContentUnavailable"
     assert calls == ["search", "reader", "closed"]
     assert diagnostic_model[0].closed
     assert "private-fixture" not in json.dumps(result)
