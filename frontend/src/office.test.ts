@@ -13,6 +13,7 @@ import {
   handoffEndpoints,
   latestAgentActivities,
   agentIdentityKey,
+  followRosterPage,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -403,5 +404,134 @@ describe("office projection", () => {
       kind: "fixed",
       department: "Engineering",
     });
+  });
+});
+
+describe.each([
+  ["Engineering specialists", 4],
+  ["external integrations", 3],
+] as const)("%s desk-page following", (_group, perPage) => {
+  const members = () =>
+    Array.from({ length: perPage + 1 }, (_, index) =>
+      event(index + 1, {
+        agent_id: `agent-${index}`,
+        activity: "completed",
+      }),
+    );
+  it("initially follows working agents before newer completed agents, then the newest non-error snapshot", () => {
+    const agents = members();
+    const selected = "executive";
+    expect(followRosterPage({ agents, page: 0, perPage, selected })).toBe(1);
+    expect(
+      followRosterPage({
+        agents: [{ ...agents[0], activity: "reading" }, ...agents.slice(1)],
+        page: 1,
+        perPage,
+        selected,
+      }),
+    ).toBe(0);
+  });
+  it("follows a new identity even when its first event is completed and an older agent stays selected", () => {
+    const agents = members();
+    const selected = agents[0].agent_id;
+    const previous = {
+      ids: agents.slice(0, perPage).map((agent) => agent.agent_id),
+      selected,
+    };
+    expect(
+      followRosterPage({ agents, page: 0, perPage, selected, previous }),
+    ).toBe(1);
+    expect(
+      followRosterPage({
+        agents,
+        page: 0,
+        perPage,
+        selected,
+        previous: { ids: [], selected },
+      }),
+    ).toBe(1);
+  });
+  it("preserves manual Previous and Next pages through ordinary activity and roster refreshes", () => {
+    const agents = members();
+    const selected = agents[0].agent_id;
+    const previous = { ids: agents.map((agent) => agent.agent_id), selected };
+    const updated = agents.map((agent, index) => ({
+      ...agent,
+      seq: 500 + index,
+      activity: "executing" as const,
+    }));
+    for (const page of [0, 1])
+      expect(
+        followRosterPage({
+          agents: updated,
+          page,
+          perPage,
+          selected,
+          previous,
+        }),
+      ).toBe(page);
+  });
+  it("follows an actual explicit selection change, including a warning avatar", () => {
+    const agents = members();
+    const previous = {
+      ids: agents.map((agent) => agent.agent_id),
+      selected: agents[0].agent_id,
+    };
+    const selected = agents[perPage].agent_id;
+    expect(
+      followRosterPage({
+        agents,
+        page: 1,
+        perPage,
+        selected: agents[0].agent_id,
+      }),
+    ).toBe(0);
+    expect(
+      followRosterPage({
+        agents: agents.map((agent) => ({ ...agent, activity: "error" })),
+        page: 0,
+        perPage,
+        selected,
+        previous,
+      }),
+    ).toBe(1);
+    expect(
+      followRosterPage({
+        agents,
+        page: 1,
+        perPage,
+        selected: agents[0].agent_id,
+        previous: { ...previous, selected },
+      }),
+    ).toBe(0);
+  });
+  it("does not follow a newly observed error or lose paging when agents disappear", () => {
+    const agents = members();
+    const selected = agents[0].agent_id;
+    const previous = {
+      ids: agents.slice(0, perPage).map((agent) => agent.agent_id),
+      selected,
+    };
+    expect(
+      followRosterPage({
+        agents: agents.map((agent, index) => ({
+          ...agent,
+          activity: index === perPage ? "error" : "completed",
+        })),
+        page: 0,
+        perPage,
+        selected,
+        previous,
+      }),
+    ).toBe(0);
+    expect(
+      followRosterPage({
+        agents: agents.slice(0, perPage),
+        page: 1,
+        perPage,
+        selected,
+        previous: { ids: agents.map((agent) => agent.agent_id), selected },
+      }),
+    ).toBe(0);
   });
 });

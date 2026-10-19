@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { layoutAgentEvents, recordedAgentEvent } from "./agentEvent";
+import {
+  eligibleAgentEvent,
+  layoutAgentEvents,
+  recordedAgentEvent,
+} from "./agentEvent";
 import { initialAgents, officeRoster, normalizeAgent } from "./office";
 import type { AgentActivity } from "./types";
 const recorded = (
@@ -50,11 +54,11 @@ describe("recorded event bubbles", () => {
       900,
       520,
     );
-    expect(bubbles.map((bubble) => bubble.label)).toEqual([
-      "Completed",
-      "Needs attention",
-    ]);
-    expect(bubbles[1].title).toContain(events[1].summary);
+    expect(bubbles.map((bubble) => bubble.label)).toEqual(["Completed"]);
+    expect(bubbles[0].title).toContain(events[0].summary);
+    // Suppressing an error bubble does not delete its avatar or recorded fact.
+    expect(officeRoster(events).positioned).toHaveLength(2);
+    expect(recordedAgentEvent(events[1])).toBe(true);
   });
   it.each([
     [579, 500],
@@ -92,7 +96,7 @@ describe("recorded event bubbles", () => {
   );
   it("uses raw snapshot summaries without changing displayed avatar state or external identity", () => {
     const source = recorded("backend_coder", {
-      activity: "error",
+      activity: "reading",
       summary: "Source could not be read; trying another citation",
     });
     const external = normalizeAgent(
@@ -119,6 +123,41 @@ describe("recorded event bubbles", () => {
       bubbles.find((b) => b.agent.agent_id === external.agent_id)?.summary,
     ).toBe("External result");
     expect(displayed.summary).toBe("Derived run status");
+  });
+  it("hides warning bubbles from either actual or displayed error state and restores them after recovery", () => {
+    const rawError = recorded("executive", { activity: "error" });
+    const derivedError = recorded("backend_coder", { activity: "executing" });
+    const external = normalizeAgent(
+      recorded("external-error", { source: "integration", activity: "error" }),
+    );
+    const records = [rawError, derivedError, external];
+    const displayed = [
+      { ...rawError, activity: "completed" as const },
+      { ...derivedError, activity: "error" as const },
+      external,
+    ];
+    for (let index = 0; index < displayed.length; index++)
+      expect(eligibleAgentEvent(displayed[index], records[index])).toBe(false);
+    expect(
+      layoutAgentEvents(officeRoster(displayed).positioned, records, 900, 520)
+        .bubbles,
+    ).toEqual([]);
+    expect(officeRoster(displayed).positioned).toHaveLength(3);
+    const recovered = records.map((agent) => ({
+      ...agent,
+      activity: "completed" as const,
+      seq: 20,
+    }));
+    const layout = layoutAgentEvents(
+      officeRoster(recovered).positioned,
+      recovered,
+      900,
+      520,
+    );
+    expect(layout.bubbles).toHaveLength(3);
+    expect(
+      recovered.filter((agent) => eligibleAgentEvent(agent, agent)),
+    ).toHaveLength(layout.bubbles.length);
   });
   it.each([560, 579])(
     "reports insufficient space and fits19 with real pager obstacles after inner height grows at width%i",

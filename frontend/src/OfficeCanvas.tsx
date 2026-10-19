@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { layoutAgentEvents, recordedAgentEvent } from "./agentEvent";
+import { eligibleAgentEvent, layoutAgentEvents } from "./agentEvent";
 import type { BubbleRect } from "./agentEvent";
 import {
   activeActivities,
@@ -8,8 +8,9 @@ import {
   officeRoster,
   specialistsPerPage,
   integrationsPerPage,
+  followRosterPage,
 } from "./office";
-import type { PositionedAgent } from "./office";
+import type { PositionedAgent, RosterPageSnapshot } from "./office";
 import type { ActivityEvent, AgentActivity } from "./types";
 
 const W = 1000,
@@ -337,24 +338,48 @@ export function OfficeCanvas({
   const [specialistPage, setSpecialistPage] = useState(0);
   const [integrationPage, setIntegrationPage] = useState(0);
   const roster = officeRoster(agents, specialistPage, integrationPage);
-  const specialistIds = roster.specialists
-    .map((agent) => agent.agent_id)
-    .join("|");
-  const integrationIds = roster.integrations
-    .map((agent) => agent.agent_id)
-    .join("|");
+  const rosterIds = JSON.stringify({
+    specialists: roster.specialists.map((agent) => agent.agent_id),
+    integrations: roster.integrations.map((agent) => agent.agent_id),
+  });
+  const previousRoster = useRef<
+    | {
+        specialists: RosterPageSnapshot;
+        integrations: RosterPageSnapshot;
+      }
+    | undefined
+  >(undefined);
   useEffect(() => {
-    const index = roster.specialists.findIndex(
-      (agent) => agent.agent_id === selected,
+    const previous = previousRoster.current;
+    setSpecialistPage((page) =>
+      followRosterPage({
+        agents: roster.specialists,
+        page,
+        perPage: specialistsPerPage,
+        selected,
+        previous: previous?.specialists,
+      }),
     );
-    if (index >= 0) setSpecialistPage(Math.floor(index / specialistsPerPage));
-  }, [selected, specialistIds]);
-  useEffect(() => {
-    const index = roster.integrations.findIndex(
-      (agent) => agent.agent_id === selected,
+    setIntegrationPage((page) =>
+      followRosterPage({
+        agents: roster.integrations,
+        page,
+        perPage: integrationsPerPage,
+        selected,
+        previous: previous?.integrations,
+      }),
     );
-    if (index >= 0) setIntegrationPage(Math.floor(index / integrationsPerPage));
-  }, [selected, integrationIds]);
+    previousRoster.current = {
+      specialists: {
+        ids: roster.specialists.map((agent) => agent.agent_id),
+        selected,
+      },
+      integrations: {
+        ids: roster.integrations.map((agent) => agent.agent_id),
+        selected,
+      },
+    };
+  }, [selected, rosterIds]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const instructionId = useId();
   const [minimumMapHeight, setMinimumMapHeight] = useState(0);
@@ -425,7 +450,7 @@ export function OfficeCanvas({
   );
   const eventCount = roster.positioned.filter(({ agent }) => {
     const event = visibleRecords.get(agent.agent_id);
-    return event && recordedAgentEvent(event);
+    return eligibleAgentEvent(agent, event);
   }).length;
   useEffect(() => {
     if (eventCount <= 10) {

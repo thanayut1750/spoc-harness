@@ -28,6 +28,17 @@ export function recordedAgentEvent(agent: AgentActivity) {
       Number.isFinite(Date.parse(agent.timestamp)))
   );
 }
+export function eligibleAgentEvent(
+  displayed: AgentActivity,
+  recorded?: AgentActivity,
+) {
+  return (
+    !!recorded &&
+    recordedAgentEvent(recorded) &&
+    recorded.activity !== "error" &&
+    displayed.activity !== "error"
+  );
+}
 function overlaps(a: BubbleRect, b: BubbleRect, gap = 4) {
   return (
     a.x < b.x + b.width + gap &&
@@ -57,7 +68,7 @@ export function layoutAgentEvents(
   const recorded = new Map(records.map((agent) => [agent.agent_id, agent]));
   const recordedCount = positioned.filter(({ agent }) => {
     const event = recorded.get(agent.agent_id);
-    return event && recordedAgentEvent(event);
+    return eligibleAgentEvent(agent, event);
   }).length;
   const cardWidth =
     recordedCount > 10
@@ -77,7 +88,7 @@ export function layoutAgentEvents(
   );
   for (const { agent: displayed, role } of ordered) {
     const agent = recorded.get(displayed.agent_id);
-    if (!agent || !recordedAgentEvent(agent)) continue;
+    if (!agent || !eligibleAgentEvent(displayed, agent)) continue;
     const anchorX = (role.x / 1000) * width;
     const anchorY = (Math.min(role.y, 594) / 650) * height;
     const desiredX = clamp(

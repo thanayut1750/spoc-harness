@@ -318,6 +318,51 @@ export function officeRoster(
     integrationPage: currentIntegrationPage,
   };
 }
+export interface RosterPageSnapshot {
+  ids: string[];
+  selected: string;
+}
+export function followRosterPage({
+  agents,
+  page,
+  perPage,
+  selected,
+  previous,
+}: {
+  agents: AgentActivity[];
+  page: number;
+  perPage: number;
+  selected: string;
+  previous?: RosterPageSnapshot;
+}) {
+  const lastPage = Math.max(0, Math.ceil(agents.length / perPage) - 1);
+  const current = Math.max(0, Math.min(page, lastPage));
+  if (!previous || previous.selected !== selected) {
+    const index = agents.findIndex((agent) => agent.agent_id === selected);
+    if (index >= 0) return Math.floor(index / perPage);
+  }
+  const seen = new Set(previous?.ids);
+  const newcomers = agents.filter(
+    (agent) => !seen.has(agent.agent_id) && agent.activity !== "error",
+  );
+  // Follow a new identity once, even when its first snapshot is already
+  // completed. Later tool/status events must leave manual paging alone.
+  const newest = newcomers.sort(
+    (a, b) =>
+      Number(activeActivities.has(b.activity)) -
+        Number(activeActivities.has(a.activity)) ||
+      (b.seq ?? 0) - (a.seq ?? 0) ||
+      (Date.parse(b.timestamp ?? "") || 0) -
+        (Date.parse(a.timestamp ?? "") || 0) ||
+      b.agent_id.localeCompare(a.agent_id),
+  )[0];
+  return newest
+    ? Math.floor(
+        agents.findIndex((agent) => agent.agent_id === newest.agent_id) /
+          perPage,
+      )
+    : current;
+}
 export function handoffEndpoints(
   event: ActivityEvent,
   positioned: PositionedAgent[],
