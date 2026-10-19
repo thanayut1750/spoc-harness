@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 import time
+from collections.abc import Iterable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from itertools import islice
@@ -24,6 +25,33 @@ _AGENT_IDENTITY_FIELDS = (
     "model_parent",
     "base_role",
 )
+
+
+def _agent_projection_key(source: str, agent_id: str) -> str:
+    """Encode the identity tuple without delimiter ambiguity."""
+    return json.dumps([source, agent_id], ensure_ascii=False, separators=(",", ":"))
+
+
+def _latest_agent_projections(events: Iterable[dict]) -> list[dict]:
+    """Read legacy and current projection rows as one latest event per identity."""
+    latest: dict[str, dict] = {}
+    for event in events:
+        key = _agent_projection_key(event["source"], event["agent_id"])
+        previous = latest.get(key)
+        if previous is None or event.get("seq", 0) > previous.get("seq", 0):
+            latest[key] = event
+    return [latest[key] for key in sorted(latest)]
+
+
+def _previous_agent_projection(event: dict, projections: Iterable[dict]) -> dict | None:
+    # A rolling upgrade may leave a newer event under the former delimiter key.
+    # Check its raw identity before inheriting public metadata.
+    matching = (
+        previous
+        for previous in projections
+        if previous["source"] == event["source"] and previous["agent_id"] == event["agent_id"]
+    )
+    return max(matching, key=lambda previous: previous.get("seq", 0), default=None)
 
 
 def _internal_agent_type(event: dict) -> str | None:
@@ -419,8 +447,16 @@ class MemoryStorage:
             event.setdefault("timestamp", timestamp())
             event.setdefault("data", {})
             event.setdefault("summary", "")
-            projection_key = f"{event['source']}:{event['agent_id']}"
-            _retain_internal_agent_identity(event, self.projection.get(projection_key))
+            projection_key = _agent_projection_key(event["source"], event["agent_id"])
+            previous = _previous_agent_projection(
+                event,
+                (
+                    self.projection[key]
+                    for key in (projection_key, f"{event['source']}:{event['agent_id']}")
+                    if key in self.projection
+                ),
+            )
+            _retain_internal_agent_identity(event, previous)
             self.events.append(event)
             self.event_ids[key] = event
             self.projection[projection_key] = event
@@ -476,7 +512,7 @@ class MemoryStorage:
     async def office_snapshot(self) -> dict:
         async with self.lock:
             return {
-                "agents": copy.deepcopy(list(self.projection.values())),
+                "agents": copy.deepcopy(_latest_agent_projections(self.projection.values())),
                 "cursor": len(self.events),
                 "generation": self.reset_generation,
             }
@@ -649,6 +685,31 @@ class PostgresStorage:
             async with conn.transaction():
                 await conn.execute("SELECT pg_advisory_xact_lock(73910401)")
                 await conn.execute(SCHEMA, prepare=False)
+                version = await (
+                    await conn.execute("SELECT version FROM harness_migrations WHERE version=3")
+                ).fetchone()
+                if version is None:
+                    # Rebuild only the derived projection. Durable events recover
+                    # identities previously overwritten by ambiguous source:id keys.
+                    # Serialize with emit and keep events -> projection lock order.
+                    await conn.execute("SELECT pg_advisory_xact_lock(73910402)")
+                    rows = await (
+                        await conn.execute(
+                            "SELECT DISTINCT ON (source, data->>'agent_id') source,seq,data "
+                            "FROM harness_events ORDER BY source,data->>'agent_id',seq DESC"
+                        )
+                    ).fetchall()
+                    await conn.execute("DELETE FROM harness_projection")
+                    for row in rows:
+                        event = {"schema_version": 1, **row["data"], "seq": row["seq"]}
+                        await conn.execute(
+                            "INSERT INTO harness_projection(agent_key,data) VALUES(%s,%s)",
+                            (
+                                _agent_projection_key(row["source"], event["agent_id"]),
+                                self._json(event),
+                            ),
+                        )
+                    await conn.execute("INSERT INTO harness_migrations(version) VALUES (3)")
 
     async def ready(self) -> bool:
         try:
@@ -900,13 +961,15 @@ class PostgresStorage:
             ).fetchone()
             if row:
                 return {"schema_version": 1, **row["data"], "seq": row["seq"]}
-            projection_key = f"{event['source']}:{event['agent_id']}"
-            previous = await (
+            projection_key = _agent_projection_key(event["source"], event["agent_id"])
+            previous_rows = await (
                 await conn.execute(
-                    "SELECT data FROM harness_projection WHERE agent_key=%s", (projection_key,)
+                    "SELECT data FROM harness_projection WHERE agent_key=ANY(%s)",
+                    ([projection_key, f"{event['source']}:{event['agent_id']}"],),
                 )
-            ).fetchone()
-            _retain_internal_agent_identity(event, previous["data"] if previous else None)
+            ).fetchall()
+            previous = _previous_agent_projection(event, (row["data"] for row in previous_rows))
+            _retain_internal_agent_identity(event, previous)
             row = await (
                 await conn.execute(
                     "INSERT INTO harness_events(source,event_id,run_id,data) VALUES(%s,%s,%s,%s) RETURNING seq",
@@ -1003,7 +1066,9 @@ class PostgresStorage:
                 await conn.execute("SELECT data FROM harness_settings WHERE key='reset_generation'")
             ).fetchone()
             return {
-                "agents": [{"schema_version": 1, **row["data"]} for row in rows],
+                "agents": _latest_agent_projections(
+                    {"schema_version": 1, **row["data"]} for row in rows
+                ),
                 "cursor": cursor["cursor"],
                 "generation": generation["data"]["value"] if generation else "initial",
             }

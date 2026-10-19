@@ -254,8 +254,7 @@ export function roleFor(value: string | AgentActivity, index = 0): OfficeRole {
     };
   return {
     id,
-    name:
-      name ?? pretty(id.includes(":") ? id.split(":").slice(1).join(":") : id),
+    name: name ?? pretty(agent.original_agent_id ?? id),
     title: "Connected agent",
     department: "Integrations",
     color: "#d2bca4",
@@ -325,24 +324,38 @@ export function handoffEndpoints(
 ) {
   const raw = event.data?.target_agent_id ?? event.data?.to_agent_id;
   if (typeof raw !== "string") return undefined;
-  const target =
-    event.source &&
-    event.source !== "harness" &&
-    !raw.startsWith(`${event.source}:`)
-      ? `${event.source}:${raw}`
-      : raw;
+  // Targets on the wire are raw IDs. Resolve them only in the sending source's
+  // namespace, even when a raw ID happens to look like an encoded UI key.
+  const target = agentIdentityKey(event.source, raw);
   const from = positioned.find(
     ({ agent }) => agent.agent_id === event.agent_id,
   )?.role;
-  const to = positioned.find(({ agent }) => agent.agent_id === target)?.role;
+  const to = (
+    positioned.find(({ agent }) => agent.agent_id === target) ??
+    (event.source !== "harness"
+      ? positioned.find(
+          ({ agent }) =>
+            agent.source === event.source &&
+            agent.agent_id === raw &&
+            agent.original_agent_id !== undefined &&
+            agentIdentityKey(agent.source, agent.original_agent_id) === raw,
+        )
+      : undefined)
+  )?.role;
   return from && to ? { from, to } : undefined;
+}
+export function agentIdentityKey(source: string | undefined, rawId: string) {
+  return !source || source === "harness"
+    ? rawId
+    : `external:${JSON.stringify([source, rawId])}`;
 }
 export function normalizeAgent<T extends AgentActivity>(agent: T): T {
   if (!agent.source || agent.source === "harness") return agent;
+  const rawId = agent.original_agent_id ?? agent.agent_id;
   return {
     ...agent,
-    original_agent_id: agent.agent_id,
-    agent_id: `${agent.source}:${agent.agent_id}`,
+    original_agent_id: rawId,
+    agent_id: agentIdentityKey(agent.source, rawId),
   };
 }
 export function initialAgents(): Record<string, AgentActivity> {
@@ -353,6 +366,17 @@ export function initialAgents(): Record<string, AgentActivity> {
     ]),
   );
 }
+export function latestAgentActivities(
+  agents: AgentActivity[],
+): Record<string, AgentActivity> {
+  const latest: Record<string, AgentActivity> = {};
+  for (const agent of agents) {
+    const previous = latest[agent.agent_id];
+    if (!previous || (agent.seq ?? -1) > (previous.seq ?? -1))
+      latest[agent.agent_id] = agent;
+  }
+  return latest;
+}
 export function projectEvent(
   agents: Record<string, AgentActivity>,
   event: ActivityEvent,
@@ -360,10 +384,15 @@ export function projectEvent(
   if (!event.agent_id) return agents;
   const current = agents[event.agent_id];
   if (current?.seq !== undefined && current.seq >= event.seq) return agents;
+  const previousType = current && internalProjectionType(current);
   const retainedIdentity =
     current?.source === "harness" &&
     event.source === "harness" &&
-    current.run_id === event.run_id
+    typeof event.run_id === "string" &&
+    !!event.run_id &&
+    current.run_id === event.run_id &&
+    previousType &&
+    (event.data?.agent_type ?? previousType) === previousType
       ? Object.fromEntries(
           [
             "agent_type",
@@ -373,18 +402,34 @@ export function projectEvent(
             "model_parent",
             "base_role",
           ].flatMap((key) =>
-            current.data?.[key] === undefined ? [] : [[key, current.data[key]]],
+            typeof current.data?.[key] === "string"
+              ? [[key, current.data[key]]]
+              : [],
           ),
         )
       : {};
+  const projected: AgentActivity = {
+    ...event,
+    data: { ...retainedIdentity, ...event.data },
+  };
+  if (
+    internalProjectionType(projected) &&
+    typeof projected.data?.display_name === "string"
+  )
+    projected.display_name = projected.data.display_name;
   return {
     ...agents,
-    [event.agent_id]: {
-      ...current,
-      ...event,
-      data: { ...retainedIdentity, ...event.data },
-    },
+    [event.agent_id]: projected,
   };
+}
+function internalProjectionType(agent: AgentActivity): string | undefined {
+  if (agent.source !== "harness") return undefined;
+  if (isEngineeringSpecialist(agent)) return "engineering_specialist";
+  if (
+    agent.agent_id === "tools_rd_lead" &&
+    agent.data?.agent_type === "tools_rd_lead"
+  )
+    return "tools_rd_lead";
 }
 export function appendEvent(
   events: ActivityEvent[],

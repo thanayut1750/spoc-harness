@@ -20,7 +20,6 @@ import {
   Pause,
   Play,
   Plus,
-  Radio,
   Search,
   Send,
   Settings2,
@@ -1115,12 +1114,9 @@ export default function App() {
   const [run, setRun] = useState<Run | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selected, setSelected] = useState("executive");
-  const [historicalAgent, setHistoricalAgent] = useState<AgentActivity | null>(
-    null,
-  );
   const [view, setView] = useState<"office" | "list">("office");
   const [modal, setModal] = useState<
-    "mission" | "review" | "settings" | "report" | "activity" | null
+    "mission" | "review" | "settings" | "report" | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1136,9 +1132,6 @@ export default function App() {
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("model");
   const [officeVersion, setOfficeVersion] = useState(0);
-  const [activityScope, setActivityScope] = useState<"mission" | "all">(
-    "mission",
-  );
   const dataEpoch = useRef(0);
   const selectedRun = useRef(runId);
   useEffect(() => {
@@ -1225,7 +1218,6 @@ export default function App() {
     setRuns([]);
     setArtifacts([]);
     setSelected("executive");
-    setHistoricalAgent(null);
     setView("office");
     setFilter("");
     setDepartment("all");
@@ -1243,14 +1235,6 @@ export default function App() {
     void refreshRuns();
   }, [clearClientData, reloadSettings, refreshRuns]);
   const office = useOffice(onEvent, officeVersion, onOfficeReset);
-  const activityHistory = useActivityHistory({
-    scope: activityScope === "mission" && runId ? { run_id: runId } : {},
-    liveEvents: office.events,
-    snapshot: office.snapshot,
-    resetVersion: officeVersion,
-    onReset: onOfficeReset,
-    subscribe: office.subscribe,
-  });
   async function regenesis(confirmation: string): Promise<RegenesisResult> {
     const result = await api.regenesis(confirmation);
     clearClientData();
@@ -1294,17 +1278,10 @@ export default function App() {
     activeActivities.has(agent.activity),
   ).length;
   const selectedAgent =
-    allAgents.find((agent) => agent.agent_id === selected) ??
-    (historicalAgent?.agent_id === selected
-      ? displayActivity(
-          historicalAgent,
-          activityRuns.get(historicalAgent.run_id ?? ""),
-        )
-      : allAgents[0]);
+    allAgents.find((agent) => agent.agent_id === selected) ?? allAgents[0];
   const inspectedRun = selectedAgent?.run_id
     ? (activityRuns.get(selectedAgent.run_id) ?? null)
     : run;
-  const events = activityHistory.events;
   async function perform(operation: () => Promise<unknown>, close = false) {
     setBusy(true);
     setError("");
@@ -1436,19 +1413,6 @@ export default function App() {
               </div>
             </div>
             <div className="mission-actions">
-              <button
-                className="activity-button"
-                aria-label="Open activity stream"
-                aria-haspopup="dialog"
-                title="Activity stream"
-                onClick={() => setModal("activity")}
-              >
-                <ActivityIcon size={16} />
-                <span className="activity-button-text">Activity</span>
-                <span className="activity-count" aria-hidden="true">
-                  {events.length}
-                </span>
-              </button>
               <button
                 className="primary-button"
                 onClick={() => {
@@ -1686,6 +1650,7 @@ export default function App() {
               {view === "office" ? (
                 <OfficeCanvas
                   agents={allAgents}
+                  recordedAgents={Object.values(office.agents)}
                   events={office.events}
                   selected={selected}
                   onSelect={setSelected}
@@ -1841,101 +1806,6 @@ export default function App() {
           />
         </Modal>
       )}{" "}
-      {modal === "activity" && (
-        <Modal
-          title="Activity stream"
-          onClose={() => setModal(null)}
-          wide
-          className="activity-modal"
-        >
-          <section className="activity-section" aria-label="Recent activity">
-            <div className="activity-heading">
-              <h3>
-                <ActivityIcon size={16} /> Recent activity{" "}
-                <span className="tiny-count">{events.length}</span>
-              </h3>
-              <span className="live-word">
-                <Radio size={12} />{" "}
-                {office.connection === "live" ? "LIVE" : "AWAITING CONNECTION"}
-              </span>
-            </div>
-            <label className="activity-scope">
-              Show
-              <select
-                aria-label="Activity scope"
-                value={runId ? activityScope : "all"}
-                onChange={(event) =>
-                  setActivityScope(event.target.value as "mission" | "all")
-                }
-              >
-                <option value="mission" disabled={!runId}>
-                  Selected mission
-                </option>
-                <option value="all">All activity</option>
-              </select>
-            </label>
-            <ActivityHistoryControls history={activityHistory} />
-            {events.length === 0 &&
-            !activityHistory.loading &&
-            !activityHistory.error ? (
-              <div className="timeline-empty">
-                <span className="timeline-line" />
-                <div>
-                  <span className="small-dot" />
-                  <strong>The office is ready</strong>
-                  <p>
-                    {run
-                      ? "Activity will appear here as the organization works."
-                      : "Create a mission to see your organization get to work."}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="timeline">
-                {events.map((event) => {
-                  const current = office.agents[event.agent_id];
-                  const role = roleFor({
-                    ...current,
-                    ...event,
-                    data: { ...current?.data, ...event.data },
-                  });
-                  return (
-                    <button
-                      key={event.seq}
-                      onClick={() => {
-                        setHistoricalAgent(event);
-                        setSelected(event.agent_id);
-                        if (event.source === "harness" && event.run_id)
-                          setRunId(event.run_id);
-                        setModal(null);
-                      }}
-                    >
-                      <Stamp date={event.timestamp} />
-                      <span className={`small-dot ${event.activity}`} />
-                      <strong>{role.name}</strong>
-                      <span>
-                        {event.summary ?? activityLabels[event.activity]}
-                      </span>
-                      <code>{event.kr_id ?? ""}</code>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {activityHistory.hasMore && !activityHistory.error && (
-              <button
-                className="text-button history-more"
-                disabled={activityHistory.loading}
-                onClick={activityHistory.loadEarlier}
-              >
-                {activityHistory.loading
-                  ? "Loading activity…"
-                  : "Load earlier activity"}
-              </button>
-            )}
-          </section>
-        </Modal>
-      )}
       {modal === "report" && run && (
         <Modal
           title="Mission report"

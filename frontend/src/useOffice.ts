@@ -4,6 +4,7 @@ import {
   appendEvent,
   activityLabels,
   initialAgents,
+  latestAgentActivities,
   normalizeAgent,
   parseActivityEvent,
   projectEvent,
@@ -106,13 +107,17 @@ export function useOffice(
         setAgents((current) => ({
           ...initialAgents(),
           ...Object.fromEntries(
-            snapshotAgents.map((agent) => {
-              const newer = !changed && current[agent.agent_id];
-              return [
-                agent.agent_id,
-                newer && (newer.seq ?? -1) > (agent.seq ?? -1) ? newer : agent,
-              ];
-            }),
+            Object.values(latestAgentActivities(snapshotAgents)).map(
+              (agent) => {
+                const newer = !changed && current[agent.agent_id];
+                return [
+                  agent.agent_id,
+                  newer && (newer.seq ?? -1) > (agent.seq ?? -1)
+                    ? newer
+                    : agent,
+                ];
+              },
+            ),
           ),
         }));
         const query = new URLSearchParams({ after: String(cursor.current) });

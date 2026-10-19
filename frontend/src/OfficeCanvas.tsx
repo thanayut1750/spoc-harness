@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { layoutAgentEvents, recordedAgentEvent } from "./agentEvent";
+import type { BubbleRect } from "./agentEvent";
 import {
   activeActivities,
   activityLabels,
@@ -292,19 +294,6 @@ function draw(
         role.kind === "specialist",
       );
     }
-    if (active || agent.activity === "error" || agent.activity === "waiting") {
-      const text = activityLabels[agent.activity];
-      const width = ctx.measureText(text).width + 14;
-      rect(
-        ctx,
-        x - width / 2,
-        y - 75,
-        width,
-        18,
-        agent.activity === "error" ? "#eed0bb" : "#f5f0d9",
-      );
-      label(ctx, text, x, y - 62, "#4f6250", 9);
-    }
   });
   // Handoffs are drawn only when an actual event identifies both agents.
   events.slice(0, 8).forEach((event) => {
@@ -337,11 +326,13 @@ export function OfficeCanvas({
   selected,
   onSelect,
   events,
+  recordedAgents,
 }: {
   agents: AgentActivity[];
   selected: string;
   onSelect: (id: string) => void;
   events: ActivityEvent[];
+  recordedAgents?: AgentActivity[];
 }) {
   const [specialistPage, setSpecialistPage] = useState(0);
   const [integrationPage, setIntegrationPage] = useState(0);
@@ -365,6 +356,96 @@ export function OfficeCanvas({
     if (index >= 0) setIntegrationPage(Math.floor(index / integrationsPerPage));
   }, [selected, integrationIds]);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const instructionId = useId();
+  const [minimumMapHeight, setMinimumMapHeight] = useState(0);
+  const [minimumMapWidth, setMinimumMapWidth] = useState(0);
+  const [geometry, setGeometry] = useState({
+    width: 0,
+    height: 0,
+    obstacles: [] as BubbleRect[],
+  });
+  useEffect(() => {
+    const node = canvas.current;
+    if (!node) return;
+    const controls = [
+      ...node.parentElement!.querySelectorAll<HTMLElement>(
+        ".canvas-roster-group",
+      ),
+    ];
+    const measure = () => {
+      const bounds = node.getBoundingClientRect();
+      const obstacles = controls.map((control) => {
+        const box = control.getBoundingClientRect();
+        return {
+          x: box.left - bounds.left,
+          y: box.top - bounds.top,
+          width: box.width,
+          height: box.height,
+        };
+      });
+      setGeometry((current) =>
+        current.width === bounds.width &&
+        current.height === bounds.height &&
+        JSON.stringify(current.obstacles) === JSON.stringify(obstacles)
+          ? current
+          : { width: bounds.width, height: bounds.height, obstacles },
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    controls.forEach((control) => observer.observe(control));
+    return () => observer.disconnect();
+  }, [
+    roster.specialists.length,
+    roster.integrations.length,
+    roster.specialistPage,
+    roster.integrationPage,
+  ]);
+  const layout = useMemo(
+    () =>
+      layoutAgentEvents(
+        roster.positioned,
+        recordedAgents ?? agents,
+        geometry.width,
+        geometry.height,
+        geometry.obstacles,
+      ),
+    [
+      agents,
+      recordedAgents,
+      geometry,
+      roster.specialistPage,
+      roster.integrationPage,
+    ],
+  );
+  const bubbles = layout.bubbles;
+  const visibleRecords = new Map(
+    (recordedAgents ?? agents).map((agent) => [agent.agent_id, agent]),
+  );
+  const eventCount = roster.positioned.filter(({ agent }) => {
+    const event = visibleRecords.get(agent.agent_id);
+    return event && recordedAgentEvent(event);
+  }).length;
+  useEffect(() => {
+    if (eventCount <= 10) {
+      setMinimumMapWidth(0);
+      setMinimumMapHeight(0);
+    }
+  }, [eventCount]);
+  useEffect(() => {
+    if (!geometry.width || !geometry.height || !eventCount) return;
+    if (geometry.width < 140 || (eventCount > 10 && geometry.width < 560))
+      setMinimumMapWidth(eventCount > 10 ? 560 : 280);
+    else if (layout.tooSmall)
+      setMinimumMapHeight((current) => Math.max(current, geometry.height + 64));
+  }, [layout.tooSmall, geometry.width, geometry.height, eventCount]);
+  const bubbleIds = new Map(
+    bubbles.map((bubble, index) => [
+      bubble.agent.agent_id,
+      `${instructionId}-event-${index}`,
+    ]),
+  );
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const media = matchMedia("(prefers-reduced-motion: reduce)");
@@ -421,48 +502,120 @@ export function OfficeCanvas({
     roster.integrationPage,
   ]);
   return (
-    <div className="office-canvas">
-      <canvas
-        ref={canvas}
-        role="img"
-        aria-label="Top-down office: executive room north, Tools R&D northeast, research west, engineering east, quality gates center, integrations southwest, Engineering specialist desks southeast."
-      />
-      {roster.positioned.map(({ agent, role }) => {
-        return (
+    <div
+      className="office-scroll-region"
+      role="region"
+      aria-label="Agent office map"
+      aria-describedby={instructionId}
+      tabIndex={0}
+    >
+      <p className="office-map-instructions" id={instructionId}>
+        Select an activity bubble or agent to inspect the full recorded event.
+        On small screens, scroll the map to see every desk.
+      </p>
+      <div
+        className="office-canvas"
+        style={{
+          minHeight: minimumMapHeight || undefined,
+          minWidth: minimumMapWidth || undefined,
+        }}
+      >
+        <canvas
+          ref={canvas}
+          role="img"
+          aria-label="Top-down office: executive room north, Tools R&D northeast, research west, engineering east, quality gates center, integrations southwest, Engineering specialist desks southeast."
+        />
+        <svg
+          className="agent-event-connectors"
+          width={geometry.width}
+          height={geometry.height}
+          aria-hidden="true"
+        >
+          {bubbles.map((bubble) => (
+            <line
+              key={bubble.agent.agent_id}
+              x1={Math.max(
+                bubble.x + 10,
+                Math.min(bubble.anchorX, bubble.x + bubble.width - 10),
+              )}
+              y1={
+                bubble.y + bubble.height <= bubble.anchorY
+                  ? bubble.y + bubble.height
+                  : bubble.y
+              }
+              x2={bubble.anchorX}
+              y2={bubble.anchorY - 18}
+            />
+          ))}
+        </svg>
+        {roster.positioned.map(({ agent, role }) => {
+          return (
+            <button
+              key={agent.agent_id}
+              className="canvas-agent"
+              type="button"
+              data-agent-key={agent.agent_id}
+              aria-describedby={bubbleIds.get(agent.agent_id)}
+              style={{
+                left: `${(role.x / W) * 100}%`,
+                top: `${(Math.min(role.y, 594) / H) * 100}%`,
+              }}
+              aria-label={`${role.name}: ${activityLabels[agent.activity]}. Inspect agent`}
+              aria-pressed={selected === agent.agent_id}
+              onClick={() => onSelect(agent.agent_id)}
+              title={`${role.name} · ${activityLabels[agent.activity]}`}
+            />
+          );
+        })}
+        {bubbles.map((bubble) => (
           <button
-            key={agent.agent_id}
-            className="canvas-agent"
+            key={bubble.agent.agent_id}
+            type="button"
+            id={bubbleIds.get(bubble.agent.agent_id)}
+            className={`agent-event-bubble ${bubble.agent.activity}`}
+            data-agent-key={bubble.agent.agent_id}
+            data-run-id={bubble.agent.run_id}
+            data-event-seq={bubble.agent.seq}
             style={{
-              left: `${(role.x / W) * 100}%`,
-              top: `${(Math.min(role.y, 594) / H) * 100}%`,
+              left: bubble.x,
+              top: bubble.y,
+              width: bubble.width,
+              height: bubble.height,
             }}
-            aria-label={`${role.name}: ${activityLabels[agent.activity]}. Inspect agent`}
-            aria-pressed={selected === agent.agent_id}
-            onClick={() => onSelect(agent.agent_id)}
-            title={`${role.name} · ${activityLabels[agent.activity]}`}
-          />
-        );
-      })}
-      {(roster.specialists.length > 0 || roster.integrations.length > 0) && (
-        <div className="canvas-roster-controls">
-          <RosterPager
-            label="Integrations"
-            count={roster.integrations.length}
-            page={roster.integrationPage}
-            pages={roster.integrationPages}
-            perPage={integrationsPerPage}
-            onPage={setIntegrationPage}
-          />
-          <RosterPager
-            label="Engineering specialists"
-            count={roster.specialists.length}
-            page={roster.specialistPage}
-            pages={roster.specialistPages}
-            perPage={specialistsPerPage}
-            onPage={setSpecialistPage}
-          />
-        </div>
-      )}
+            aria-label={bubble.title}
+            title={bubble.title}
+            onClick={() => onSelect(bubble.agent.agent_id)}
+          >
+            <span className="agent-event-label">
+              <span className="agent-event-name">{bubble.name}</span>
+              <span className="agent-event-recency">Last</span>
+            </span>
+            {bubble.summary && (
+              <span className="agent-event-summary">{bubble.summary}</span>
+            )}
+          </button>
+        ))}
+        {(roster.specialists.length > 0 || roster.integrations.length > 0) && (
+          <div className="canvas-roster-controls">
+            <RosterPager
+              label="Integrations"
+              count={roster.integrations.length}
+              page={roster.integrationPage}
+              pages={roster.integrationPages}
+              perPage={integrationsPerPage}
+              onPage={setIntegrationPage}
+            />
+            <RosterPager
+              label="Engineering specialists"
+              count={roster.specialists.length}
+              page={roster.specialistPage}
+              pages={roster.specialistPages}
+              perPage={specialistsPerPage}
+              onPage={setSpecialistPage}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

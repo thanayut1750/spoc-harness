@@ -66,6 +66,6 @@ describe("durable activity history", () => {
     const merged = mergeActivity([internal], [external]);
     expect(merged).toEqual([external, internal]);
     expect(internal.agent_id).toBe("backend_coder");
-    expect(external.agent_id).toBe("office:backend_coder");
+    expect(external.agent_id).toBe('external:["office","backend_coder"]');
   });
 });

@@ -11,6 +11,8 @@ import {
   roleFor,
   officeRoster,
   handoffEndpoints,
+  latestAgentActivities,
+  agentIdentityKey,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -42,8 +44,172 @@ describe("office projection", () => {
     const incoming = normalizeAgent(event(2, { source: "custom-office" }));
     const next = projectEvent(initialAgents(), incoming);
     expect(next.backend_coder.activity).toBe("idle");
-    expect(next["custom-office:backend_coder"].activity).toBe("executing");
+    expect(
+      next[agentIdentityKey("custom-office", "backend_coder")].activity,
+    ).toBe("executing");
     expect(incoming.original_agent_id).toBe("backend_coder");
+  });
+  it("isolates delimiter collisions, dynamic internal IDs, and encoded-looking raw IDs", () => {
+    const internal = event(1, {
+      agent_id: "specialist:run:1234567890abcdef",
+      data: {
+        agent_type: "engineering_specialist",
+        display_name: "Shader specialist",
+      },
+    });
+    const incoming = [
+      internal,
+      normalizeAgent(
+        event(2, { source: "specialist", agent_id: "run:1234567890abcdef" }),
+      ),
+      normalizeAgent(event(3, { source: "a", agent_id: "b:c" })),
+      normalizeAgent(event(4, { source: "a:b", agent_id: "c" })),
+      normalizeAgent(
+        event(5, { source: "a", agent_id: 'external:["a","b:c"]' }),
+      ),
+      normalizeAgent(
+        event(6, { source: "ทีม😀", agent_id: 'quoted:"\\:วิศวกร' }),
+      ),
+    ];
+    const projected = incoming.reduce(projectEvent, initialAgents());
+    expect(new Set(incoming.map((agent) => agent.agent_id)).size).toBe(
+      incoming.length,
+    );
+    for (const agent of incoming)
+      expect(projected[agent.agent_id].seq).toBe(agent.seq);
+    expect(roleFor(projected[internal.agent_id]).kind).toBe("specialist");
+    for (const agent of incoming.slice(1)) {
+      expect(roleFor(projected[agent.agent_id]).kind).toBe("external");
+      expect(normalizeAgent(agent)).toEqual(agent);
+    }
+    expect(roleFor(normalizeAgent(event(7, { source: "custom" }))).name).toBe(
+      "Backend Coder",
+    );
+  });
+  it("keeps the newest duplicate snapshot regardless of legacy row order", () => {
+    const older = normalizeAgent(
+      event(1, { source: "custom", summary: "Old activity" }),
+    );
+    const newer = normalizeAgent(
+      event(2, { source: "custom", summary: "Current activity" }),
+    );
+    for (const rows of [
+      [older, newer],
+      [newer, older],
+    ]) {
+      const projected = latestAgentActivities(rows);
+      expect(Object.values(projected)).toEqual([newer]);
+      expect(projectEvent(projected, older)).toBe(projected);
+    }
+  });
+  it("replaces omitted mission, KR and display fields rather than leaking the preceding event", () => {
+    const previous = event(1, {
+      run_id: "prior-run",
+      kr_id: "prior-kr",
+      summary: "Old action",
+      display_name: "Old name",
+      name: "Old alias",
+      department: "Old department",
+      data: { stdout: "Previous proof" },
+    });
+    const bare: ActivityEvent = {
+      seq: 2,
+      event_id: "bare",
+      source: "harness",
+      agent_id: previous.agent_id,
+      activity: "completed",
+      timestamp: previous.timestamp,
+    };
+    const projected = projectEvent(
+      projectEvent(initialAgents(), previous),
+      bare,
+    )[bare.agent_id];
+    expect(projected).toEqual({ ...bare, data: {} });
+    const sameRun = projectEvent(projectEvent(initialAgents(), previous), {
+      ...bare,
+      run_id: "prior-run",
+    })[bare.agent_id];
+    expect(sameRun.run_id).toBe("prior-run");
+    expect(sameRun.kr_id).toBeUndefined();
+    const external = normalizeAgent({ ...previous, source: "feed" });
+    const externalBare = normalizeAgent({ ...bare, source: "feed" });
+    const externalNext = projectEvent(
+      projectEvent(initialAgents(), external),
+      externalBare,
+    )[externalBare.agent_id];
+    expect(externalNext.run_id).toBeUndefined();
+    expect(externalNext.summary).toBeUndefined();
+  });
+  it("retains only same-run internal specialist identity, including its public name", () => {
+    const activated = event(1, {
+      agent_id: "specialist:run:1234567890abcdef",
+      run_id: "run",
+      display_name: "Shader specialist",
+      name: "Old alias",
+      kr_id: "old-kr",
+      data: {
+        agent_type: "engineering_specialist",
+        display_name: "Shader specialist",
+        model_parent: "backend_coder",
+        stdout: "Old output",
+      },
+    });
+    const bare = event(2, {
+      agent_id: activated.agent_id,
+      run_id: "run",
+      data: {},
+    });
+    const current = projectEvent(initialAgents(), activated);
+    const next = projectEvent(current, bare)[bare.agent_id];
+    expect(next.display_name).toBe("Shader specialist");
+    expect(next.data).toEqual({
+      agent_type: "engineering_specialist",
+      display_name: "Shader specialist",
+      model_parent: "backend_coder",
+    });
+    expect(next.kr_id).toBeUndefined();
+    expect(next.name).toBeUndefined();
+    for (const run_id of [undefined, "another-run"])
+      expect(projectEvent(current, { ...bare, run_id })[bare.agent_id]).toEqual(
+        { ...bare, run_id, data: {} },
+      );
+  });
+  it("resolves raw and normalized handoff targets only inside their exact source", () => {
+    const sender = normalizeAgent(
+      event(1, { source: "a", agent_id: "sender" }),
+    );
+    const rawPrefix = normalizeAgent(
+      event(2, { source: "a", agent_id: "a:target" }),
+    );
+    const target = normalizeAgent(
+      event(3, { source: "a", agent_id: "target" }),
+    );
+    const encodedRaw = normalizeAgent(
+      event(4, { source: "a", agent_id: target.agent_id }),
+    );
+    const foreign = normalizeAgent(
+      event(5, { source: "other", agent_id: "target" }),
+    );
+    const agents = [sender, rawPrefix, target, encodedRaw, foreign];
+    const positioned = officeRoster(agents).positioned;
+    // The paged roster has only three integrations, so use explicit positions for all endpoints.
+    const all = agents.map((agent, index) => ({
+      agent,
+      role: roleFor(agent, index),
+    }));
+    expect(positioned.length).toBeGreaterThan(0);
+    const handoff = (raw: string) =>
+      handoffEndpoints({ ...sender, data: { target_agent_id: raw } }, all)?.to;
+    expect(handoff("a:target")).toBe(all[1].role);
+    expect(handoff(target.agent_id)).toBe(all[3].role); // exact raw ID wins
+    expect(
+      handoffEndpoints(
+        { ...sender, data: { to_agent_id: target.agent_id } },
+        all.filter(({ agent }) => agent !== encodedRaw),
+      )?.to,
+    ).toBe(all[2].role);
+    expect(handoff(foreign.agent_id)).toBeUndefined();
+    expect(handoff("backend_coder")).toBeUndefined();
   });
   it("does not regress a newer activity with a stale event", () => {
     const current = projectEvent(initialAgents(), event(2));
@@ -136,6 +302,7 @@ describe("office projection", () => {
   it("recognizes named Engineering specialists only from internal metadata and retains their identity", () => {
     const specialist = event(4, {
       agent_id: "specialist:run:1234567890abcdef",
+      run_id: "run",
       data: {
         agent_type: "engineering_specialist",
         display_name: "Shader specialist",

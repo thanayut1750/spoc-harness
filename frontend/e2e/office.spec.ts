@@ -7,6 +7,14 @@ import type {
   WorkspaceSettings,
 } from "../src/types";
 const runId = "run-fixture";
+function eventBubble(page: Page, agentKey: string) {
+  return page.locator(
+    `.agent-event-bubble[data-agent-key=${JSON.stringify(agentKey)}]`,
+  );
+}
+function summaryBubble(page: Page, summary: string) {
+  return page.locator(".agent-event-bubble").filter({ hasText: summary });
+}
 const defaultSettings: WorkspaceSettings = {
   defaults: {
     provider: "configured",
@@ -261,13 +269,30 @@ test("projects live activity, isolates external identities, reconnects from curs
 }) => {
   await fixture(page);
   await expect(
-    page.getByRole("dialog", { name: "Activity stream", exact: true }),
+    page.getByRole("button", { name: "Open activity stream" }),
   ).toHaveCount(0);
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Running acceptance tests",
+  );
+  const lastEvent = await eventBubble(page, "backend_coder").boundingBox();
+  const avatar = await page
+    .locator('.canvas-agent[data-agent-key="backend_coder"]')
+    .boundingBox();
+  expect(lastEvent).not.toBeNull();
+  expect(avatar).not.toBeNull();
+  expect(lastEvent!.y + lastEvent!.height).toBeLessThanOrEqual(
+    avatar!.y + avatar!.height / 2,
+  );
+  await expect(eventBubble(page, "executive")).toHaveCount(0);
   await expect(page.locator(".office-footer")).toBeInViewport();
   await page
     .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
     .click();
-  await expect(page.getByText("Running acceptance tests")).toBeVisible();
+  await expect(
+    page
+      .getByRole("complementary", { name: "Selected agent" })
+      .getByText("Running acceptance tests"),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Files" }).click();
   await expect(
     page.getByRole("link", { name: /acceptance-results.txt/ }),
@@ -293,25 +318,22 @@ test("projects live activity, isolates external identities, reconnects from curs
       name: "Backend coder: Executing. Inspect agent",
     }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const activity = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await activity.getByLabel("Activity scope").selectOption("all");
-  await expect(
-    activity.getByRole("heading", { name: "Recent activity 1" }),
-  ).toBeVisible();
-  await activity
-    .locator(".timeline > button")
-    .filter({ hasText: "Reading integration notes" })
+  await expect(summaryBubble(page, "Reading integration notes")).toContainText(
+    "Reading integration notes",
+  );
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Running acceptance tests",
+  );
+  await page
+    .getByRole("button", { name: "Backend Coder: Reading. Inspect agent" })
     .click();
-  await expect(activity).toBeHidden();
   await expect(
     page.getByRole("heading", { name: "Backend Coder", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Reading integration notes", { exact: true }),
+    page
+      .getByRole("complementary", { name: "Selected agent" })
+      .getByText("Reading integration notes", { exact: true }),
   ).toBeVisible();
   await page.evaluate(() => {
     const stream = (
@@ -334,7 +356,7 @@ test("projects live activity, isolates external identities, reconnects from curs
     fullPage: true,
   });
 });
-test("restores paginated mission and agent activity after reload without changing the live desk projection", async ({
+test("restores paginated agent history with exact mission and identity scopes without changing event bubbles", async ({
   page,
 }) => {
   await fixture(page);
@@ -407,29 +429,9 @@ test("restores paginated mission and agent activity after reload without changin
       name: "Backend coder: Executing. Inspect agent",
     }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await expect(dialog.locator(".timeline > button")).toHaveCount(100);
-  await expect(
-    dialog.getByText("Saved worker step 205", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    dialog.getByText("Activity belonging to the older mission"),
-  ).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Load earlier activity" }).click();
-  await expect(dialog.locator(".timeline > button")).toHaveCount(200);
-  await dialog.getByRole("button", { name: "Load earlier activity" }).click();
-  await expect(dialog.locator(".timeline > button")).toHaveCount(206);
-  await expect(
-    dialog.getByText("Saved worker step 1", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    dialog.getByRole("button", { name: "Load earlier activity" }),
-  ).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Running acceptance tests",
+  );
   await page
     .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
     .click();
@@ -447,6 +449,12 @@ test("restores paginated mission and agent activity after reload without changin
     .getByRole("button", { name: "Load earlier activity" })
     .click();
   await expect(inspector.locator(".agent-event")).toHaveCount(205);
+  await expect(
+    inspector.getByText("Saved worker step 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByRole("button", { name: "Load earlier activity" }),
+  ).toHaveCount(0);
   await page
     .getByRole("combobox", { name: "Selected mission" })
     .selectOption(otherRun.run_id);
@@ -456,6 +464,12 @@ test("restores paginated mission and agent activity after reload without changin
   await expect(
     inspector.getByText("Saved worker step 205", { exact: true }),
   ).toHaveCount(0);
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Running acceptance tests",
+  );
+  await expect(eventBubble(page, "backend_coder")).not.toContainText(
+    "older mission",
+  );
   expect(
     historyRequests.some(
       (query) =>
@@ -473,6 +487,559 @@ test("restores paginated mission and agent activity after reload without changin
     ),
   ).toContain("after=10");
 });
+
+test("shows the latest real summaries for terminal, named, and external agents without mixing missions", async ({
+  page,
+}) => {
+  await fixture(page);
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(1);
+  await expect(eventBubble(page, "executive")).toHaveCount(0);
+  const currentSpecialist = "specialist:run-fixture:0000000000000001";
+  const olderSpecialist = "specialist:older-run:0000000000000001";
+  await page.evaluate(
+    ({ currentSpecialist, olderSpecialist }) => {
+      const emit = (
+        window as unknown as { __officeEmit: (event: unknown) => void }
+      ).__officeEmit;
+      for (const event of [
+        {
+          seq: 11,
+          agent_id: "backend_coder",
+          source: "harness",
+          activity: "completed",
+          summary: "Saved the completed implementation",
+          run_id: "run-fixture",
+        },
+        {
+          seq: 12,
+          agent_id: "backend_coder",
+          source: "harness",
+          activity: "error",
+          summary: "Verification needs the missing credentials",
+          run_id: "run-fixture",
+        },
+        {
+          seq: 13,
+          agent_id: "backend_coder",
+          source: "custom",
+          activity: "reading",
+          summary: "External monitor read its own integration feed",
+          run_id: "run-fixture",
+        },
+        {
+          seq: 14,
+          agent_id: currentSpecialist,
+          source: "harness",
+          activity: "completed",
+          summary: "Verified the current mission shader output",
+          run_id: "run-fixture",
+          data: {
+            agent_type: "engineering_specialist",
+            display_name: "Shader verifier",
+            model_parent: "backend_coder",
+          },
+        },
+        {
+          seq: 15,
+          agent_id: olderSpecialist,
+          source: "harness",
+          activity: "error",
+          summary: "Older mission shader requires a different input",
+          run_id: "older-run",
+          data: {
+            agent_type: "engineering_specialist",
+            display_name: "Shader verifier",
+            model_parent: "backend_coder",
+          },
+        },
+      ])
+        emit({
+          ...event,
+          event_id: `latest-${event.seq}`,
+          timestamp: "2026-10-18T10:00:05Z",
+        });
+    },
+    { currentSpecialist, olderSpecialist },
+  );
+  const worker = eventBubble(page, "backend_coder");
+  await expect(worker).toContainText(
+    "Verification needs the missing credentials",
+  );
+  await expect(worker.locator(".agent-event-name")).toHaveText("Backend coder");
+  await expect(worker.locator(".agent-event-recency")).toHaveText("Last");
+  await expect(worker).toHaveAccessibleName(/Last event: Needs attention/);
+  await expect(worker).not.toContainText("Saved the completed implementation");
+  await expect(worker).toHaveAttribute("data-event-seq", "12");
+  await expect(worker).toHaveAttribute("data-run-id", runId);
+  await expect(
+    summaryBubble(page, "External monitor read its own integration feed"),
+  ).toHaveCount(1);
+  await expect(eventBubble(page, currentSpecialist)).toContainText(
+    "Verified the current mission shader output",
+  );
+  await expect(
+    eventBubble(page, currentSpecialist).locator(".agent-event-name"),
+  ).toHaveText("Shader verifier");
+  await expect(eventBubble(page, currentSpecialist)).toHaveAccessibleName(
+    /Last event: Completed/,
+  );
+  await expect(eventBubble(page, currentSpecialist)).toHaveAttribute(
+    "data-run-id",
+    runId,
+  );
+  await expect(eventBubble(page, olderSpecialist)).toContainText(
+    "Older mission shader requires a different input",
+  );
+  await expect(eventBubble(page, olderSpecialist)).toHaveAttribute(
+    "data-run-id",
+    "older-run",
+  );
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(4);
+  await page
+    .getByRole("button", {
+      name: "Backend coder: Needs attention. Inspect agent",
+    })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(
+    inspector.getByText("Saved the completed implementation", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("Verification needs the missing credentials", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("External monitor read its own integration feed"),
+  ).toHaveCount(0);
+});
+
+test("keeps external tuple identities distinct from internal specialists and one another", async ({
+  page,
+}) => {
+  await fixture(page);
+  const specialist = "specialist:run-fixture:0000000000000001";
+  await page.evaluate((specialist) => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    const identities = [
+      {
+        agent_id: specialist,
+        source: "harness",
+        summary: "Internal specialist output",
+        data: {
+          display_name: "Internal verifier",
+          agent_type: "engineering_specialist",
+          model_parent: "backend_coder",
+        },
+      },
+      {
+        agent_id: "run-fixture:0000000000000001",
+        source: "specialist",
+        summary: "External specialist-shaped ID",
+        data: {
+          display_name: "External lookalike",
+          agent_type: "engineering_specialist",
+        },
+      },
+      {
+        agent_id: "b:c",
+        source: "a",
+        summary: "First independent colon identity",
+        data: { display_name: "Colon monitor A" },
+      },
+      {
+        agent_id: "c",
+        source: "a:b",
+        summary: "Second independent colon identity",
+        data: { display_name: "Colon monitor B" },
+      },
+    ];
+    identities.forEach((identity, index) =>
+      emit({
+        ...identity,
+        seq: 11 + index,
+        event_id: `collision-${index}`,
+        run_id: "run-fixture",
+        activity: "reading",
+        timestamp: "2026-10-18T10:00:05Z",
+      }),
+    );
+  }, specialist);
+  const summaries = [
+    "Internal specialist output",
+    "External specialist-shaped ID",
+    "First independent colon identity",
+    "Second independent colon identity",
+  ];
+  const keys = [];
+  for (const summary of summaries) {
+    const bubble = summaryBubble(page, summary);
+    await expect(bubble).toHaveCount(1);
+    const key = await bubble.getAttribute("data-agent-key");
+    expect(key).toBeTruthy();
+    keys.push(key);
+  }
+  expect(new Set(keys).size).toBe(4);
+  await expect(eventBubble(page, specialist)).toContainText(
+    "Internal specialist output",
+  );
+  for (const name of [
+    "Internal verifier",
+    "External lookalike",
+    "Colon monitor A",
+    "Colon monitor B",
+  ]) {
+    await page
+      .getByRole("button", {
+        name: `${name}: Reading. Inspect agent`,
+        exact: true,
+      })
+      .click();
+    const inspector = page.getByRole("complementary", {
+      name: "Selected agent",
+    });
+    await expect(
+      inspector.getByRole("heading", { name, exact: true }),
+    ).toBeVisible();
+    await expect(
+      inspector.locator(".detail-row").filter({ hasText: "Department" }),
+    ).toContainText(
+      name === "Internal verifier" ? "Engineering" : "Integrations",
+    );
+  }
+});
+
+test("keeps the newest snapshot event when older duplicate actor rows follow it", async ({
+  page,
+}) => {
+  await fixture(page);
+  const base = {
+    agent_id: "backend_coder",
+    run_id: runId,
+    timestamp: "2026-10-18T10:00:05Z",
+  };
+  await page.route("**/api/office", (route) =>
+    route.fulfill({
+      json: {
+        agents: [
+          {
+            ...base,
+            source: "harness",
+            seq: 12,
+            event_id: "new-internal",
+            activity: "error",
+            summary: "Newest internal verification needs attention",
+          },
+          {
+            ...base,
+            source: "custom",
+            seq: 14,
+            event_id: "new-external",
+            activity: "reading",
+            summary: "Newest external monitor source",
+          },
+          {
+            ...base,
+            source: "harness",
+            seq: 11,
+            event_id: "old-internal",
+            activity: "completed",
+            summary: "Stale internal snapshot summary",
+          },
+          {
+            ...base,
+            source: "custom",
+            seq: 13,
+            event_id: "old-external",
+            activity: "writing",
+            summary: "Stale external snapshot summary",
+          },
+        ],
+        cursor: 14,
+        generation: "fixture-generation",
+      },
+    }),
+  );
+  await page.reload();
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Newest internal verification needs attention",
+  );
+  await expect(eventBubble(page, "backend_coder")).toHaveAttribute(
+    "data-event-seq",
+    "12",
+  );
+  await expect(
+    summaryBubble(page, "Newest external monitor source"),
+  ).toHaveAttribute("data-event-seq", "14");
+  await expect(
+    summaryBubble(page, "Stale internal snapshot summary"),
+  ).toHaveCount(0);
+  await expect(
+    summaryBubble(page, "Stale external snapshot summary"),
+  ).toHaveCount(0);
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(2);
+});
+
+test("fits seven recorded agents beside a paused review banner without office or page scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 867, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await fixture(page, {
+    status: "review",
+    review: {
+      interrupt_id: "paused-source-review",
+      kind: "blocked",
+      reason:
+        "A required reference was unavailable. Choose how the team should continue.",
+      allowed_actions: ["provide_context", "revise_kr", "abort"],
+    },
+  });
+  const specialistData = {
+    agent_type: "engineering_specialist",
+    parent_agent_id: "engineering_head",
+    model_parent: "backend_coder",
+  };
+  const actors: ActivityEvent[] = [
+    {
+      agent_id: "executive",
+      activity: "waiting",
+      summary: "Waiting for the engineering review decision",
+    },
+    {
+      agent_id: "engineering_head",
+      activity: "error",
+      summary: "The required reference needs a corrected public URL",
+    },
+    {
+      agent_id: "engineering_gatekeeper",
+      activity: "error",
+      summary: "The source evidence is incomplete for the requested output",
+    },
+    {
+      agent_id: "tools_rd_lead",
+      activity: "completed",
+      summary: "Returned an evidence-backed report to the Engineering lead",
+    },
+    {
+      agent_id: "triage_router",
+      activity: "completed",
+      summary: "Selected Engineering departmental execution",
+    },
+    {
+      agent_id: "specialist:run-fixture:0000000000000001",
+      activity: "completed",
+      summary: "Saved the implementation and its verification output",
+      data: { ...specialistData, display_name: "Implementation specialist" },
+    },
+    {
+      agent_id: "specialist:run-fixture:0000000000000002",
+      activity: "error",
+      summary: "The outdated source URL returned no readable page",
+      data: { ...specialistData, display_name: "Source analyst" },
+    },
+  ].map((actor, index) => ({
+    ...actor,
+    activity: actor.activity as ActivityEvent["activity"],
+    source: "harness",
+    run_id: runId,
+    seq: 11 + index,
+    event_id: `paused-${index}`,
+    timestamp: "2026-10-18T10:00:05Z",
+  }));
+  await page.route("**/api/office", (route) =>
+    route.fulfill({
+      json: { agents: actors, cursor: 17, generation: "fixture-generation" },
+    }),
+  );
+  const triage = actors.find((actor) => actor.agent_id === "triage_router")!;
+  await page.route("**/api/events/history?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const matches =
+      query.get("agent_id") === "triage_router" &&
+      query.get("source") === "harness" &&
+      query.get("run_id") === runId;
+    const events = matches
+      ? [
+          triage,
+          ...[
+            "Received the mission",
+            "Evaluated the requested task scope",
+            "Checked the available departments",
+          ].map((summary, index) => ({
+            ...triage,
+            seq: index + 1,
+            event_id: `triage-history-${index}`,
+            summary,
+          })),
+        ]
+      : [];
+    return route.fulfill({
+      json: {
+        events,
+        next_before: null,
+        has_more: false,
+        generation: "fixture-generation",
+      },
+    });
+  });
+  await page.reload();
+  await expect(page.locator(".review-banner")).toBeVisible();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(7);
+  for (const actor of actors)
+    await expect(eventBubble(page, actor.agent_id)).toContainText(
+      actor.summary!,
+    );
+  await expect(eventBubble(page, "backend_coder")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page
+        .locator(".office-scroll-region")
+        .evaluate(
+          (node) =>
+            node.scrollWidth <= node.clientWidth &&
+            node.scrollHeight <= node.clientHeight,
+        ),
+    )
+    .toBe(true);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <= window.innerWidth &&
+        document.documentElement.scrollHeight <= window.innerHeight,
+    ),
+  ).toBe(true);
+  await eventBubble(page, "triage_router").click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(
+    inspector.getByRole("heading", { name: "Triage Router", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(inspector.locator(".agent-event")).toHaveCount(4);
+  await expect(
+    inspector.getByText(triage.summary!, { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/office-bubbles-paused-867.png",
+    fullPage: true,
+  });
+});
+
+for (const { width, height } of [
+  { width: 1440, height: 1000 },
+  { width: 867, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`keeps dense event bubbles readable within the ${width}px office map and agent selection usable`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await fixture(page);
+    const fullSummary =
+      "Working from the recorded source and checking the required output. The final sentence must remain available to keyboard and assistive technology users.";
+    await page.evaluate((fullSummary) => {
+      const emit = (
+        window as unknown as { __officeEmit: (event: unknown) => void }
+      ).__officeEmit;
+      const fixed = [
+        "planner",
+        "triage_router",
+        "executive",
+        "research_head",
+        "market_researcher",
+        "data_analyst",
+        "engineering_head",
+        "tools_rd_lead",
+        "system_architect",
+        "backend_coder",
+        "research_gatekeeper",
+        "engineering_gatekeeper",
+      ];
+      const actors = [
+        ...fixed.map((agent_id) => ({ agent_id, source: "harness", data: {} })),
+        ...Array.from({ length: 4 }, (_, index) => ({
+          agent_id: `specialist:run-fixture:${String(index).padStart(16, "0")}`,
+          source: "harness",
+          data: {
+            display_name: `Dense specialist ${index}`,
+            agent_type: "engineering_specialist",
+            model_parent: "backend_coder",
+          },
+        })),
+        ...Array.from({ length: 3 }, (_, index) => ({
+          agent_id: `monitor-${index}`,
+          source: "custom-office",
+          data: { display_name: `Dense integration ${index}` },
+        })),
+      ];
+      actors.forEach((actor, index) =>
+        emit({
+          ...actor,
+          seq: 11 + index,
+          event_id: `dense-${index}`,
+          run_id: "run-fixture",
+          activity: "reading",
+          summary: `${index + 1}. ${fullSummary}`,
+          timestamp: "2026-10-18T10:00:05Z",
+        }),
+      );
+    }, fullSummary);
+    await expect(page.locator(".agent-event-bubble")).toHaveCount(19);
+    const bounds = await page.locator(".office-canvas canvas").boundingBox();
+    expect(bounds).not.toBeNull();
+    const boxes = [];
+    for (const bubble of await page.locator(".agent-event-bubble").all()) {
+      const box = await bubble.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(bounds!.x - 1);
+      expect(box!.y).toBeGreaterThanOrEqual(bounds!.y - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(
+        bounds!.x + bounds!.width + 1,
+      );
+      expect(box!.y + box!.height).toBeLessThanOrEqual(
+        bounds!.y + bounds!.height + 1,
+      );
+      expect(await bubble.getAttribute("title")).toContain(fullSummary);
+      expect(await bubble.getAttribute("aria-label")).toContain(fullSummary);
+      boxes.push(box!);
+    }
+    for (let left = 0; left < boxes.length; left++)
+      for (let right = left + 1; right < boxes.length; right++) {
+        const a = boxes[left],
+          b = boxes[right];
+        expect(
+          a.x + a.width <= b.x + 1 ||
+            b.x + b.width <= a.x + 1 ||
+            a.y + a.height <= b.y + 1 ||
+            b.y + b.height <= a.y + 1,
+        ).toBe(true);
+      }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/office-bubbles-${width}.png`,
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", {
+        name: "Engineering reviewer: Reading. Inspect agent",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page
+        .getByRole("complementary", { name: "Selected agent" })
+        .getByRole("heading", { name: "Engineering reviewer", exact: true }),
+    ).toBeVisible();
+  });
+}
 
 test("activity history errors stay visible and retry restores source-isolated integration history", async ({
   page,
@@ -522,34 +1089,46 @@ test("activity history errors stay visible and retry restores source-isolated in
     });
   });
   await page.reload();
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await expect(dialog.getByRole("alert")).toContainText(
-    "Activity database temporarily unavailable",
-  );
-  await expect(dialog.getByText("The office is ready")).toHaveCount(0);
-  unavailable = false;
-  await dialog.getByRole("button", { name: "Retry activity" }).click();
-  await expect(dialog.getByText("Internal saved output")).toBeVisible();
-  await expect(dialog.getByRole("alert")).toHaveCount(0);
-  await dialog.getByLabel("Activity scope").selectOption("all");
-  await expect(
-    dialog.getByText("External saved integration output"),
-  ).toBeVisible();
-  await dialog
-    .locator(".timeline > button")
-    .filter({ hasText: "External saved integration output" })
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
     .click();
-  // An integration may be absent from the latest projection; its persisted event still identifies the inspector.
   await page.getByRole("tab", { name: "Activity", exact: true }).click();
   const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(inspector.getByRole("alert")).toContainText(
+    "Activity database temporarily unavailable",
+  );
+  await expect(inspector.getByText("The office is ready")).toHaveCount(0);
+  unavailable = false;
+  await inspector.getByRole("button", { name: "Retry activity" }).click();
+  await expect(inspector.getByText("Internal saved output")).toBeVisible();
+  await expect(inspector.getByRole("alert")).toHaveCount(0);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      seq: 11,
+      event_id: "external-current",
+      source: "custom",
+      agent_id: "backend_coder",
+      activity: "reading",
+      summary: "External current integration state",
+      timestamp: "2026-10-18T10:00:01Z",
+    });
+  });
+  await page
+    .getByRole("button", { name: "Backend Coder: Reading. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
   await expect(
     inspector.getByText("External saved integration output"),
   ).toBeVisible();
   await expect(inspector.getByText("Internal saved output")).toHaveCount(0);
+  await expect(
+    summaryBubble(page, "External current integration state"),
+  ).toHaveCount(1);
+  await expect(
+    summaryBubble(page, "External saved integration output"),
+  ).toHaveCount(0);
 });
 test("retains every matching live event when a batched burst exceeds the animation buffer", async ({
   page,
@@ -583,15 +1162,12 @@ test("retains every matching live event when a batched burst exceeds the animati
   await expect(
     inspector.getByText("Batched worker event 11", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await expect(dialog.locator(".timeline > button")).toHaveCount(250);
-  await expect(
-    dialog.getByText("Batched worker event 11", { exact: true }),
-  ).toBeVisible();
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Batched worker event 260",
+  );
+  await expect(eventBubble(page, "backend_coder")).not.toContainText(
+    "Batched worker event 11",
+  );
 });
 test("a history generation mismatch resets stale client data before loading the new history", async ({
   page,
@@ -640,11 +1216,13 @@ test("a history generation mismatch resets stale client data before loading the 
       ),
     )
     .toBe("/api/events?after=0&generation=history-reset");
-  await page.getByRole("button", { name: "Open activity stream" }).click();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Backend coder: Idle. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
   await expect(
-    page
-      .getByRole("dialog")
-      .getByRole("heading", { name: "Recent activity 0" }),
+    page.getByText("No activity recorded for this agent yet."),
   ).toBeVisible();
 });
 test("creates a mission with constitution and sends targeted guidance", async ({
@@ -1009,16 +1587,12 @@ test("offers usable mobile navigation and keyboard agent selection with reduced 
   await expect(
     page.getByRole("dialog", { name: "Activity stream", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const activity = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
   await expect(
-    activity.getByRole("heading", { name: "Recent activity 0" }),
-  ).toBeVisible();
-  await activity.getByRole("button", { name: "Close dialog" }).click();
-  await expect(activity).toBeHidden();
+    page.getByRole("button", { name: "Open activity stream" }),
+  ).toHaveCount(0);
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Running acceptance tests",
+  );
   await page.getByRole("button", { name: "Agents", exact: true }).click();
   await page.getByRole("textbox", { name: "Search agents" }).fill("architect");
   await expect(
@@ -1879,12 +2453,7 @@ test("Regenesis requires exact typed confirmation and resets the client from a f
       ),
     )
     .toContain("after=0");
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  await expect(
-    page
-      .getByRole("dialog", { name: "Activity stream", exact: true })
-      .getByRole("heading", { name: "Recent activity 0" }),
-  ).toBeVisible();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(0);
 });
 test("another client reset event clears stale run data and reopens the stream at zero", async ({
   page,
@@ -1894,16 +2463,15 @@ test("another client reset event clears stale run data and reopens the stream at
     route.fulfill({ json: { agents: [], cursor: 0 } }),
   );
   await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const activity = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await expect(activity).toBeVisible();
+  await expect(eventBubble(page, "backend_coder")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Backend coder: Executing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
   await page.evaluate(() => {
     (window as unknown as { __officeReset: () => void }).__officeReset();
   });
-  await expect(activity).toBeHidden();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(0);
   await expect(
     page.getByRole("combobox", { name: "Selected mission" }),
   ).toHaveValue("");
@@ -1920,9 +2488,12 @@ test("another client reset event clears stale run data and reopens the stream at
       ),
     )
     .toContain("after=0");
-  await page.getByRole("button", { name: "Open activity stream" }).click();
+  await page
+    .getByRole("button", { name: "Backend coder: Idle. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
   await expect(
-    activity.getByRole("heading", { name: "Recent activity 0" }),
+    page.getByText("No activity recorded for this agent yet."),
   ).toBeVisible();
   expect(requests.some((request) => request.path === "/api/regenesis")).toBe(
     false,
@@ -1994,21 +2565,24 @@ test("same-generation reconnect replays missed activity from the last received s
         timestamp: `2026-10-18T10:00:0${seq - 8}Z`,
       });
   });
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const activity = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
+  await expect(eventBubble(page, "backend_coder")).toContainText(
+    "Writing the final acceptance report",
+  );
+  await expect(eventBubble(page, "backend_coder")).not.toContainText(
+    "Read acceptance results while disconnected",
+  );
+  await page
+    .getByRole("button", { name: "Backend coder: Writing. Inspect agent" })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  const activity = page.getByRole("complementary", { name: "Selected agent" });
   await expect(
     activity.getByText("Read acceptance results while disconnected"),
   ).toBeVisible();
   await expect(
     activity.getByText("Writing the final acceptance report"),
   ).toBeVisible();
-  await expect(
-    activity.getByRole("heading", { name: "Recent activity 2" }),
-  ).toBeVisible();
-  await activity.getByRole("button", { name: "Close dialog" }).click();
+  await expect(activity.locator(".agent-event")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "Backend coder: Writing. Inspect agent" }),
   ).toBeVisible();
@@ -2030,13 +2604,7 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
       timestamp: "2026-10-18T10:00:02Z",
     });
   });
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const activity = page.getByRole("dialog", {
-    name: "Activity stream",
-    exact: true,
-  });
-  await activity.getByLabel("Activity scope").selectOption("all");
-  await expect(activity.getByText("Old generation activity")).toBeVisible();
+  await expect(summaryBubble(page, "Old generation activity")).toBeVisible();
   await page.route("**/api/office", (route) =>
     route.fulfill({
       json: { agents: [], cursor: 0, generation: "after-offline-reset" },
@@ -2063,16 +2631,12 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
       ),
     )
     .toBe("/api/events?after=0&generation=after-offline-reset");
-  await expect(activity).toBeHidden();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(0);
   await expect(
     page.getByRole("combobox", { name: "Selected mission" }),
   ).toHaveValue("");
   await expect(page.getByText("Old generation activity")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Old Agent/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  await expect(
-    activity.getByRole("heading", { name: "Recent activity 0" }),
-  ).toBeVisible();
   expect(reloadedSettings).toBe(true);
   await page.evaluate(() => {
     (
@@ -2088,12 +2652,9 @@ test("reconnecting after an offline reset replaces stale missions and accepts th
     });
   });
   await expect(
-    activity.getByText("First activity after offline reset"),
+    summaryBubble(page, "First activity after offline reset"),
   ).toBeVisible();
-  await expect(
-    activity.getByRole("heading", { name: "Recent activity 1" }),
-  ).toBeVisible();
-  await activity.getByRole("button", { name: "Close dialog" }).click();
+  await expect(page.locator(".agent-event-bubble")).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "New Agent: Reading. Inspect agent" }),
   ).toBeVisible();
@@ -2363,13 +2924,26 @@ test("named Engineering specialists page separately from external integrations a
       timestamp: "2026-10-18T10:00:04Z",
     });
   });
-  await page.getByRole("button", { name: "Open activity stream" }).click();
-  const row = page
-    .getByRole("dialog")
-    .locator(".timeline > button")
-    .filter({ hasText: "Checking shader validation" });
-  await expect(row).toContainText("Shader specialist 8");
-  await row.click();
+  await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Search agents" })
+    .fill("Shader specialist 8");
+  await page
+    .locator(".agent-list .agent-row")
+    .filter({ hasText: "Shader specialist 8" })
+    .click();
+  await page.getByRole("button", { name: "Office", exact: true }).click();
+  const bubble = summaryBubble(page, "Checking shader validation");
+  await expect(bubble).toHaveAttribute("title", /Shader specialist 8/);
+  await page
+    .getByRole("button", {
+      name: "Shader specialist 8: Reading. Inspect agent",
+    })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    inspector.getByText("Checking shader validation", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", {
       name: "Shader specialist 8: Reading. Inspect agent",

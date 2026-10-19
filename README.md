@@ -56,7 +56,7 @@ uv run spoc doctor
 
 Use `spoc run --workspace /absolute/project/path` to select an existing project. Otherwise, each KR writes to its own local workspace under `.harness/workspaces/`. Use `--constitution policy.json` to supply a mission, prohibited actions, compliance rules, and `max_revision_loops`.
 
-The office shows the objective/KR hierarchy on the left, actual agent activity in department rooms, and selected-agent details on the right. Select a character to inspect its work, evidence, tool logs, and gate feedback. Human guidance is consumed at the next applicable agent boundary. Pause waits for a safe graph boundary; cancel also terminates active host commands.
+The office shows the objective/KR hierarchy on the left, actual agent activity in department rooms, and selected-agent details on the right. The latest recorded event appears above each agent, including Engineering specialists and connected integrations. Select an agent to inspect its full activity history, evidence, tool logs, and gate feedback. Human guidance is consumed at the next applicable agent boundary. Pause waits for a safe graph boundary; cancel also terminates active host commands.
 
 Ordinary blockers in the full workflow receive one automatic executive replan per run. Fast-track and departmental work stop for review after their bounded retry allowance. Constitution violations pause immediately for review. Review actions provide context, revise a KR, explicitly retry an interrupted command, or abort. Revising a KR creates a new version and invalidates dependent approvals. Use the review drawer or `spoc resume --help` to resume the recorded interrupt.
 
@@ -136,7 +136,7 @@ curl http://127.0.0.1:8000/api/integrations/events \
 
 Activity values are `idle`, `planning`, `reading`, `writing`, `executing`, `reviewing`, `waiting`, `completed`, and `error`. Optional fields include `run_id`, `kr_id`, `timestamp`, and bounded display `data`. The office snapshots its current event cursor and reconnects to persisted SSE events after that cursor.
 
-Activity Stream and the inspector load saved history after a refresh and merge new live events into it. Use **Selected mission** or **All activity** in the stream, and **Load earlier activity** to page backward. Inspector activity follows the actual agent and mission; external integrations keep their separate source identity. Historical events leave the current office positions and handoffs intact. Public model-work, file-read, delegation, and failure events keep activity visible as agents work.
+Activity appears directly above the agents instead of in a separate stream dialog. Each label shows that agent's latest recorded event and updates from the live stream; the saved office projection restores it after a refresh. The inspector's **Activity** tab loads saved history and merges live events into it; use **Load earlier activity** to page backward. Inspector activity follows the actual agent and selected mission; external integrations keep their separate source identity. Historical events leave the current office positions and handoffs intact. Public model-work, file-read, delegation, and failure events keep activity visible as agents work.
 
 ## API
 

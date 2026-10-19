@@ -136,7 +136,7 @@ it("requests a bounded earlier history page with exact source, actor, mission, a
   expect(fetch.mock.calls[0][0]).toBe(
     "/api/events/history?limit=100&run_id=mission+%2F+a&source=custom&agent_id=backend_coder&before=9&generation=generation-a",
   );
-  expect(result.events[0].agent_id).toBe("custom:backend_coder");
+  expect(result.events[0].agent_id).toBe('external:["custom","backend_coder"]');
   expect(result.events[0].original_agent_id).toBe("backend_coder");
 });
 it("rejects malformed history and nonadvancing pagination instead of silently hiding activity", async () => {
