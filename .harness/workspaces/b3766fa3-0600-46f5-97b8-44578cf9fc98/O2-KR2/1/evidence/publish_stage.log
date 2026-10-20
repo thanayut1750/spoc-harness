@@ -33,3 +33,58 @@ mission_log: 200 text/plain; charset=utf-8 3993
 
 ## GIT — stage deliverables (commit hash recorded below after push)
 (files: evidence/BLOCKER_EVIDENCE.md, evidence/publish_stage.log, offer/CHECKOUT_INSTRUCTIONS.md, store/CHECKOUT_LINK.txt, mission_log.md; git add -f required because .gitignore excludes .harness/)
+
+## 2026-10-20T22:50:10Z — GIT — DELIVERABLES COMMITTED AND PUSHED (push re-established by fresh fetch after receipt flag)
+deliverables_commit: 532c449a72d0c535b0cdb99cf6cf05be871400b5 (short 532c449)
+parent_commit: a8563e06532ea3fd0af2b51331ba8d3be66eff5b
+branch: codex/spoc-harness-v1
+files_committed (index sha256 == on-disk sha256 verified before commit):
+  evidence/BLOCKER_EVIDENCE.md   532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649
+  evidence/publish_stage.log     084179326ce79aabd76f99a3886df67303f16ccd04d70525ed1cbd5bdad88469  (pre-append state; this file's update is committed immediately after)
+  mission_log.md                 8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94
+  offer/CHECKOUT_INSTRUCTIONS.md 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c
+  store/CHECKOUT_LINK.txt        e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8
+push_output_verbatim: "a8563e0..532c449  codex/spoc-harness-v1 -> codex/spoc-harness-v1"
+receipt_flag: push receipt carried the benign execution_stopped flag -> treated as unproven and re-established:
+fresh_fetch_check: git fetch origin codex/spoc-harness-v1 -> origin/codex/spoc-harness-v1 = 532c449a72d0c535b0cdb99cf6cf05be871400b5 -> REMOTE_AT_EXPECTED_COMMIT=YES
+independent_http_confirmation: the commit-pinned raw fetch-backs below (all HTTP 200 at commit 532c449a72d0c535b0cdb99cf6cf05be871400b5) prove the commit is reachable on GitHub.
+
+## 2026-10-20T22:51:15Z — POST-PUSH FETCH-BACKS (raw.githubusercontent.com, unauthenticated, commit-pinned 532c449a72d0c535b0cdb99cf6cf05be871400b5; sha256 must equal on-disk bytes)
+url_base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/532c449a72d0c535b0cdb99cf6cf05be871400b5/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1
+started_utc=2026-10-20T22:51:15Z
+FETCH_BACK evidence/BLOCKER_EVIDENCE.md -> 200 7644 sha256=532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649 SHA_MATCH_LOCAL
+FETCH_BACK evidence/publish_stage.log -> 200 2238 sha256=084179326ce79aabd76f99a3886df67303f16ccd04d70525ed1cbd5bdad88469 SHA_MATCH_LOCAL (state at commit 532c449, before this post-push append)
+FETCH_BACK offer/CHECKOUT_INSTRUCTIONS.md -> 200 2713 sha256=6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c SHA_MATCH_LOCAL
+FETCH_BACK store/CHECKOUT_LINK.txt -> 200 326 sha256=e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8 SHA_MATCH_LOCAL
+FETCH_BACK mission_log.md -> 200 5718 sha256=8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94 SHA_MATCH_LOCAL
+finished_utc=2026-10-20T22:51:18Z
+RESULT: all five staged deliverables fetch HTTP 200 from the pushed commit and match local bytes exactly.
+
+## 2026-10-20T22:51:28Z — HOSTED ZIP RE-VERIFICATION (unauthenticated; $15 package must be untouched and reachable)
+branch-pinned URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+started_utc=2026-10-20T22:51:28Z
+HEAD: HTTP/2 200 | content-type: application/zip | content-length: 40299
+GET: 200 40299 application/zip
+sha256: f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (EXACT match)
+unzip -t: "No errors detected in compressed data of /tmp/hosted.zip." UNZIP_T_EXIT=0
+commit-pinned URL (branch name replaced by a8563e06532ea3fd0af2b51331ba8d3be66eff5b):
+GET: 200 40299 application/zip
+sha256: f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (EXACT match)
+
+## 2026-10-20T22:51:39Z — LOCAL PACKAGE INTEGRITY re-check (O2-KR2/0/build)
+$ sha256sum -c CHECKSUMS.txt
+pydevtoolkit-1.0.0.zip: OK
+pydevtoolkit-1.0.0.tar.gz: OK
+SHA256SUM_C_EXIT=0
+checked_at_utc: 2026-10-20T22:51:39Z
+
+## TERMINAL STATE NOTE
+Prepared-asset mode STAGED at deliverables commit 532c449a72d0c535b0cdb99cf6cf05be871400b5 on codex/spoc-harness-v1.
+Single instruction document: offer/CHECKOUT_INSTRUCTIONS.md — exactly one action: a human creates the Gumroad
+or Lemon Squeezy product at $15.00 USD, attaches the hosted zip URL, publishes, and pastes the minted checkout
+link into store/CHECKOUT_LINK.txt. Hosted zip (branch-pinned):
+https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+No checkout link exists; no live offer exists. No PASS verdict is issued in this log (certification is WP2's
+separate audit). This post-push section is committed and pushed immediately after 532c449; the resulting
+log-update commit hash is re-established by fresh fetch and fetch-back and reported with the WP report
+(it cannot be embedded in this file without self-reference).
