@@ -1,0 +1,1 @@
+{"jsonapi":{"version":"1.0"},"errors":[{"detail":"The POST method is not supported for route v1\/products. Supported methods: GET, HEAD.","status":"405","title":"Method Not Allowed"}]}

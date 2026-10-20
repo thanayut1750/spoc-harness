@@ -1,0 +1,11 @@
+{
+  "data": {
+    "type": "products",
+    "attributes": {
+      "name": "pydevtoolkit 1.0.0 — 16 CLI developer utilities",
+      "description": "<p><strong>Python Dev Toolkit (pydevtoolkit) 1.0.0</strong> — 16 command-line developer utilities built exclusively on the Python standard library: no third-party dependencies, no network access, works anywhere Python 3.8+ runs. Every utility has an argparse CLI with -h/--help, file and stdin input, and exit codes 0 (success), 1 (runtime error), 2 (usage error).</p><p>Utilities: jsonfmt, csvstat, hashfile, b64, urlenc, difftxt, regexfind, timestamp, textstat, uniqcount, filesize, pickrand, passwdgen, hexdump, utfcheck, lorem.</p><p>Install: <code>python3 -m pip install --no-build-isolation .</code> (or <code>sh install.sh</code> for ~/.local/bin wrappers). Tests: <code>python3 run_tests.py</code> (92 tests). MIT licensed. Price: $15.00 (1500 cents).</p>",
+      "price": 1500,
+      "status": "published"
+    }
+  }
+}
