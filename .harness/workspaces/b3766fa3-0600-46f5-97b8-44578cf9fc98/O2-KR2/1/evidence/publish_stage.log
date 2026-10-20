@@ -88,3 +88,71 @@ No checkout link exists; no live offer exists. No PASS verdict is issued in this
 separate audit). This post-push section is committed and pushed immediately after 532c449; the resulting
 log-update commit hash is re-established by fresh fetch and fetch-back and reported with the WP report
 (it cannot be embedded in this file without self-reference).
+
+## 2026-10-20T23:11:34Z — RETRY PASS (evidentiary re-verification, append-only) — PHASE 1: TIP STATE
+Nothing in this session may rest on a run_command receipt alone (benign execution_stopped flags observed), so
+this retry pass re-establishes every criterion with fresh, timestamped, tee'd command output.
+tip_at_phase1: 90585ffb68d9c29fbdfdbbdec77c02d4cb7d5eaf (local HEAD == origin/codex/spoc-harness-v1 via git fetch + ls-remote)
+tree_clean: yes
+five fetch-backs at tip 90585ff (raw.githubusercontent.com, unauthenticated): all HTTP 200 with sha256 == local:
+  evidence/BLOCKER_EVIDENCE.md   532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649
+  evidence/publish_stage.log     a5592b02125682041e926350f82306e2961c7c7bdce20b5326c040810ee912ed  (pre-this-append state)
+  mission_log.md                 8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94
+  offer/CHECKOUT_INSTRUCTIONS.md 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c
+  store/CHECKOUT_LINK.txt        e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8
+full log: /tmp/o2kr2_retry/phase1_tip_state.log (sha256 1e4e7c5ae267233d1c135bd2618d74c5d9518f3630d74908774850171bb2ecda)
+
+## 2026-10-20T23:09:33Z — RETRY PHASE 2 — GREP PROOF: every required string shown INSIDE the tip blobs (not excerpted)
+Method: re-fetched evidence/BLOCKER_EVIDENCE.md and mission_log.md from raw.githubusercontent.com at commit
+90585ffb68d9c29fbdfdbbdec77c02d4cb7d5eaf (branch tip), sha256-verified identical to local bytes, then ran
+grep -c / grep -n -F for each acceptance-required string. RESULT: 33/33 patterns matched, MISSING_count=0;
+log end marker verified at 2026-10-20T23:10:47Z. Full output: /tmp/o2kr2_retry/phase2_grep_proof.log
+(sha256 c7cffca5c06ae42537de367a8ff529bba4b67ebf3c8704bdd6ba4d7c73a8cf2f).
+evidence/BLOCKER_EVIDENCE.md (fetched from tip) verbatim-line matches (line numbers from grep -n):
+  L13/17/31/38 'https://api.gumroad.com/v2/products' + POST; L19/20 '2026-10-20T22:28:39Z' (4 total);
+  L21 '| HTTP status | **401** |'; L26/34 source artifact '5d807a3b8891908a3e3ccb30e7257804';
+  L50/54 'https://api.lemonsqueezy.com/v1/products'; L56 '2026-10-20T22:28:52Z';
+  L58 '| HTTP status | **405** (Method Not Allowed) |'; L67 verbatim body '"The POST method is not supported
+  for route v1\/products. Supported methods: GET, HEAD."'; L59/64 '184 bytes';
+  L62/64/70 artifacts 'aed37d178ea4621f07f202b772abb0a2' and '62e2d9c1bd870a81cc0e1d6ccb7060b4';
+  L8/82 'dashboard-listing human step' + 'BLOCKED (no credentials)'; L86 'no Gumroad or Lemon Squeezy';
+  L100-103 'https://0x0.st -> 200', 'https://litterbox.catbox.moe -> 200', 'https://tmpfiles.org -> 000',
+  'https://catbox.moe -> 000'; L108 'Zero uploads were made to any third-party host'.
+mission_log.md (fetched from tip) verbatim-line matches:
+  L28/33 'offer/CHECKOUT_INSTRUCTIONS.md' (staged instruction document path); L36 hosted zip URL
+  'https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip';
+  L38 package sha256 'f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99';
+  L20 'BLOCKED — HTTP 401' at '2026-10-20T22:28:39Z' + artifact '5d807a3b8891908a3e3ccb30e7257804';
+  L21 'BLOCKED — HTTP 405' + verbatim 'The POST method is not supported for route v1/products. Supported
+  methods: GET, HEAD.' + artifacts 'aed37d178ea4621f07f202b772abb0a2', '62e2d9c1bd870a81cc0e1d6ccb7060b4';
+  L11 'terminal prepared-asset state STAGED (no live offer)'; L31/50 'store/CHECKOUT_LINK.txt';
+  L72 'No live offer URL exists.'; L14/74 'No PASS verdict'.
+git ls-tree HEAD blob hashes at 90585ff (paths prefixed .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/):
+  evidence/BLOCKER_EVIDENCE.md 573ce22dc0949649c95ef82f7d75fa936b06f248
+  evidence/publish_stage.log 451996b3db9ca78212b4c4e9f969250dc16ea325
+  mission_log.md 902615a9560d1a8fa0c8476a79dbefb640c1214a
+  offer/CHECKOUT_INSTRUCTIONS.md ef2d6487b31d5257792bdfb1dde92f49dd02dd7e
+  store/CHECKOUT_LINK.txt 96e30078f6e84dc7bc04fa88ec25cd4b6b3212f7
+
+## 2026-10-20T23:10:47Z — RETRY PHASE 3 — HOSTED ZIP FRESH VERIFICATION + BUILD INTEGRITY (both pinned URLs)
+-- [branch-pinned codex/spoc-harness-v1] HEAD --
+HTTP/2 200 | content-type: application/zip | content-length: 40299
+-- [branch-pinned] GET -- GET_RESULT: 200 application/zip 40299
+sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 SHA_MATCH: YES
+unzip -t: No errors detected in compressed data of /tmp/o2kr2_retry/zip_br.bin.
+-- [commit-pinned a8563e06532ea3fd0af2b51331ba8d3be66eff5b] HEAD --
+HTTP/2 200 | content-type: application/zip | content-length: 40299
+-- [commit-pinned] GET -- GET_RESULT: 200 application/zip 40299
+sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 SHA_MATCH: YES
+unzip -t: No errors detected in compressed data of /tmp/o2kr2_retry/zip_ct.bin.
+-- local build/ integrity (O2-KR2/0/build) --
+-rw-rw-r-- 40299 pydevtoolkit-1.0.0.zip
+pydevtoolkit-1.0.0.zip: OK / pydevtoolkit-1.0.0.tar.gz: OK / SHA256SUM_C_EXIT=0
+full log: /tmp/o2kr2_retry/phase3_zip_verify.log (sha256 6be6ffc0f953574c21247101618a5c96a87d9a23a695a2241294c171db28945b)
+
+## APPEND NOTE (this file)
+This retry section is a pure append: sha256 of this file's first 7010 bytes equals the pre-append hash
+a5592b02125682041e926350f82306e2961c7c7bdce20b5326c040810ee912ed recorded above. The commit containing this
+append cannot embed its own hash; it is re-established post-push by fresh git fetch/ls-remote and
+commit-pinned raw fetch-backs and reported with the WP report. No PASS verdict is issued here; no live offer
+is claimed (certification is WP2's separate audit).

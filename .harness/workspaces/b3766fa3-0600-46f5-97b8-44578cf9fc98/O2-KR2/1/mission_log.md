@@ -74,3 +74,31 @@ there and are not modified by this staging pass). This continuation records the
 * **No PASS verdict** is written here — certification of O2-KR2 belongs to the separate
   WP2 audit.
 * No checkout link is minted, implied, or exampled anywhere in this staging pass.
+
+## Addendum — 2026-10-20T23:11:34Z (retry pass): evidentiary re-verification of the O2-KR2 entry above
+
+The first-pass rejection of this work package concerned evidentiary visibility only (the reviewer's excerpts of
+the committed files were truncated). This addendum records fresh, timestamped proof that the required content is
+present in the committed, pushed blobs. No outcome, claim, or deliverable above changed.
+
+* **Grep proof against the branch tip.** At `2026-10-20T23:09:33Z` both this file and
+  `evidence/BLOCKER_EVIDENCE.md` were re-fetched from raw.githubusercontent.com at commit
+  `90585ffb68d9c29fbdfdbbdec77c02d4cb7d5eaf` (sha256-verified identical to local bytes) and grep-verified:
+  33/33 required strings found, 0 missing. Visible in the blobs: the staged instruction document path
+  `offer/CHECKOUT_INSTRUCTIONS.md`; the hosted zip URL and package sha256
+  `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99`; the chain outcomes Gumroad
+  `BLOCKED — HTTP 401` at `2026-10-20T22:28:39Z` (artifact `5d807a3b8891908a3e3ccb30e7257804`) and Lemon
+  Squeezy `BLOCKED — HTTP 405` with verbatim body "The POST method is not supported for route v1/products.
+  Supported methods: GET, HEAD." (184 bytes; artifacts `aed37d178ea4621f07f202b772abb0a2`,
+  `62e2d9c1bd870a81cc0e1d6ccb7060b4`); `terminal prepared-asset state STAGED`; the Gumroad dashboard human
+  step `BLOCKED` (no credentials); the fallback probes (`0x0.st` 200, `litterbox.catbox.moe` 200,
+  `tmpfiles.org` 000, `catbox.moe` 000, zero uploads); and the explicit non-claims. Full output:
+  `/tmp/o2kr2_retry/phase2_grep_proof.log`, mirrored in `evidence/publish_stage.log` (retry section).
+* **Fresh hosted-zip verification** at `2026-10-20T23:10:47Z`: branch-pinned and commit-pinned
+  (`a8563e06532ea3fd0af2b51331ba8d3be66eff5b`) URLs both HTTP 200, `application/zip`, 40,299 B, sha256 exact
+  match, `unzip -t` OK; `sha256sum -c CHECKSUMS.txt` in `O2-KR2/0/build` exit 0 (package untouched).
+* **Pure-append proof:** sha256 of this file's first 5718 bytes equals the previously verified hash
+  `8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94`.
+
+Non-claims unchanged and restated: **no live offer URL exists**; no checkout link is minted or implied; **no
+PASS verdict** is written here — certification of O2-KR2 remains the separate WP2 audit.
