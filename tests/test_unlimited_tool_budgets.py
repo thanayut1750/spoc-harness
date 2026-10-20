@@ -41,11 +41,22 @@ async def test_dynamic_worker_exceeds_two_hundred_tool_operations_and_replays_wi
         }
     )
 
+    written, reads_issued = False, 0
+
     def script(body, requests):
+        nonlocal written, reads_issued
         if body.get("response_format"):
+            if "private_progress" in json.loads(body["messages"][-1]["content"]):
+                return {
+                    "content": json.dumps(
+                        {
+                            "report": "Output.txt is saved. Continue verifying the existing output; completed reads need no replay."
+                        }
+                    )
+                }
             return extracted_deliverable(body)
-        results = [message for message in body["messages"] if message["role"] == "tool"]
-        if not results:
+        if not written:
+            written = True
             return {
                 "tool_calls": [
                     tool_call(
@@ -53,8 +64,9 @@ async def test_dynamic_worker_exceeds_two_hundred_tool_operations_and_replays_wi
                     )
                 ]
             }
-        reads = len(results) - 1
-        if reads < 201:
+        if reads_issued < 201:
+            reads = reads_issued
+            reads_issued = min(reads + 30, 201)
             return {
                 "tool_calls": [
                     tool_call("read_file", {"path": "output.txt"}, f"read-{index}")
@@ -74,7 +86,8 @@ async def test_dynamic_worker_exceeds_two_hundred_tool_operations_and_replays_wi
         assert not first.fallback and first.worker_role.startswith("specialist:")
         assert (workspace / "output.txt").read_text() == "Verified output"
         saved = await storage.get_run(run["run_id"])
-        assert (saved["model_calls"], saved["tool_calls"]) == (10, 202)
+        assert saved["model_calls"] == len(requests) and saved["tool_calls"] == 202
+        first_calls = saved["model_calls"]
         assert len(storage.operations) == 202
         assert all(item["status"] == "done" for item in storage.operations.values())
         artifacts = await storage.list_artifacts(run["run_id"])
@@ -83,8 +96,8 @@ async def test_dynamic_worker_exceeds_two_hundred_tool_operations_and_replays_wi
         repeated = await services.execute(work, kr, Constitution(), [], "", 0)
         assert repeated.artifact_ids == first.artifact_ids
         saved = await storage.get_run(run["run_id"])
-        assert (saved["model_calls"], saved["tool_calls"]) == (20, 202)
-        assert len(requests) == 20 and len(storage.operations) == 202
+        assert (saved["model_calls"], saved["tool_calls"]) == (first_calls + 1, 202)
+        assert len(requests) == first_calls + 1 and len(storage.operations) == 202
         assert len(await storage.list_artifacts(run["run_id"])) == len(artifacts)
         assert len([event for event in storage.events if event["activity"] == "reading"]) == 201
 
@@ -161,8 +174,8 @@ async def test_rd_dispatch_and_nested_work_share_the_tool_budget_and_replay_once
             artifacts = await storage.list_artifacts(run["run_id"])
             assert await services.plan_work(kr, Constitution(), [], "")
             saved = await storage.get_run(run["run_id"])
-            assert (saved["model_calls"], saved["tool_calls"]) == (8, 4)
-            assert len(storage.operations) == 4 and len(requests) == 8
+            assert (saved["model_calls"], saved["tool_calls"]) == (6, 4)
+            assert len(storage.operations) == 4 and len(requests) == 6
             assert len(await storage.list_artifacts(run["run_id"])) == len(artifacts)
         else:
             with pytest.raises(EscalationSignal) as error:

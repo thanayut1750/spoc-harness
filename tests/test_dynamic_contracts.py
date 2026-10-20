@@ -4,7 +4,13 @@ from pydantic import ValidationError
 
 from org_harness.api import create_app
 from org_harness.config import Settings
-from org_harness.models import EngineeringSpecialistSpec, WorkPackage, worker_agent_id
+from org_harness.models import (
+    EngineeringSpecialistSpec,
+    TaskSpecialistSpec,
+    WorkPackage,
+    worker_agent_id,
+    worker_agent_metadata,
+)
 from org_harness.storage import MemoryStorage
 
 
@@ -32,7 +38,7 @@ def package():
 def test_specialist_identity_is_stable_bounded_and_isolated_from_other_missions():
     work = package()
     identity = worker_agent_id("92a0129d-decd-4c63-b8b9-9ec1fbf0d4cc", work)
-    assert identity.startswith("specialist:92a0129d-decd-4c63-b8b9-9ec1fbf0d4cc:")
+    assert identity == "specialist:92a0129d-decd-4c63-b8b9-9ec1fbf0d4cc:f251cff817aadd08"
     assert len(identity) <= 100
     assert (
         worker_agent_id(
@@ -50,6 +56,54 @@ def test_specialist_identity_is_stable_bounded_and_isolated_from_other_missions(
         )
         == identity
     )
+
+
+@pytest.mark.parametrize(
+    ("role", "tool"),
+    [
+        ("market_researcher", "run_command"),
+        ("market_researcher", "validate_code_syntax"),
+        ("market_researcher", "run_mission_tool"),
+        ("backend_coder", "search_market_data"),
+        ("system_architect", "search_market_data"),
+    ],
+)
+def test_named_specialists_cannot_expand_their_inherited_role_capabilities(role, tool):
+    data = package().model_dump(mode="json")
+    data["role"] = role
+    data["specialist"]["tools"] = [tool]
+    with pytest.raises(ValidationError, match="inherited worker role"):
+        WorkPackage.model_validate(data)
+
+
+def test_named_data_analyst_can_reuse_tested_mission_tools_within_its_command_capabilities():
+    data = package().model_dump(mode="json")
+    data["role"] = "data_analyst"
+    data["specialist"]["tools"] = ["run_mission_tool"]
+    work = WorkPackage.model_validate(data)
+    assert work.role == "data_analyst" and work.specialist.tools == ("run_mission_tool",)
+
+
+def test_research_specialist_roundtrip_has_research_parent_without_changing_legacy_fields():
+    data = package().model_dump(mode="json")
+    data["role"] = "market_researcher"
+    data["specialist"] = {
+        "name": "bioRxiv Content Cartographer",
+        "instructions": "Map the paper's claims to source evidence.",
+        "tools": ["search_market_data", "read_web_page"],
+    }
+    work = WorkPackage.model_validate(data)
+    assert isinstance(work.specialist, TaskSpecialistSpec)
+    assert EngineeringSpecialistSpec is TaskSpecialistSpec
+    assert WorkPackage.model_validate_json(work.model_dump_json()) == work
+    assert worker_agent_metadata(work) == {
+        "display_name": "bioRxiv Content Cartographer",
+        "agent_type": "research_specialist",
+        "parent_agent_id": "research_head",
+        "department": "research",
+        "model_parent": "market_researcher",
+        "base_role": "market_researcher",
+    }
 
 
 @pytest.mark.parametrize(

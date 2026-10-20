@@ -51,6 +51,8 @@ import { ModelPicker } from "./ModelPicker";
 import { WorkspaceSettings } from "./WorkspaceSettings";
 import type { SettingsSection } from "./WorkspaceSettings";
 import { agentModelSelection, validModelConfig } from "./modelSettings";
+import { autonomousContinuation, requiresHumanReview } from "./runPolicy";
+import { autonomousCallBudget } from "./modelCallBudget";
 import {
   activeActivities,
   activityLabels,
@@ -1322,7 +1324,8 @@ export default function App() {
         }
       : run;
   const canControl = run && !terminalStatuses.has(run.status);
-  const needsReview = !!reviewRun?.review;
+  const needsReview = requiresHumanReview(reviewRun);
+  const continuation = autonomousContinuation(run);
   const loadError = [runsError, detailError, artifactsError]
     .filter(Boolean)
     .join(" ");
@@ -1568,8 +1571,9 @@ export default function App() {
                     "The mission ended before it could finish. Check its recorded activity for details."}
                 </p>
                 <small>
-                  Continue from saved work. Interrupted commands may require
-                  review.
+                  {autonomousCallBudget(run.limits)
+                    ? "Retry continues from saved work. Unresolved command effects must be reconciled before retrying."
+                    : "Continue from saved work. Interrupted commands may require review."}
                 </small>
               </div>
               <button
@@ -1584,6 +1588,37 @@ export default function App() {
                 )}
                 {busy ? "Retrying…" : "Retry mission"}
               </button>
+            </div>
+          )}
+          {continuation && (
+            <div
+              className="continuation-banner"
+              role="status"
+              aria-label="Autonomous continuation"
+            >
+              <ActivityIcon size={17} />
+              <div>
+                <strong>{continuation.title}</strong>
+                <p title={continuation.reason}>{continuation.reason}</p>
+                {continuation.wakeAt && (
+                  <small>
+                    Next attempt:{" "}
+                    <time dateTime={continuation.wakeAt}>
+                      {Number.isFinite(Date.parse(continuation.wakeAt))
+                        ? new Date(continuation.wakeAt).toLocaleString()
+                        : "Awaiting worker schedule"}
+                    </time>
+                  </small>
+                )}
+              </div>
+              {(continuation.cycles > 0 || continuation.attempt > 0) && (
+                <small className="continuation-counts">
+                  {continuation.cycles} cycles · {continuation.attempt}{" "}
+                  continuations
+                  {continuation.failures > 0 &&
+                    ` · ${continuation.failures} recovery attempts`}
+                </small>
+              )}
             </div>
           )}
           {needsReview && (
@@ -1774,7 +1809,7 @@ export default function App() {
           error={modalError}
         />
       )}{" "}
-      {modal === "review" && reviewRun && (
+      {modal === "review" && reviewRun && needsReview && (
         <ReviewModal
           run={reviewRun}
           artifacts={artifacts}

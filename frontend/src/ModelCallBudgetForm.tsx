@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Check, LoaderCircle, Save } from "lucide-react";
 import { api } from "./api";
 import {
+  autonomousCallBudget,
   canApplyCallBudget,
   formatCallLimit,
   matchesSavedCallBudget,
@@ -151,7 +152,13 @@ export function ModelCallBudgetForm({
       const updated = await api.updateRunBudgets(selectedRun.run_id, saved);
       onRunUpdated?.(updated);
       setApplyNotice(
-        "Saved budgets applied. The mission has not resumed and usage counters are unchanged.",
+        autonomousCallBudget(saved)
+          ? selectedRun.status === "paused"
+            ? "Saved budgets applied. The mission stays paused until you resume; then autonomous continuation is enabled. Usage counters are unchanged."
+            : selectedRun.status === "failed"
+              ? "Saved budgets applied. Retry this mission to continue saved work in autonomous mode. Usage counters are unchanged."
+              : "Saved budgets applied. Autonomous mode may continue this mission automatically; usage counters are unchanged."
+          : "Saved budgets applied. The mission has not resumed and usage counters are unchanged.",
       );
     } catch (failure) {
       setApplyError(
@@ -170,9 +177,14 @@ export function ModelCallBudgetForm({
       <h3>Call budgets</h3>
       <p>
         Workspace-wide defaults for new missions, across all model choices. The
-        model-call budget includes reviews and retries. No limit removes only
-        the selected call cap; timeouts and revision limits still apply.
-        Existing missions keep their recorded limits until explicitly updated.
+        model-call budget includes reviews and retries. Each No limit removes
+        its call cap. Existing missions keep their recorded limits until
+        explicitly updated.
+      </p>
+      <p className="call-budget-policy">
+        {autonomousCallBudget(parsed)
+          ? "All three No limit options enable autonomous continuation: bounded work cycles resume or replan from saved progress without routine human review. Acceptance criteria stay unchanged; manual pause and cancellation remain available."
+          : "A finite call cap keeps governed review behavior. Individual unlimited caps leave the other limits in effect."}
       </p>
       <form onSubmit={save}>
         <div className="call-budget-fields">
@@ -290,8 +302,11 @@ export function ModelCallBudgetForm({
                 Saved workspace budgets: model calls{" "}
                 {formatCallLimit(saved.max_model_calls)}, agent turns{" "}
                 {formatCallLimit(saved.worker_model_calls)}, tool calls{" "}
-                {formatCallLimit(saved.max_tool_calls)}. Applying these values
-                does not resume the mission or reset its usage.
+                {formatCallLimit(saved.max_tool_calls)}.{" "}
+                {autonomousCallBudget(saved)
+                  ? "With all three budgets unlimited, routine pending reviews may continue automatically without another approval, including older missions. Manual pauses stay paused; failed missions retain the separate Retry action."
+                  : "Applying these values does not resume the mission."}{" "}
+                Usage counters and recorded evidence are preserved.
               </p>
               {hasUnsavedBudget && (
                 <p>Save changes before applying them to this mission.</p>

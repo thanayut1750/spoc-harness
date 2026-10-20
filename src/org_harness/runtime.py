@@ -15,11 +15,11 @@ from typing import Annotated, Any, Literal, Protocol, TypedDict, cast
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Send, interrupt
+from langgraph.types import Overwrite, Send, interrupt
 from pydantic import TypeAdapter, ValidationError
 
+from org_harness.autonomy import AutonomousCheckpointYield, autonomous_mode, retry_delay
 from org_harness.models import (
-    ENGINEERING_TOOL_NAMES,
     AttemptRecord,
     Constitution,
     Deliverable,
@@ -35,7 +35,8 @@ from org_harness.models import (
     TriageDecision,
     WorkPackage,
     worker_agent_id,
-    worker_agent_name,
+    worker_agent_metadata,
+    worker_tool_names,
 )
 from org_harness.storage import ArtifactNotFoundError
 from org_harness.text_safety import require_json_text
@@ -121,6 +122,10 @@ class ExecutiveState(TypedDict, total=False):
     execution_mode: str
     active_departments: list[str]
     revision_limit: int
+    automatic_cycles: int
+    automatic_retry: JSON | None
+    autonomous_policy_repairs: int
+    planning_feedback: str
 
 
 class DepartmentState(TypedDict, total=False):
@@ -175,6 +180,10 @@ def initial_state(
         "epochs": {},
         "feedback": {},
         "auto_replans": 0,
+        "automatic_cycles": 0,
+        "automatic_retry": None,
+        "autonomous_policy_repairs": 0,
+        "planning_feedback": "",
         "dispatches": [],
         "review": None,
         "report": "",
@@ -239,24 +248,13 @@ def _validate_work_plan(value: Any, kr: KeyResult) -> list[WorkPackage]:
     for package in packages:
         if package.specialist is None:
             continue
-        if kr.target_department != "engineering":
-            raise ValueError("Task-specific specialists are available only to Engineering")
-        if not set(package.specialist.tools) <= ENGINEERING_TOOL_NAMES:
-            raise ValueError("Specialist tools must use existing Engineering capabilities")
+        if not set(package.specialist.tools) <= worker_tool_names(package.role):
+            raise ValueError("Specialist tools must use the assigned role's existing capabilities")
     return packages
 
 
 def _worker_event_data(work: WorkPackage) -> JSON:
-    if work.specialist is None:
-        return {}
-    return {
-        "display_name": worker_agent_name(work),
-        "agent_type": "engineering_specialist",
-        "parent_agent_id": "engineering_head",
-        "department": "engineering",
-        "model_parent": work.role,
-        "base_role": work.role,
-    }
+    return dict(worker_agent_metadata(work))
 
 
 async def _validated_response[ResponseT](
@@ -769,6 +767,57 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     """Build root and per-invocation child graphs using the supplied durable stores."""
     halted: dict[str, asyncio.Event] = {}
 
+    def autonomous() -> bool:
+        limits = getattr(services, "limits", None)
+        if limits is None:
+            limits = getattr(services, "run", {}).get("limits")
+        return autonomous_mode(limits)
+
+    def defer(
+        state: ExecutiveState,
+        kind: str,
+        reason: str,
+        next_node: str,
+        kr_ids: Sequence[str] = (),
+    ) -> JSON:
+        policy = kind in {"constitution_violation", "policy_violation"}
+        recoveries = getattr(services, "run", {}).get("autonomous_command_recoveries", [])
+        if kind == "unknown_operation" and recoveries:
+            kind = "reconciled_command"
+            reason += (
+                "\nDo not repeat the interrupted command. Inspect its stored process/effect receipts "
+                "and current files before selecting a safe alternative. Recorded operations remain completed.\n"
+                + json.dumps(
+                    [
+                        {
+                            "operation_id": item.get("operation_id"),
+                            "artifact_ids": item.get("result", {}).get("artifact_ids", []),
+                            "process_state": item.get("result", {}).get("process_state"),
+                        }
+                        for item in recoveries[-16:]
+                    ],
+                    ensure_ascii=True,
+                )[:4000]
+            )
+        if kind in {"unknown_operation", "operation_conflict"}:
+            return {
+                "status": "failed",
+                "route": "finish",
+                "review": None,
+                "report": f"Autonomous execution stopped safely ({kind}): {reason[:6000]}",
+            }
+        return {
+            "route": "automatic_prepare",
+            "review": None,
+            "automatic_retry": {
+                "kind": kind,
+                "reason": reason[:6000],
+                "next": next_node,
+                "kr_ids": list(kr_ids),
+                "policy_repair": policy,
+            },
+        }
+
     def halt(run_id: str) -> asyncio.Event:
         return halted.setdefault(run_id, asyncio.Event())
 
@@ -929,6 +978,16 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if isinstance(exc, ArtifactNotFoundError):
                 exc = _missing_artifact_signal()
             kind = exc.kind
+            if autonomous() and kind in {
+                "provider_error",
+                "invalid_output",
+                "invalid_model_output",
+            }:
+                raise AutonomousCheckpointYield(
+                    "Worker review temporarily unavailable; retaining the submitted deliverable",
+                    retry_delay(getattr(services, "run", {}).get("autonomous_failures", 0) + 1),
+                    recoverable_failure=True,
+                ) from exc
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit(
@@ -1167,6 +1226,16 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if isinstance(exc, ArtifactNotFoundError):
                 exc = _missing_artifact_signal()
             kind = exc.kind
+            if autonomous() and kind in {
+                "provider_error",
+                "invalid_output",
+                "invalid_model_output",
+            }:
+                raise AutonomousCheckpointYield(
+                    "KR review temporarily unavailable; retaining all submitted work",
+                    retry_delay(getattr(services, "run", {}).get("autonomous_failures", 0) + 1),
+                    recoverable_failure=True,
+                ) from exc
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit(
@@ -1351,6 +1420,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         await services.emit("planner", "planning", "Create Strategic Pyramid")
         notes = await services.notes("planner")
         request = "\n".join([state["user_request"], *notes])
+        if state.get("planning_feedback"):
+            request += "\n\n" + state["planning_feedback"]
         try:
             objectives = await _validated_response(
                 services.plan(request, Constitution.model_validate(state["constitution"])),
@@ -1362,6 +1433,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if kind == "constitution_violation":
                 await mark_halted(state, str(exc))
             await services.emit("planner", "error", str(exc), kind=kind)
+            if autonomous():
+                return defer(state, kind, exc.reason, "plan")
             review = _review_payload(kind, str(exc), [], state)
             review["allowed_actions"] = ["provide_context", "abort"]
             return {"review": review, "status": "awaiting_review", "route": "review"}
@@ -1378,6 +1451,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "epochs": {kr.kr_id: 0 for kr in krs},
             "progress": {kr.kr_id: "pending" for kr in krs},
             "auto_replans": state.get("auto_replans", 0),
+            "planning_feedback": "",
             "route": "coordinate",
         }
 
@@ -1397,6 +1471,14 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 for outcome in outcomes.values()
                 if outcome.escalation and outcome.escalation.kind == "constitution_violation"
             ]
+            if autonomous():
+                return defer(
+                    state,
+                    "constitution_violation",
+                    "\n".join(reasons) or "Execution was suspended after a policy violation.",
+                    "coordinate",
+                    blocked_ids,
+                )
             return {
                 "status": "awaiting_review",
                 "route": "review",
@@ -1423,6 +1505,19 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             cancelled = next((e for e in escalations if e.kind == "cancelled"), None)
             if cancelled:
                 return {"status": "cancelled", "route": "finish", "review": None}
+            if autonomous():
+                protected = next(
+                    (
+                        e
+                        for e in escalations
+                        if e.kind in {"operation_conflict", "policy_violation"}
+                    ),
+                    None,
+                )
+                principal = violation or unknown or protected
+                kind = principal.kind if principal else "blocked"
+                reason = "\n".join(e.reason for e in escalations) or "Department execution failed"
+                return defer(state, kind, reason, "coordinate", [o.kr_id for o in blocked])
             if (
                 not violation
                 and not unknown
@@ -1544,10 +1639,104 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
         await services.emit("executive", "planning", "Automatic executive replan", replan=1)
         return {**reset_epochs(state, set(blocked), feedback), "auto_replans": 1}
 
+    async def automatic_prepare(state: ExecutiveState) -> JSON:
+        retry = dict(state.get("automatic_retry") or {})
+        reason = str(retry.get("reason", "Continue the saved mission."))[:6000]
+        update: JSON = {}
+        if retry.get("policy_repair"):
+            repair = getattr(services, "prepare_autonomous_repair", None)
+            if repair is None:
+                return {
+                    "status": "failed",
+                    "route": "finish",
+                    "review": None,
+                    "report": "A policy violation cannot be repaired with the available autonomous capabilities.",
+                }
+            await repair(reason)
+            halt(state["run_id"]).clear()
+            update["autonomous_policy_repairs"] = state.get("autonomous_policy_repairs", 0) + 1
+        ids = set(retry.get("kr_ids", []))
+        if retry.get("next") == "plan":
+            update["planning_feedback"] = (
+                "Autonomous planning repair: choose a compliant alternative that addresses the "
+                "recorded blocker. Preserve the original mission and constitution; do not invent success.\n"
+                + reason
+            )[-12000:]
+        if ids:
+            context = (
+                "Autonomous repair: choose a different compliant approach using recorded evidence. "
+                "Preserve every original acceptance criterion and constitution rule; do not invent success.\n"
+                + reason
+            )
+            update.update(reset_epochs(state, ids, context))
+            update["auto_replans"] = state.get("auto_replans", 0) + 1
+        cycle = state.get("automatic_cycles", 0) + 1
+        await services.emit(
+            "executive",
+            "waiting",
+            "Checkpoint saved; automatic continuation scheduled",
+            automatic_cycle=cycle,
+            reason=reason[:2000],
+        )
+        # Keep active checkpoint state bounded across weeks of repairs. Full
+        # evidence and prior events stay in their durable artifact/event stores.
+        attempts = list(state.get("attempt_history", {}).items())[-128:]
+        escalations = list(state.get("escalations", {}).items())[-64:]
+        return {
+            **update,
+            "automatic_cycles": cycle,
+            "automatic_retry": retry,
+            "attempt_history": Overwrite(dict(attempts)),
+            "escalations": Overwrite(
+                {
+                    key: {**value, "resolved": True} if value.get("kr_id") in ids else value
+                    for key, value in escalations
+                }
+            ),
+            "review": None,
+            "route": "automatic_wait",
+        }
+
+    async def automatic_wait(state: ExecutiveState) -> JSON:
+        retry = state.get("automatic_retry") or {}
+        acknowledgement = interrupt(
+            {
+                "kind": "automatic_cycle",
+                "reason": str(retry.get("reason", "Continue the saved mission."))[:2000],
+                "attempt": state.get("automatic_cycles", 1),
+                "delay_seconds": retry_delay(state.get("automatic_cycles", 1)),
+            }
+        )
+        if acknowledgement != {"automatic": True}:
+            raise ValueError(
+                "Automatic continuation requires the worker's internal acknowledgement"
+            )
+        destination = retry.get("next", "coordinate")
+        return {
+            "automatic_retry": None,
+            "status": "completed" if destination == "finish" else "running",
+            "route": destination,
+            "review": None,
+        }
+
     async def human_review(state: ExecutiveState) -> JSON:
         # This node deliberately performs no side effects before interrupt.
+        response = interrupt(state["review"])
+        if (
+            autonomous()
+            and response == {"automatic": True}
+            and (state.get("review") or {}).get("kind") != "manual_pause"
+        ):
+            review = state.get("review") or {}
+            return defer(
+                state,
+                str(review.get("kind", "blocked")),
+                str(review.get("reason", "Continue using recorded evidence")),
+                "coordinate" if state.get("objectives") else "plan",
+                review.get("kr_ids", []),
+            )
         decision = validate_review_decision(
-            state["review"] or {}, interrupt(state["review"]), state.get("objectives", [])
+            state["review"] or {}, response, state.get("objectives", [])
         )
         resolve_review = getattr(services, "resolve_review", None)
         if resolve_review is not None:
@@ -1647,6 +1836,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                     report = "\n".join(lines)
                     publish = getattr(services, "publish_report", None)
             except EscalationSignal as exc:
+                if autonomous():
+                    return defer(state, exc.kind, exc.reason, "finish")
                 status = "failed"
                 report = f"Final report synthesis failed ({exc.kind}): {exc.reason}"
             # Deterministic ledger keeps every approval and artifact traceable even if
@@ -1661,6 +1852,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 try:
                     await publish(report)
                 except EscalationSignal as exc:
+                    if autonomous():
+                        return defer(state, exc.kind, exc.reason, "finish")
                     status = "failed"
                     report = f"Report publication failed ({exc.kind}): {exc.reason}\n\n{report}"
         elif not report:
@@ -1672,7 +1865,7 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             "completed" if status == "completed" else "idle" if status == "cancelled" else "error",
             f"Run {status}",
         )
-        return {"report": report, "status": status}
+        return {"report": report, "status": status, "route": "end"}
 
     builder = StateGraph(ExecutiveState)
     builder.add_node("triage", triage)
@@ -1680,6 +1873,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     builder.add_node("coordinate", coordinate)
     builder.add_node("department", run_department)
     builder.add_node("replan", replan)
+    builder.add_node("automatic_prepare", automatic_prepare)
+    builder.add_node("automatic_wait", automatic_wait)
     builder.add_node("review", human_review)
     builder.add_node("finish", finish)
     builder.add_edge(START, "triage")
@@ -1689,15 +1884,37 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     builder.add_conditional_edges(
         "plan",
         lambda state: state.get("route", "coordinate"),
-        {"coordinate": "coordinate", "review": "review", "finish": "finish"},
+        {
+            "coordinate": "coordinate",
+            "review": "review",
+            "finish": "finish",
+            "automatic_prepare": "automatic_prepare",
+        },
     )
-    builder.add_conditional_edges("coordinate", route, ["department", "review", "replan", "finish"])
+    builder.add_conditional_edges(
+        "coordinate", route, ["department", "review", "replan", "finish", "automatic_prepare"]
+    )
     builder.add_edge("department", "coordinate")
     builder.add_edge("replan", "coordinate")
     builder.add_conditional_edges(
+        "automatic_prepare", lambda state: state["route"], ["automatic_wait", "finish"]
+    )
+    builder.add_conditional_edges(
+        "automatic_wait", lambda state: state["route"], ["coordinate", "plan", "finish"]
+    )
+    builder.add_conditional_edges(
         "review",
         lambda state: state["route"],
-        {"coordinate": "coordinate", "plan": "plan", "finish": "finish"},
+        {
+            "coordinate": "coordinate",
+            "plan": "plan",
+            "finish": "finish",
+            "automatic_prepare": "automatic_prepare",
+        },
     )
-    builder.add_edge("finish", END)
+    builder.add_conditional_edges(
+        "finish",
+        lambda state: state["route"],
+        {"end": END, "finish": "finish", "automatic_prepare": "automatic_prepare"},
+    )
     return builder.compile(checkpointer=checkpointer, store=store)

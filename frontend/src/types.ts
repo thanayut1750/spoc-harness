@@ -165,6 +165,15 @@ export interface Run {
   model_calls?: number;
   tool_calls?: number;
   cancel_requested?: boolean;
+  pause_requested?: boolean;
+  continuation?: {
+    attempt: number;
+    reason: string;
+    scheduled_at: string;
+  } | null;
+  next_attempt_at?: string | null;
+  automatic_cycles?: number;
+  autonomous_failures?: number;
 }
 export interface Artifact {
   artifact_id: string;

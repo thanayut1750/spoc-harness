@@ -48,9 +48,44 @@ EngineeringToolName = Literal[
     "run_mission_tool",
 ]
 ENGINEERING_TOOL_NAMES = frozenset(get_args(EngineeringToolName))
+SpecialistToolName = Literal[
+    "read_file",
+    "write_file",
+    "publish_file",
+    "read_artifact",
+    "read_web_page",
+    "run_command",
+    "validate_code_syntax",
+    "run_mission_tool",
+    "search_market_data",
+]
 # Task-specific selections narrow optional capabilities. Every specialist still
 # needs the artifact protocol to read evidence, save outputs, and report blockers.
-ENGINEERING_CORE_TOOL_NAMES = frozenset({"write_file", "read_artifact", "escalate_blocker"})
+SPECIALIST_CORE_TOOL_NAMES = frozenset({"write_file", "read_artifact", "escalate_blocker"})
+ENGINEERING_CORE_TOOL_NAMES = SPECIALIST_CORE_TOOL_NAMES
+_COMMON_WORKER_TOOL_NAMES = SPECIALIST_CORE_TOOL_NAMES | {
+    "read_file",
+    "publish_file",
+    "read_web_page",
+}
+
+
+def worker_tool_names(role: Role) -> frozenset[str]:
+    """Existing capabilities of the inherited role, independent of the worker's name."""
+    if role == "market_researcher":
+        return _COMMON_WORKER_TOOL_NAMES | {"search_market_data"}
+    if role == "data_analyst":
+        return _COMMON_WORKER_TOOL_NAMES | {
+            "search_market_data",
+            "run_command",
+            "validate_code_syntax",
+            "run_mission_tool",
+        }
+    return ENGINEERING_TOOL_NAMES | SPECIALIST_CORE_TOOL_NAMES
+
+
+def worker_department(role: Role) -> Department:
+    return "research" if role in {"market_researcher", "data_analyst"} else "engineering"
 
 
 class Contract(BaseModel):
@@ -142,20 +177,25 @@ class StrategicPlan(Contract):
     objectives: tuple[StrategicObjective, ...] = Field(min_length=1, max_length=3)
 
 
-class EngineeringSpecialistSpec(Contract):
+class TaskSpecialistSpec(Contract):
     """Task instructions and optional capabilities; core artifact tools always remain available."""
 
     name: str = Field(min_length=1, max_length=80)
     instructions: str = Field(min_length=1, max_length=12000)
-    tools: tuple[EngineeringToolName, ...] = ()
+    tools: tuple[SpecialistToolName, ...] = ()
 
     @model_validator(mode="after")
-    def valid_specialist(self) -> "EngineeringSpecialistSpec":
+    def valid_specialist(self) -> "TaskSpecialistSpec":
         if not self.name.strip() or not self.instructions.strip():
             raise ValueError("Specialist name and instructions must not be blank")
         if len(set(self.tools)) != len(self.tools):
             raise ValueError("Specialist tool names must be unique")
         return self
+
+
+# Existing imports and serialized assignments remain compatible. The persisted
+# name/instructions/tools fields, and therefore specialist identity hashes, do not change.
+EngineeringSpecialistSpec = TaskSpecialistSpec
 
 
 class WorkPackage(Contract):
@@ -166,7 +206,13 @@ class WorkPackage(Contract):
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
     execution_attempt: int = Field(default=0, ge=0)
     critical: bool = True
-    specialist: EngineeringSpecialistSpec | None = None
+    specialist: TaskSpecialistSpec | None = None
+
+    @model_validator(mode="after")
+    def legal_specialist_capabilities(self) -> "WorkPackage":
+        if self.specialist and not set(self.specialist.tools) <= worker_tool_names(self.role):
+            raise ValueError("Specialist tools must use capabilities of the inherited worker role")
+        return self
 
 
 def worker_agent_id(run_id: str, work: WorkPackage) -> str:
@@ -185,6 +231,20 @@ def worker_agent_id(run_id: str, work: WorkPackage) -> str:
 
 def worker_agent_name(work: WorkPackage) -> str:
     return work.specialist.name if work.specialist else work.role.replace("_", " ").title()
+
+
+def worker_agent_metadata(work: WorkPackage) -> dict[str, str]:
+    if work.specialist is None:
+        return {}
+    department = worker_department(work.role)
+    return {
+        "display_name": worker_agent_name(work),
+        "agent_type": f"{department}_specialist",
+        "parent_agent_id": f"{department}_head",
+        "department": department,
+        "model_parent": work.role,
+        "base_role": work.role,
+    }
 
 
 class TacticalPlan(Contract):

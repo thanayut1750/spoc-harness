@@ -335,9 +335,21 @@ def submit(
     user_request: Annotated[str, typer.Argument(help="Objective for the organization")],
     workspace: Annotated[Path | None, typer.Option(exists=True, file_okay=False)] = None,
     constitution: Annotated[Path | None, typer.Option(exists=True, dir_okay=False)] = None,
+    autonomous: Annotated[
+        bool,
+        typer.Option(
+            help="Remove all three call caps and continue automatically from saved progress."
+        ),
+    ] = False,
 ):
     """Queue an objective; a worker must be running to execute it."""
-    body = {"user_request": user_request}
+    body: dict[str, object] = {"user_request": user_request}
+    if autonomous:
+        body["limits"] = {
+            "max_model_calls": None,
+            "worker_model_calls": None,
+            "max_tool_calls": None,
+        }
     if workspace:
         body["workspace_path"] = str(workspace.resolve())
     if constitution:

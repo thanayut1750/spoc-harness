@@ -9,11 +9,12 @@ import json
 import time
 from collections.abc import Callable, Iterable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import islice
 from typing import Any, cast
 from uuid import uuid4
 
+from org_harness.autonomy import autonomous_mode
 from org_harness.models import RunBudgetUpdate
 from org_harness.text_safety import require_json_text
 
@@ -63,7 +64,7 @@ def _internal_agent_type(event: dict) -> str | None:
     if (
         isinstance(agent_id, str)
         and agent_id.startswith("specialist:")
-        and agent_type == "engineering_specialist"
+        and agent_type in {"engineering_specialist", "research_specialist"}
     ) or (agent_id == "tools_rd_lead" and agent_type == "tools_rd_lead"):
         return agent_type
     return None
@@ -143,6 +144,51 @@ def timestamp() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _operator_pause_review(run_id: str) -> dict:
+    return {
+        "interrupt_id": f"operator-pause:{run_id}",
+        "kind": "manual_pause",
+        "reason": "Mission paused at your request.",
+        "allowed_actions": ["continue", "abort"],
+        "kr_ids": [],
+    }
+
+
+def _scheduled_run(run: dict, delay_seconds: float, reason: str, projection: dict) -> dict:
+    """Record an automatic wakeup without losing operator lifecycle decisions."""
+    if not 0 <= delay_seconds <= 86400:
+        raise ValueError("Continuation delay must be between 0 and 86400 seconds")
+    reserved = {
+        "run_id",
+        "limits",
+        "constitution",
+        "model_config",
+        "agent_model_configs",
+        "cancel_requested",
+        "pause_requested",
+        "status",
+        "user_request",
+    }
+    if reserved.intersection(projection):
+        raise ValueError("Continuation cannot replace mission controls or requirements")
+    updated = {**run, **copy.deepcopy(projection)}
+    if run.get("cancel_requested") or run["status"] in TERMINAL:
+        return copy.deepcopy(run)
+    paused = bool(run.get("pause_requested"))
+    attempt = int((run.get("continuation") or {}).get("attempt", 0)) + 1
+    updated.update(
+        status="paused" if paused else "queued",
+        review=_operator_pause_review(run["run_id"]) if paused else None,
+        resume_decision=None,
+        next_attempt_at=None
+        if paused
+        else (datetime.now(UTC) + timedelta(seconds=delay_seconds)).isoformat(),
+        continuation={"attempt": attempt, "reason": reason[:2000], "scheduled_at": timestamp()},
+        updated_at=timestamp(),
+    )
+    return updated
+
+
 def fingerprint(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 
@@ -218,6 +264,8 @@ def apply_command(run: dict, kind: str, payload: dict) -> dict:
         run["pause_requested"] = True
         if status == "queued":
             run["status"] = "paused"
+            if autonomous_mode(run.get("limits", {})):
+                run["review"] = _operator_pause_review(run["run_id"])
     elif kind == "cancel":
         run["cancel_requested"] = True
         run["status"] = "cancelled"
@@ -253,6 +301,8 @@ def apply_command(run: dict, kind: str, payload: dict) -> dict:
             raise ConflictError("A note cannot be empty")
     else:
         raise ConflictError("Unknown command")
+    if kind in {"resume", "retry", "cancel", "pause"}:
+        run["next_attempt_at"] = None
     run["updated_at"] = timestamp()
     return run
 
@@ -311,8 +361,17 @@ class MemoryStorage:
             run_ids = list(self.runs)
             for saver, store in self.runtime_resources:
                 if saver is not None:
-                    for run_id in run_ids:
-                        await saver.adelete_thread(run_id)
+                    # Agent conversations and compaction receipts are independent
+                    # threads. Erase their full history with the owning mission,
+                    # including checkpoints in nested namespaces.
+                    threads = set(run_ids)
+                    private_prefixes = tuple(f"{run_id}:private:" for run_id in run_ids)
+                    async for checkpoint in saver.alist(None):
+                        thread = checkpoint.config["configurable"]["thread_id"]
+                        if thread.startswith(private_prefixes):
+                            threads.add(thread)
+                    for thread in threads:
+                        await saver.adelete_thread(thread)
                 if store is not None:
                     for namespace in await store.alist_namespaces(limit=10000):
                         while items := await store.asearch(namespace, limit=100):
@@ -348,7 +407,7 @@ class MemoryStorage:
     async def close(self) -> None:
         pass
 
-    async def ready(self) -> bool:
+    async def ready(self, *, raise_errors: bool = False) -> bool:
         return True
 
     def _cached(self, key: str | None, value: Any) -> dict | None:
@@ -645,20 +704,50 @@ class MemoryStorage:
             now = time.monotonic()
             if any(v["owner"] and v["lease_until"] > now for v in self.jobs.values()):
                 return None
-            for run_id, job in self.jobs.items():
+            for run_id, job in sorted(
+                self.jobs.items(),
+                key=lambda item: (
+                    (self.runs[item[0]].get("continuation") or {}).get("scheduled_at")
+                    or self.runs[item[0]]["created_at"]
+                ),
+            ):
                 run = self.runs[run_id]
-                if run["status"] not in {"queued", "running"}:
+                automatic_review = (
+                    run["status"] == "review"
+                    and autonomous_mode(run.get("limits", {}))
+                    and (run.get("review") or {}).get("kind") != "manual_pause"
+                    and not run.get("pause_requested")
+                    and not run.get("cancel_requested")
+                )
+                if run["status"] not in {"queued", "running"} and not automatic_review:
                     continue
-                recovered = run["status"] == "running"
+                wakeup = run.get("next_attempt_at")
+                if wakeup and datetime.fromisoformat(wakeup) > datetime.now(UTC):
+                    continue
+                recovered = run["status"] == "running" or automatic_review
                 job.update(owner=worker_id, lease_until=now + lease_seconds)
                 run.update(status="running", updated_at=timestamp())
                 return {**copy.deepcopy(run), "recovered": recovered}
             return None
 
+    async def schedule_retry(
+        self, run_id: str, worker_id: str, delay_seconds: float, reason: str, **projection: Any
+    ) -> dict:
+        async with self.lock:
+            run = self.runs.get(run_id)
+            job = self.jobs.get(run_id)
+            if run is None:
+                raise RunNotFoundError("Run not found")
+            if not job or job["owner"] != worker_id or job["lease_until"] <= time.monotonic():
+                raise ConflictError("Execution lease was lost before scheduling continuation")
+            updated = _scheduled_run(run, delay_seconds, reason, projection)
+            self.runs[run_id] = updated
+            return copy.deepcopy(updated)
+
     async def heartbeat(self, run_id: str, worker_id: str, lease_seconds: int = 30) -> bool:
         async with self.lock:
             job = self.jobs.get(run_id)
-            if not job or job["owner"] != worker_id:
+            if not job or job["owner"] != worker_id or job["lease_until"] <= time.monotonic():
                 return False
             job["lease_until"] = time.monotonic() + lease_seconds
             return True
@@ -755,7 +844,7 @@ class PostgresStorage:
                         )
                     await conn.execute("INSERT INTO harness_migrations(version) VALUES (3)")
 
-    async def ready(self) -> bool:
+    async def ready(self, *, raise_errors: bool = False) -> bool:
         try:
             async with self.pool.connection() as conn:
                 row = await (
@@ -763,6 +852,8 @@ class PostgresStorage:
                 ).fetchone()
                 return bool(row)
         except Exception:
+            if raise_errors:
+                raise
             return False
 
     async def get_setting(self, key: str) -> dict | None:
@@ -1293,13 +1384,22 @@ class PostgresStorage:
                 return None
             row = await (
                 await conn.execute("""SELECT r.run_id,r.data FROM harness_jobs j JOIN harness_runs r USING(run_id)
-                WHERE r.data->>'status' IN ('queued','running') AND (j.lease_until IS NULL OR j.lease_until<now())
-                ORDER BY r.created_at LIMIT 1 FOR UPDATE OF j,r SKIP LOCKED""")
+                WHERE (r.data->>'status' IN ('queued','running') OR
+                  (r.data->>'status'='review' AND
+                   r.data->'limits' @> '{"max_model_calls":null,"worker_model_calls":null,"max_tool_calls":null}'::jsonb
+                   AND coalesce(r.data#>>'{review,kind}','')<>'manual_pause'
+                   AND coalesce((r.data->>'pause_requested')::boolean,false)=false
+                   AND coalesce((r.data->>'cancel_requested')::boolean,false)=false))
+                AND (j.lease_until IS NULL OR j.lease_until<now())
+                AND (r.data->>'next_attempt_at' IS NULL OR (r.data->>'next_attempt_at')::timestamptz<=now())
+                ORDER BY coalesce((r.data#>>'{continuation,scheduled_at}')::timestamptz,
+                                  (r.data->>'created_at')::timestamptz,r.created_at)
+                LIMIT 1 FOR UPDATE OF j,r SKIP LOCKED""")
             ).fetchone()
             if not row:
                 return None
             run = row["data"]
-            recovered = run["status"] == "running"
+            recovered = run["status"] in {"running", "review"}
             run.update(status="running", updated_at=timestamp())
             await conn.execute(
                 "UPDATE harness_jobs SET owner=%s,lease_until=now()+(%s*interval '1 second') WHERE run_id=%s",
@@ -1309,6 +1409,28 @@ class PostgresStorage:
                 "UPDATE harness_runs SET data=%s WHERE run_id=%s", (self._json(run), row["run_id"])
             )
             return {**run, "recovered": recovered}
+
+    async def schedule_retry(
+        self, run_id: str, worker_id: str, delay_seconds: float, reason: str, **projection: Any
+    ) -> dict:
+        async with self.pool.connection() as conn, conn.transaction():
+            row = await (
+                await conn.execute(
+                    "SELECT r.data,j.owner,j.lease_until>now() AS lease_valid "
+                    "FROM harness_jobs j JOIN harness_runs r USING(run_id) "
+                    "WHERE r.run_id=%s FOR UPDATE OF j,r",
+                    (run_id,),
+                )
+            ).fetchone()
+            if not row:
+                raise RunNotFoundError("Run not found")
+            if row["owner"] != worker_id or not row["lease_valid"]:
+                raise ConflictError("Execution lease was lost before scheduling continuation")
+            updated = _scheduled_run(row["data"], delay_seconds, reason, projection)
+            await conn.execute(
+                "UPDATE harness_runs SET data=%s WHERE run_id=%s", (self._json(updated), run_id)
+            )
+            return updated
 
     async def heartbeat(self, run_id: str, worker_id: str, lease_seconds: int = 30) -> bool:
         async with self.pool.connection() as conn:

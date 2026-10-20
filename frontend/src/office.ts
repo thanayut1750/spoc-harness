@@ -194,9 +194,17 @@ export function agentMetadata(
 }
 export function isEngineeringSpecialist(agent: AgentActivity): boolean {
   return (
+    isTaskSpecialist(agent) &&
+    agentMetadata(agent, "agent_type") === "engineering_specialist"
+  );
+}
+export function isTaskSpecialist(agent: AgentActivity): boolean {
+  return (
     agent.source === "harness" &&
     agent.agent_id.startsWith("specialist:") &&
-    agentMetadata(agent, "agent_type") === "engineering_specialist"
+    ["engineering_specialist", "research_specialist"].includes(
+      agentMetadata(agent, "agent_type") ?? "",
+    )
   );
 }
 export function isExternalAgent(agent: AgentActivity): boolean {
@@ -222,22 +230,27 @@ export function roleFor(value: string | AgentActivity, index = 0): OfficeRole {
       kind: "fixed",
       parent_agent_id: agentMetadata(agent, "parent_agent_id"),
     };
-  if (isEngineeringSpecialist(agent))
+  if (isTaskSpecialist(agent)) {
+    const department = isEngineeringSpecialist(agent)
+      ? "Engineering"
+      : "Research";
     return {
       id,
-      name: name ?? "Engineering specialist",
-      title: "Engineering specialist",
-      department: "Engineering",
-      color: "#a6c9e6",
+      name: name ?? `${department} specialist`,
+      title: `${department} specialist`,
+      department,
+      color: department === "Engineering" ? "#a6c9e6" : "#b4cd96",
       x: [640, 740, 840, 940][Math.max(0, index) % specialistsPerPage],
       y: 575,
       kind: "specialist",
       parent_agent_id:
-        agentMetadata(agent, "parent_agent_id") ?? "engineering_head",
+        agentMetadata(agent, "parent_agent_id") ??
+        `${department.toLowerCase()}_head`,
       model_parent:
         agentMetadata(agent, "model_parent") ??
         agentMetadata(agent, "base_role"),
     };
+  }
   if (!external)
     return {
       id,
@@ -271,7 +284,7 @@ export function officeRoster(
   const ordered = [...agents].sort((a, b) =>
     a.agent_id.localeCompare(b.agent_id),
   );
-  const specialists = ordered.filter(isEngineeringSpecialist);
+  const specialists = ordered.filter(isTaskSpecialist);
   const integrations = ordered.filter(isExternalAgent);
   const specialistPages = Math.max(
     1,
@@ -291,9 +304,7 @@ export function officeRoster(
   );
   const positioned: PositionedAgent[] = [
     ...agents
-      .filter(
-        (agent) => !isExternalAgent(agent) && !isEngineeringSpecialist(agent),
-      )
+      .filter((agent) => !isExternalAgent(agent) && !isTaskSpecialist(agent))
       .map((agent) => ({ agent, role: roleFor(agent) })),
     ...specialists
       .slice(
@@ -469,7 +480,7 @@ export function projectEvent(
 }
 function internalProjectionType(agent: AgentActivity): string | undefined {
   if (agent.source !== "harness") return undefined;
-  if (isEngineeringSpecialist(agent)) return "engineering_specialist";
+  if (isTaskSpecialist(agent)) return agentMetadata(agent, "agent_type");
   if (
     agent.agent_id === "tools_rd_lead" &&
     agent.data?.agent_type === "tools_rd_lead"

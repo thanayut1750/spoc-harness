@@ -1,5 +1,14 @@
 import type { ModelCallBudget, Run } from "./types";
 
+export function autonomousCallBudget(budget?: Partial<ModelCallBudget> | null) {
+  return (
+    !!budget &&
+    budget.max_model_calls === null &&
+    budget.worker_model_calls === null &&
+    budget.max_tool_calls === null
+  );
+}
+
 export function normalizeCallBudget(
   budget: ModelCallBudget,
 ): Required<ModelCallBudget> {

@@ -14,11 +14,13 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
+from org_harness.autonomy import autonomous_mode
 from org_harness.models import EscalationSignal
 from org_harness.text_safety import contains_invalid_json_text
 from org_harness.tools import Artifacts, ExpectedToolInputError, HostTools, readable_text
 
 MAX_MISSION_TOOLS = 12
+CATALOG_PAGE_BYTES = 32768
 
 
 def bounded_json(value: Any, *, limit: int = 32768) -> str:
@@ -81,12 +83,92 @@ class MissionToolCatalog:
     async def list_tools(self) -> list[dict]:
         """Descriptions are discovery data; invocation verifies the immutable evidence."""
         result = []
-        for artifact in await self.storage.list_artifacts(self.run["run_id"]):
+        artifacts = sorted(
+            await self.storage.list_artifacts(self.run["run_id"]),
+            key=lambda item: (item.get("created_at", ""), item["artifact_id"]),
+        )
+        for artifact in artifacts:
             if artifact.get("kind") != "mission_tool_definition":
                 continue
             definition = artifact.get("tool_definition")
             if isinstance(definition, dict) and definition.get("tool_id"):
                 result.append({**definition, "definition_artifact_id": artifact["artifact_id"]})
+        return result
+
+    async def preview(self) -> dict:
+        """A fixed-size recent index, not execution evidence or a full schema."""
+        tools = await self.list_tools()
+        return {
+            "tools": [
+                {
+                    "tool_id": item["tool_id"],
+                    "name": item.get("name", ""),
+                    "description": str(item.get("description", ""))[:240],
+                }
+                for item in reversed(tools[-3:])
+            ],
+            "total": len(tools),
+            "has_more": len(tools) > 3,
+            "discovery_only": True,
+        }
+
+    async def discover_tools(self, *, query: str = "", offset: int = 0, limit: int = 5) -> dict:
+        """Page complete definitions in creation order, preserving every old version.
+
+        New registrations append to the index rather than shifting older pages.
+        Search matches IDs, names and descriptions; a byte limit can shorten a
+        page before its requested count without truncating any JSON schema.
+        """
+        if (
+            not isinstance(query, str)
+            or len(query) > 256
+            or contains_invalid_json_text(query)
+            or type(offset) is not int
+            or offset < 0
+            or type(limit) is not int
+            or not 1 <= limit <= 5
+        ):
+            raise ExpectedToolInputError(
+                "Catalog query must be at most 256 characters; offset must be nonnegative and limit 1–5"
+            )
+        search = query.casefold().strip()
+        tools = [
+            item
+            for item in await self.list_tools()
+            if not search
+            or any(
+                search in str(item.get(key, "")).casefold()
+                for key in ("tool_id", "name", "description")
+            )
+        ]
+        selected: list[dict] = []
+        result = {
+            "tools": selected,
+            "total": len(tools),
+            "offset": offset,
+            "limit": limit,
+            "has_more": False,
+            "next_offset": None,
+            "discovery_only": True,
+        }
+        for item in tools[offset : offset + limit]:
+            next_offset = offset + len(selected) + 1
+            has_more = next_offset < len(tools)
+            candidate = {
+                **result,
+                "tools": [*selected, item],
+                "has_more": has_more,
+                "next_offset": next_offset if has_more else None,
+            }
+            if len(json.dumps(candidate, ensure_ascii=True, allow_nan=False)) > CATALOG_PAGE_BYTES:
+                if not selected:
+                    raise ExpectedToolInputError(
+                        "Registered tool definition exceeds the discovery page limit"
+                    )
+                break
+            selected.append(item)
+        result["has_more"] = offset + len(selected) < len(tools)
+        result["next_offset"] = offset + len(selected) if result["has_more"] else None
         return result
 
     def _authorize_host(self, host: HostTools) -> None:
@@ -180,7 +262,11 @@ class MissionToolCatalog:
                     raise ExpectedToolInputError("Tool name must be a short lowercase identifier")
                 if not description.strip() or len(description) > 2000:
                     raise ExpectedToolInputError("Tool description must contain 1–2000 characters")
-                if len(await self.list_tools()) >= MAX_MISSION_TOOLS:
+                current_run = await self.storage.get_run(self.run["run_id"])
+                if (
+                    not autonomous_mode(current_run.get("limits", {}))
+                    and len(await self.list_tools()) >= MAX_MISSION_TOOLS
+                ):
                     raise ExpectedToolInputError(
                         "This mission has reached its registered-tool limit"
                     )

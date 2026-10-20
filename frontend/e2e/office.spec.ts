@@ -2287,7 +2287,7 @@ test("No limit budgets persist as independent nulls, retry failed saves, and res
   await workerUnlimited.check();
   await expect(save).toBeEnabled();
   await expect(
-    dialog.getByText(/timeouts.*revision limits still apply/i),
+    dialog.getByText(/A finite call cap keeps governed review behavior/i),
   ).toBeVisible();
   let rejectSave = true;
   await page.route("**/api/settings/budgets", (route) =>
@@ -2472,7 +2472,7 @@ test("tool No limit can be saved and explicitly applied to the exhausted mission
   await apply.click();
   await expect(selected.getByRole("alert")).toHaveCount(0);
   await expect(selected.getByRole("status")).toContainText(
-    "mission has not resumed",
+    "Autonomous mode may continue this mission automatically",
   );
   await expect(selected.getByText("200 used · limit: No limit")).toBeVisible();
   await expect(
@@ -3121,7 +3121,7 @@ for (const width of [867, 390]) {
       .click();
     await emit([actors[4]]);
     await expect(
-      page.getByText("Engineering specialists 5–5 of 5", { exact: true }),
+      page.getByText("Task specialists 5–5 of 5", { exact: true }),
     ).toBeVisible();
     await expect(eventBubble(page, actors[4].agent_id)).toContainText(
       "Preparing specialist 5 output",
@@ -3138,7 +3138,7 @@ for (const width of [867, 390]) {
 
     await page
       .getByRole("button", {
-        name: "Previous Engineering specialists page",
+        name: "Previous Task specialists page",
         exact: true,
       })
       .click();
@@ -3151,7 +3151,7 @@ for (const width of [867, 390]) {
       },
     ]);
     await expect(
-      page.getByText("Engineering specialists 1–4 of 5", { exact: true }),
+      page.getByText("Task specialists 1–4 of 5", { exact: true }),
     ).toBeVisible();
     await expect(eventBubble(page, actors[4].agent_id)).toHaveCount(0);
 
@@ -3164,7 +3164,7 @@ for (const width of [867, 390]) {
       },
     ]);
     await expect(
-      page.getByText("Engineering specialists 5–6 of 6", { exact: true }),
+      page.getByText("Task specialists 5–6 of 6", { exact: true }),
     ).toBeVisible();
     await expect(eventBubble(page, actors[5].agent_id)).toContainText(
       "Completed before the next projection refresh",
@@ -3182,7 +3182,7 @@ for (const width of [867, 390]) {
       .click();
     await page.getByRole("button", { name: "Office", exact: true }).click();
     await expect(
-      page.getByText("Engineering specialists 1–4 of 6", { exact: true }),
+      page.getByText("Task specialists 1–4 of 6", { exact: true }),
     ).toBeVisible();
     await expect(eventBubble(page, actors[0].agent_id)).toBeVisible();
   });
@@ -3241,7 +3241,7 @@ test("new integrations follow their own page while ordinary updates preserve man
   ).toHaveCount(0);
 });
 
-test("named Engineering specialists page separately from external integrations and preserve actual identity", async ({
+test("named Task specialists page separately from external integrations and preserve actual identity", async ({
   page,
 }) => {
   const requests = await fixture(page, {
@@ -3294,16 +3294,16 @@ test("named Engineering specialists page separately from external integrations a
     });
   });
   await expect(
-    page.getByText("Engineering specialists 5–8 of 8", { exact: true }),
+    page.getByText("Task specialists 5–8 of 8", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", {
-      name: "Previous Engineering specialists page",
+      name: "Previous Task specialists page",
       exact: true,
     })
     .click();
   await expect(
-    page.getByText("Engineering specialists 1–4 of 8", { exact: true }),
+    page.getByText("Task specialists 1–4 of 8", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
@@ -3317,12 +3317,12 @@ test("named Engineering specialists page separately from external integrations a
   ).toHaveCount(0);
   await page
     .getByRole("button", {
-      name: "Next Engineering specialists page",
+      name: "Next Task specialists page",
       exact: true,
     })
     .click();
   await expect(
-    page.getByText("Engineering specialists 5–8 of 8", { exact: true }),
+    page.getByText("Task specialists 5–8 of 8", { exact: true }),
   ).toBeVisible();
   const specialist = page.getByRole("button", {
     name: "Shader specialist 8: Writing. Inspect agent",
@@ -3438,7 +3438,7 @@ test("named Engineering specialists page separately from external integrations a
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("Engineering specialists 1–4 of 8", { exact: true }),
+    page.getByText("Task specialists 1–4 of 8", { exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/engineering-specialists.png",
@@ -3609,4 +3609,323 @@ test("agent file scopes isolate same-KR authors and label legacy worker context"
       }),
     ).toHaveCount(0);
   }
+});
+
+test("Research task specialists retain names, private files, inherited models and activity on the fifth desk", async ({
+  page,
+}) => {
+  const fifth = "specialist:run-fixture:research-5";
+  await fixture(
+    page,
+    {
+      agent_model_configs: {
+        data_analyst: {
+          provider: "zai",
+          model: "citation-model",
+          reasoning_effort: "high",
+        },
+      },
+    },
+    [
+      {
+        artifact_id: "research-own",
+        name: "citation-index.json",
+        media_type: "application/json",
+        run_id: runId,
+        kr_id: "KR1",
+        size: 500,
+        scope: JSON.stringify(["research-wp5", 0, fifth]),
+      },
+      {
+        artifact_id: "research-sibling",
+        name: "sibling-private.json",
+        media_type: "application/json",
+        run_id: runId,
+        kr_id: "KR1",
+        size: 300,
+        scope: JSON.stringify([
+          "research-wp1",
+          0,
+          "specialist:run-fixture:research-1",
+        ]),
+      },
+      {
+        artifact_id: "research-legacy",
+        name: "legacy-unassigned.json",
+        media_type: "application/json",
+        run_id: runId,
+        kr_id: "KR1",
+        size: 300,
+      },
+    ],
+  );
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    for (let index = 1; index <= 5; index++)
+      emit({
+        event_id: `research-${index}`,
+        seq: 50 + index,
+        source: "harness",
+        agent_id: `specialist:run-fixture:research-${index}`,
+        run_id: "run-fixture",
+        kr_id: "KR1",
+        activity: "completed",
+        summary: `Validated research source set ${index}`,
+        data: {
+          agent_type: "research_specialist",
+          display_name: `Citation specialist ${index}`,
+          parent_agent_id: "research_head",
+          department: "research",
+          model_parent: "data_analyst",
+        },
+        timestamp: "2026-10-20T10:00:00Z",
+      });
+    emit({
+      event_id: "research-external",
+      seq: 56,
+      source: "custom",
+      agent_id: "specialist:run-fixture:research-5",
+      run_id: "run-fixture",
+      activity: "reading",
+      summary: "External citation monitor",
+      data: {
+        agent_type: "research_specialist",
+        display_name: "External Research mirror",
+        parent_agent_id: "research_head",
+        model_parent: "data_analyst",
+      },
+      timestamp: "2026-10-20T10:00:00Z",
+    });
+  });
+  await expect(
+    page.getByText("Task specialists 5–5 of 5", { exact: true }),
+  ).toBeVisible();
+  await eventBubble(page, fifth).click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(
+    inspector.getByRole("heading", {
+      name: "Citation specialist 5",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Department" }),
+  ).toContainText("Research");
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Parent" }),
+  ).toContainText("Research lead");
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "citation-model",
+  );
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "Inherited from Data analyst",
+  );
+  await page.getByRole("tab", { name: /^Files/ }).click();
+  await expect(
+    inspector.getByText("citation-index.json", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("sibling-private.json", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    inspector.getByText("legacy-unassigned.json", { exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() =>
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "research-bare-progress",
+      seq: 57,
+      source: "harness",
+      agent_id: "specialist:run-fixture:research-5",
+      run_id: "run-fixture",
+      kr_id: "KR1",
+      activity: "reading",
+      summary: "Checking the final citation mapping",
+      data: { tool_name: "read_artifact" },
+      timestamp: "2026-10-20T10:00:01Z",
+    }),
+  );
+  await expect(eventBubble(page, fifth)).toHaveAttribute(
+    "title",
+    /Citation specialist 5.*Checking the final citation mapping/,
+  );
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    inspector.getByText("Checking the final citation mapping", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "External Research mirror: Reading. Inspect agent",
+    })
+    .click();
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Department" }),
+  ).toContainText("Integrations");
+  await expect(inspector.locator(".agent-model-note")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Send guidance to agent" }),
+  ).toBeDisabled();
+  await page.route("**/api/office", (route) =>
+    route.fulfill({
+      json: {
+        agents: Array.from({ length: 5 }, (_, index) => ({
+          event_id: `research-snapshot-${index}`,
+          seq: 51 + index,
+          source: "harness",
+          agent_id: `specialist:run-fixture:research-${index + 1}`,
+          run_id: runId,
+          kr_id: "KR1",
+          activity: "completed",
+          summary: `Saved research snapshot ${index + 1}`,
+          data: {
+            agent_type: "research_specialist",
+            display_name: `Citation specialist ${index + 1}`,
+            parent_agent_id: "research_head",
+            department: "research",
+            model_parent: "data_analyst",
+          },
+          timestamp: "2026-10-20T10:00:02Z",
+        })),
+        cursor: 57,
+        generation: "fixture-generation",
+      },
+    }),
+  );
+  await page.reload();
+  await expect(
+    page.getByText("Task specialists 5–5 of 5", { exact: true }),
+  ).toBeVisible();
+  await eventBubble(page, fifth).click();
+  await expect(
+    inspector.getByRole("heading", {
+      name: "Citation specialist 5",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "Inherited from Data analyst",
+  );
+});
+
+test("all unlimited budgets show queued automatic continuation without a review prompt, while operator pauses remain explicit", async ({
+  page,
+}) => {
+  await fixture(page, {
+    status: "queued",
+    limits: {
+      max_model_calls: null,
+      worker_model_calls: null,
+      max_tool_calls: null,
+    },
+    review: {
+      interrupt_id: "stale-quality-review",
+      kind: "blocked",
+      reason: "Old quality failure",
+    },
+    continuation: {
+      attempt: 3,
+      reason: "Provider rate limit; saved progress will be retried",
+      scheduled_at: "2026-10-20T10:00:00Z",
+    },
+    next_attempt_at: "2026-10-20T10:05:00Z",
+    automatic_cycles: 2,
+    autonomous_failures: 1,
+  });
+  const banner = page.getByRole("status", {
+    name: "Autonomous continuation",
+    exact: true,
+  });
+  await expect(
+    banner.getByText("Automatic continuation scheduled", { exact: true }),
+  ).toBeVisible();
+  await expect(banner).toContainText("Provider rate limit");
+  await expect(banner.locator("time")).toHaveAttribute(
+    "datetime",
+    "2026-10-20T10:05:00Z",
+  );
+  await expect(banner).toContainText("2 cycles · 3 continuations");
+  await expect(page.locator(".review-banner")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Review and resume mission" }),
+  ).toBeDisabled();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Cancel mission" }),
+  ).toBeEnabled();
+  await page.route(`**/api/runs/${runId}`, (route) =>
+    route.fulfill({
+      json: {
+        ...initialRun,
+        status: "review",
+        limits: {
+          max_model_calls: null,
+          worker_model_calls: null,
+          max_tool_calls: null,
+        },
+        review: {
+          interrupt_id: "legacy-auto",
+          kind: "blocked",
+          reason: "Worker repair pending",
+        },
+      },
+    }),
+  );
+  await page.reload();
+  await expect(banner).toContainText("Autonomous recovery pending");
+  await expect(page.locator(".review-banner")).toHaveCount(0);
+  await page.route(`**/api/runs/${runId}`, (route) =>
+    route.fulfill({
+      json: {
+        ...initialRun,
+        status: "paused",
+        limits: {
+          max_model_calls: null,
+          worker_model_calls: null,
+          max_tool_calls: null,
+        },
+        review: {
+          interrupt_id: "manual",
+          kind: "manual_pause",
+          reason: "Operator paused",
+          allowed_actions: ["continue", "abort"],
+        },
+      },
+    }),
+  );
+  await page.reload();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator(".review-banner")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review and resume mission" }),
+  ).toBeEnabled();
+  await page.route(`**/api/runs/${runId}`, (route) =>
+    route.fulfill({
+      json: {
+        ...initialRun,
+        status: "failed",
+        limits: {
+          max_model_calls: null,
+          worker_model_calls: null,
+          max_tool_calls: null,
+        },
+        error:
+          "An interrupted host command has an unknown outcome; automatic replay is unsafe.",
+      },
+    }),
+  );
+  await page.reload();
+  await expect(page.locator(".failure-banner")).toContainText(
+    "Unresolved command effects must be reconciled",
+  );
+  await expect(page.locator(".failure-banner")).not.toContainText(
+    "may require review",
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry mission", exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator(".review-banner")).toHaveCount(0);
+  await expect(banner).toHaveCount(0);
 });

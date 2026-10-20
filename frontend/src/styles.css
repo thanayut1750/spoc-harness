@@ -1493,6 +1493,49 @@ main {
   display: flex;
   color: #c4a685;
 }
+.continuation-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 11px 15px;
+  border: 1px solid #47663a;
+  border-radius: 5px;
+  background: #22341c;
+  color: #c5dfb3;
+}
+.continuation-banner > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.continuation-banner > div {
+  min-width: 0;
+  flex: 1;
+}
+.continuation-banner strong {
+  font-size: 12px;
+}
+.continuation-banner p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 4px 0 0;
+  color: #a1bd8f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.continuation-banner small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #a1bd8f;
+}
+.continuation-counts {
+  flex: 0 1 130px;
+  text-align: right;
+}
 .failure-banner {
   display: flex;
   align-items: center;

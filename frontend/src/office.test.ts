@@ -14,6 +14,8 @@ import {
   latestAgentActivities,
   agentIdentityKey,
   followRosterPage,
+  isTaskSpecialist,
+  isEngineeringSpecialist,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -408,7 +410,7 @@ describe("office projection", () => {
 });
 
 describe.each([
-  ["Engineering specialists", 4],
+  ["Task specialists", 4],
   ["external integrations", 3],
 ] as const)("%s desk-page following", (_group, perPage) => {
   const members = () =>
@@ -534,4 +536,53 @@ describe.each([
       }),
     ).toBe(0);
   });
+});
+
+it("projects Research specialists with department identity across private activity updates without trusting external metadata", () => {
+  const research = event(50, {
+    agent_id: "specialist:run:research-123",
+    run_id: "run",
+    data: {
+      agent_type: "research_specialist",
+      display_name: "Citation cartographer",
+      parent_agent_id: "research_head",
+      department: "research",
+      model_parent: "data_analyst",
+    },
+  });
+  expect(isTaskSpecialist(research)).toBe(true);
+  expect(isEngineeringSpecialist(research)).toBe(false);
+  expect(roleFor(research)).toMatchObject({
+    kind: "specialist",
+    name: "Citation cartographer",
+    title: "Research specialist",
+    department: "Research",
+    parent_agent_id: "research_head",
+    model_parent: "data_analyst",
+  });
+  const updated = projectEvent(projectEvent(initialAgents(), research), {
+    ...research,
+    seq: 51,
+    data: { tool_name: "search", stdout: "untrusted result" },
+    activity: "reading",
+  });
+  expect(roleFor(updated[research.agent_id])).toMatchObject({
+    kind: "specialist",
+    name: "Citation cartographer",
+    department: "Research",
+  });
+  expect(updated[research.agent_id].data?.stdout).toBe("untrusted result");
+  expect(roleFor(normalizeAgent({ ...research, source: "custom" })).kind).toBe(
+    "external",
+  );
+  expect(isTaskSpecialist({ ...research, source: undefined })).toBe(false);
+  const roster = officeRoster([
+    updated[research.agent_id],
+    normalizeAgent({ ...research, source: "custom" }),
+  ]);
+  expect(roster.specialists).toHaveLength(1);
+  expect(roster.integrations).toHaveLength(1);
+  expect(
+    new Set(roster.positioned.map(({ role }) => `${role.x}:${role.y}`)).size,
+  ).toBe(2);
 });

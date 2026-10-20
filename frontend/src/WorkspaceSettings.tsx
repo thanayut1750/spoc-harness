@@ -220,10 +220,15 @@ export function WorkspaceSettings({
                     Only Planner or Engineering lead may call this agent.
                   </p>
                 )}
-                {["backend_coder", "system_architect"].includes(target) && (
+                {[
+                  "backend_coder",
+                  "system_architect",
+                  "market_researcher",
+                  "data_analyst",
+                ].includes(target) && (
                   <p className="agent-access-note">
-                    Dynamic Engineering specialists inherit their declared base
-                    role’s model selection.
+                    Dynamic task specialists inherit their declared base role’s
+                    model selection.
                   </p>
                 )}
                 {target !== "all" && (

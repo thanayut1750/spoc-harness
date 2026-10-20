@@ -7,20 +7,287 @@ import math
 import mimetypes
 import os
 import signal
+import sys
 import tempfile
 from collections.abc import Awaitable, Callable
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 import httpx
 
+from org_harness.autonomy import AutonomousCheckpointYield, autonomous_mode
+from org_harness.command_runner import (
+    atomic_json,
+    process_identity,
+    same_process,
+    signal_process,
+    stop_session_children,
+)
 from org_harness.models import EscalationSignal
 from org_harness.storage import ArtifactNotFoundError, BudgetExceeded, fingerprint
 from org_harness.text_safety import contains_invalid_json_text, contains_invalid_json_value
 
 _COMMAND_PREVIEW_BYTES = 32768
+_COMMAND_ARTIFACT_BYTES = 2_000_000
+_RECOVERY_GUIDANCE = (
+    "This receipt never authorizes replaying the interrupted command. Inspect existing files, "
+    "logs, process state and external effects before deciding how to repair the assignment. "
+    "Use fresh verification to establish acceptance criteria; an interrupted/unknown receipt "
+    "is not successful evidence."
+)
+
+
+def _command_record(path: Path) -> dict | None:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _command_file_id(operation_id: str) -> str:
+    return (
+        operation_id
+        if len(operation_id) == 64 and all(char in "0123456789abcdef" for char in operation_id)
+        else hashlib.sha256(operation_id.encode()).hexdigest()
+    )
+
+
+def _verified_supervisor(manifest: dict, path: Path) -> bool:
+    identity = manifest.get("process")
+    if not isinstance(identity, dict) or not isinstance(identity.get("pid"), int):
+        return False
+    if identity.get("session") != identity["pid"] or identity.get("pgid") != identity["pid"]:
+        return False
+    if not same_process(identity, process_identity(identity["pid"])):
+        return False
+    try:
+        args = Path(f"/proc/{identity['pid']}/cmdline").read_bytes().split(b"\x00")
+        return (
+            str(Path(__file__).with_name("command_runner.py")).encode() in args
+            and str(path).encode() in args
+            and manifest.get("token", "").encode() in args
+            and bool(manifest.get("token"))
+        )
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+async def _stop_supervisor(manifest: dict, path: Path) -> bool:
+    if not _verified_supervisor(manifest, path):
+        return False
+    identity = manifest["process"]
+    signal_process(identity, signal.SIGTERM)
+    deadline = asyncio.get_running_loop().time() + 3
+    while asyncio.get_running_loop().time() < deadline:
+        current = process_identity(identity["pid"])
+        if not same_process(identity, current) or (current and current["state"] == "Z"):
+            return True
+        await asyncio.sleep(0.05)
+    # A hung supervisor must not leave its command running. Clean its verified
+    # private session before stopping the exact leader. Never kill a raw PID.
+    if not _verified_supervisor(manifest, path):
+        return False
+    if not await asyncio.to_thread(stop_session_children, identity):
+        return False
+    signal_process(identity, signal.SIGKILL)
+    deadline = asyncio.get_running_loop().time() + 1
+    while asyncio.get_running_loop().time() < deadline:
+        current = process_identity(identity["pid"])
+        if not same_process(identity, current) or (current and current["state"] == "Z"):
+            return True
+        await asyncio.sleep(0.05)
+    return False
+
+
+async def _save_command_receipt(
+    artifacts: "Artifacts", operation_id: str, context: dict, result: dict
+) -> dict:
+    log_dir = artifacts.root / "operations"
+    file_id = _command_file_id(operation_id)
+    saved = []
+    metadata = {
+        "kr_id": context.get("kr_id", ""),
+        "department": context.get("department", ""),
+        "epoch": context.get("epoch", 0),
+        "version": context.get("version", 1),
+        "scope": context.get("scope", ""),
+        "exit_code": result["exit_code"],
+        "command": context["command"],
+        "cwd": context.get("cwd", ""),
+        "operation_id": operation_id,
+    }
+    for suffix in ("stdout", "stderr"):
+        path = log_dir / f"{file_id}.{suffix}"
+        try:
+            size = path.stat().st_size
+            with path.open("rb") as handle:
+                body = handle.read(_COMMAND_ARTIFACT_BYTES)
+        except FileNotFoundError:
+            size = 0
+            body = b""
+        result[suffix] = body[:_COMMAND_PREVIEW_BYTES].decode(errors="replace")
+        result[f"{suffix}_truncated"] = size > _COMMAND_PREVIEW_BYTES
+        result[f"{suffix}_log_bytes"] = size
+        result[f"{suffix}_artifact_truncated"] = size > len(body)
+        if body:
+            artifact = await artifacts.save(
+                f"{file_id}.{suffix}.txt", body, kind="command_log", **metadata
+            )
+            saved.append(artifact["artifact_id"])
+    unsafe_display = contains_invalid_json_value(result)
+    result = {**json_safe_display(result), "artifact_ids": saved}
+    if unsafe_display:
+        result["display_encoding"] = "json-string-escape"
+    receipt = await artifacts.save(
+        f"{file_id}.command.json",
+        json.dumps({"command": context["command"], "cwd": context.get("cwd", ""), **result}),
+        kind="command_result",
+        **metadata,
+    )
+    result["artifact_ids"] = [*saved, receipt["artifact_id"]]
+    return result
+
+
+def _durable_command_result(manifest: dict | None, path: Path) -> dict:
+    terminal = _command_record(path.with_suffix(".result.json")) if manifest else None
+    if (
+        manifest
+        and terminal
+        and terminal.get("operation_id") == manifest.get("operation_id")
+        and terminal.get("request_fingerprint") == manifest.get("request_fingerprint")
+        and isinstance(terminal.get("exit_code"), int)
+        and not isinstance(terminal["exit_code"], bool)
+        and -255 <= terminal["exit_code"] <= 255
+        and terminal.get("execution_stopped") is True
+        and all(
+            isinstance(terminal.get(key), bool)
+            for key in ("timed_out", "interrupted", "effects_uncertain")
+        )
+        and isinstance(terminal.get("duration_seconds"), (int, float))
+        and not isinstance(terminal["duration_seconds"], bool)
+        and terminal["duration_seconds"] >= 0
+        and not (
+            terminal["exit_code"] == 0
+            and any(terminal[key] for key in ("timed_out", "interrupted", "effects_uncertain"))
+        )
+        and not contains_invalid_json_value(terminal)
+        and same_process(manifest.get("process", {}), terminal.get("process"))
+    ):
+        return {
+            key: terminal[key]
+            for key in (
+                "exit_code",
+                "timed_out",
+                "interrupted",
+                "effects_uncertain",
+                "execution_stopped",
+                "duration_seconds",
+            )
+        } | {"process_state": "stopped", "recovery_guidance": _RECOVERY_GUIDANCE}
+    return {
+        "exit_code": 125,
+        "timed_out": False,
+        "interrupted": True,
+        "effects_uncertain": True,
+        "execution_stopped": False,
+        "duration_seconds": None,
+        "process_state": "unverified",
+        "recovery_guidance": _RECOVERY_GUIDANCE,
+    }
+
+
+async def reconcile_pending_commands(settings: Any, storage: Any, run: dict) -> list[dict]:
+    """Finalize truthful recovery receipts, without ever replaying a command.
+
+    The worker calls this under its exclusive lease. Legacy records have no
+    trustworthy process identity: leave effects explicitly unverified and let
+    the agent inspect them rather than signalling anything or assuming success.
+    """
+    if not autonomous_mode(run.get("limits")):
+        return []
+    artifacts = Artifacts(storage, settings.data_dir, run["run_id"])
+    import fcntl
+
+    results = []
+    for operation in await storage.uncertain_operations(run["run_id"]):
+        operation_id = operation["operation_id"]
+        file_id = _command_file_id(operation_id)
+        path = artifacts.root / "operations" / f"{file_id}.process.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        manifest = _command_record(path)
+        request = operation.get("request", {})
+        valid = bool(
+            manifest
+            and file_id == operation_id
+            and manifest.get("run_id") == run["run_id"]
+            and manifest.get("operation_id") == operation_id
+            and manifest.get("request_fingerprint") == fingerprint(request)
+            and manifest.get("command") == request.get("command")
+        )
+        if valid and manifest is not None and _verified_supervisor(manifest, path):
+            if not await _stop_supervisor(manifest, path):
+                raise AutonomousCheckpointYield("Waiting for interrupted command cleanup", 5)
+        with path.with_suffix(".lock").open("ab") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise AutonomousCheckpointYield(
+                    "Waiting for interrupted command identity", 5
+                ) from exc
+            result = _durable_command_result(manifest if valid else None, path)
+            context = (
+                manifest
+                if valid and manifest is not None
+                else {
+                    "command": str(request.get("command", "")),
+                    "cwd": str(request.get("cwd") or run.get("workspace_path") or ""),
+                }
+            )
+            result = await _save_command_receipt(artifacts, operation_id, context, result)
+            await storage.complete_operation(operation_id, result)
+            results.append({"operation_id": operation_id, "result": result})
+    return results
+
+
+async def stop_run_command_processes(settings: Any, run: dict) -> list[str]:
+    """Stop verified managed supervisors before reset moves/deletes their records.
+
+    The caller holds the exclusive worker lock. An unverified *locked* record
+    remains intact until ownership can be established; an unrelated PID in an
+    unlocked stale record is never signalled.
+    """
+    import fcntl
+
+    root = Artifacts(None, settings.data_dir, run["run_id"]).root / "operations"
+    if any(path.is_symlink() for path in (root.parent.parent, root.parent, root)):
+        return []
+    stopped = []
+    for path in root.glob("*.process.json"):
+        if path.is_symlink() or path.with_suffix(".lock").is_symlink():
+            raise AutonomousCheckpointYield("Command records must be inspected before reset", 5)
+        manifest = _command_record(path)
+        if (
+            manifest
+            and manifest.get("run_id") == run["run_id"]
+            and isinstance(manifest.get("operation_id"), str)
+            and path.name == f"{_command_file_id(manifest['operation_id'])}.process.json"
+            and _verified_supervisor(manifest, path)
+        ):
+            if not await _stop_supervisor(manifest, path):
+                raise AutonomousCheckpointYield("Waiting for command cleanup before reset", 5)
+            stopped.append(manifest["operation_id"])
+        with path.with_suffix(".lock").open("ab") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise AutonomousCheckpointYield(
+                    "Command ownership is not yet safe to reset", 5
+                ) from exc
+    return stopped
 
 
 class ExpectedToolInputError(ValueError):
@@ -550,135 +817,156 @@ class HostTools:
                 raise ExpectedToolInputError("Command cwd must be an existing directory")
             if "\x00" in command:
                 raise ExpectedToolInputError("Command cannot contain null bytes")
-            log_id = self.operation_id(call_id, "run_command")
-            log_dir = self.artifacts.root / "operations"
-            log_dir.mkdir(parents=True, exist_ok=True)
-            stdout_path, stderr_path = log_dir / f"{log_id}.stdout", log_dir / f"{log_id}.stderr"
-            await self.emit(self.role, "executing", command[:160], kr_id=self.kr_id)
-            cancelled, timed_out = False, False
-            with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-                try:
-                    process = await asyncio.create_subprocess_exec(
-                        "/bin/bash",
-                        "-lc",
-                        command,
-                        cwd=str(working_directory),
-                        stdout=stdout,
-                        stderr=stderr,
-                        start_new_session=True,
-                    )
-                except (OSError, ValueError) as exc:
-                    raise ExpectedToolInputError(
-                        f"Command process could not start ({type(exc).__name__})"
-                    ) from exc
-                started = asyncio.get_running_loop().time()
-                try:
-                    while process.returncode is None:
-                        current = await self.storage.get_run(self.run["run_id"])
-                        cancelled = current.get("cancel_requested", False)
-                        timed_out = asyncio.get_running_loop().time() - started >= timeout
-                        if cancelled or timed_out:
-                            await self._terminate(process)
-                            break
-                        try:
-                            await asyncio.wait_for(process.wait(), timeout=0.25)
-                        except TimeoutError:
-                            pass
-                except BaseException:
-                    await self._terminate(process)
-                    raise
-            elapsed = asyncio.get_running_loop().time() - started
-            output_artifacts = []
-            for suffix, log_path in (("stdout", stdout_path), ("stderr", stderr_path)):
-                if not log_path.stat().st_size:
-                    continue
-                artifact = await self.artifacts.save(
-                    f"{log_id}.{suffix}.txt",
-                    log_path.read_bytes(),
-                    kr_id=self.kr_id,
-                    department=self.department,
-                    epoch=self.epoch,
-                    version=self.version,
-                    scope=self.scope,
-                    kind="command_log",
-                    exit_code=124 if timed_out else process.returncode,
-                    command=command,
-                    cwd=str(self.workspace if not cwd else self.path(cwd)),
-                    operation_id=log_id,
-                )
-                output_artifacts.append(artifact["artifact_id"])
-            result = {
-                "exit_code": 124 if timed_out else process.returncode,
-                "stdout": stdout_path.read_bytes()[:_COMMAND_PREVIEW_BYTES].decode(
-                    errors="replace"
-                ),
-                "stderr": stderr_path.read_bytes()[:_COMMAND_PREVIEW_BYTES].decode(
-                    errors="replace"
-                ),
-                "stdout_truncated": stdout_path.stat().st_size > _COMMAND_PREVIEW_BYTES,
-                "stderr_truncated": stderr_path.stat().st_size > _COMMAND_PREVIEW_BYTES,
-                "timed_out": timed_out,
-                "cancelled": cancelled,
-                "duration_seconds": round(elapsed, 3),
-                "artifact_ids": output_artifacts,
-            }
-            if contains_invalid_json_value(result):
-                result = {**json_safe_display(result), "display_encoding": "json-string-escape"}
-            receipt = await self.artifacts.save(
-                f"{log_id}.command.json",
-                json.dumps(
-                    {
-                        "command": command,
-                        "cwd": str(self.workspace if not cwd else self.path(cwd)),
-                        **result,
-                    }
-                ),
-                kr_id=self.kr_id,
-                department=self.department,
-                epoch=self.epoch,
-                version=self.version,
-                scope=self.scope,
-                kind="command_result",
-                exit_code=result["exit_code"],
-                command=command,
-                cwd=str(self.workspace if not cwd else self.path(cwd)),
-                operation_id=log_id,
+            return await self._run_supervised_command(
+                call_id, command, working_directory, timeout, requested_cwd=cwd
             )
-            # Keep a receipt even for successful silent commands. Empty stdout
-            # and stderr remain raw operation logs rather than empty task files.
-            result["artifact_ids"] = [*output_artifacts, receipt["artifact_id"]]
-            await self.emit(
-                self.role,
-                "executing",
-                f"Command exited {result['exit_code']}",
-                kr_id=self.kr_id,
-                **result,
-            )
-            if cancelled:
-                raise EscalationSignal("cancelled", "Run was cancelled during host execution")
-            return result
 
-        return await self.journal(
+        result = await self.journal(
             call_id,
             "run_command",
             {"command": command, "cwd": cwd, "timeout": timeout},
             execute,
             kind="command",
         )
+        if result.get("cancelled"):
+            raise EscalationSignal("cancelled", "Run was cancelled during host execution")
+        return result
 
-    @staticmethod
-    async def _terminate(process: asyncio.subprocess.Process) -> None:
-        if process.returncode is not None:
-            return
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-            try:
-                await asyncio.wait_for(process.wait(), 1)
-            except TimeoutError:
-                os.killpg(process.pid, signal.SIGKILL)
+    async def _run_supervised_command(
+        self,
+        call_id: str,
+        command: str,
+        working_directory: Path,
+        timeout: int,
+        *,
+        requested_cwd: str | None,
+    ) -> dict:
+        if (
+            sys.platform != "linux"
+            or not hasattr(os, "pidfd_open")
+            or not hasattr(signal, "pidfd_send_signal")
+        ):
+            raise ExpectedToolInputError("Verified command cleanup requires Linux pidfd support")
+        import fcntl
+
+        operation_id = self.operation_id(call_id, "run_command")
+        directory = self.artifacts.root / "operations"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{operation_id}.process.json"
+
+        def cleanup_wait(reason: str) -> None:
+            if autonomous_mode(self.run.get("limits")):
+                raise AutonomousCheckpointYield(reason, 5)
+            raise EscalationSignal("unknown_operation", reason)
+
+        prior = _command_record(path)
+        if prior and _verified_supervisor(prior, path) and not await _stop_supervisor(prior, path):
+            cleanup_wait("Waiting for the previous command to stop before an approved retry")
+        manifest = {
+            "schema_version": 1,
+            "phase": "prepared",
+            "run_id": self.run["run_id"],
+            "operation_id": operation_id,
+            "request_fingerprint": fingerprint(
+                {"command": command, "cwd": requested_cwd, "timeout": timeout}
+            ),
+            "command": command,
+            "cwd": str(working_directory),
+            "timeout": timeout,
+            "token": uuid4().hex,
+            "kr_id": self.kr_id,
+            "department": self.department,
+            "epoch": self.epoch,
+            "version": self.version,
+            "scope": self.scope,
+            "actor_id": self.role,
+        }
+        process = None
+        spawn = None
+        cancelled = False
+        await self.emit(self.role, "executing", command[:160], kr_id=self.kr_id)
+
+        async def finish(*, commit: bool, emit_event: bool = True) -> dict:
+            nonlocal process
+            if process is None and spawn is not None:
+                process = await asyncio.shield(spawn)
+            recorded = _command_record(path) or manifest
+            if process is not None and process.returncode is None:
+                if not isinstance(recorded.get("process"), dict):
+                    # We still own the subprocess handle when cancellation
+                    # beats supervisor initialization; its command line + token
+                    # verify the identity before any signal is sent.
+                    recorded = {**recorded, "process": process_identity(process.pid)}
+                if not await _stop_supervisor(recorded, path):
+                    actual = process_identity(process.pid)
+                    if actual is not None and actual["state"] != "Z":
+                        cleanup_wait("Waiting for interrupted command cleanup")
                 await process.wait()
-        except ProcessLookupError:
-            await process.wait()
+            recorded = _command_record(path) or recorded
+            result = _durable_command_result(recorded, path)
+            result["cancelled"] = cancelled
+            result = await _save_command_receipt(self.artifacts, operation_id, manifest, result)
+            if commit:
+                await self.storage.complete_operation(operation_id, result)
+            if emit_event:
+                await self.emit(
+                    self.role,
+                    "executing",
+                    "Command interrupted; inspect its saved receipt before repair"
+                    if result["interrupted"]
+                    else f"Command exited {result['exit_code']}",
+                    kr_id=self.kr_id,
+                    **result,
+                )
+            return result
+
+        with path.with_suffix(".lock").open("ab") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                if autonomous_mode(self.run.get("limits")):
+                    raise AutonomousCheckpointYield(
+                        "Waiting for command operation ownership", 5
+                    ) from exc
+                raise EscalationSignal(
+                    "unknown_operation", "Command ownership must be resolved before retrying"
+                ) from exc
+            atomic_json(path, manifest)
+            with (
+                (directory / f"{operation_id}.stdout").open("wb") as stdout,
+                (directory / f"{operation_id}.stderr").open("wb") as stderr,
+            ):
+                try:
+                    spawn = asyncio.create_task(
+                        asyncio.create_subprocess_exec(
+                            sys.executable,
+                            str(Path(__file__).with_name("command_runner.py")),
+                            str(path),
+                            str(lock.fileno()),
+                            manifest["token"],
+                            stdout=stdout,
+                            stderr=stderr,
+                            start_new_session=True,
+                            pass_fds=(lock.fileno(),),
+                        )
+                    )
+                    process = await asyncio.shield(spawn)
+                    while process.returncode is None:
+                        current = await self.storage.get_run(self.run["run_id"])
+                        cancelled = current.get("cancel_requested", False)
+                        if cancelled:
+                            break
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=0.25)
+                        except TimeoutError:
+                            pass
+                    return await finish(commit=autonomous_mode(self.run.get("limits")))
+                except BaseException:
+                    cleanup = asyncio.create_task(
+                        finish(commit=autonomous_mode(self.run.get("limits")), emit_event=False)
+                    )
+                    await asyncio.shield(cleanup)
+                    raise
 
     async def record_research(
         self, call_id: str, name: str, request: dict, execute: Callable[[], Awaitable[dict]]

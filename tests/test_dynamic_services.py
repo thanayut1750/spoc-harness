@@ -167,7 +167,12 @@ async def test_research_lead_keeps_its_direct_structured_call_without_rd_capabil
         return {"content": TacticalPlan(work_packages=(work,)).model_dump_json()}
 
     async with services_with_provider(tmp_path, script) as (services, _, _, requests, _):
-        assert await services.plan_work(kr, Constitution(), [], "") == [work]
+        packages = await services.plan_work(kr, Constitution(), [], "")
+        assert len(packages) == 1
+        assert packages[0].model_copy(update={"specialist": None}) == work
+        assert packages[0].specialist.name == work.task
+        assert work.task in packages[0].specialist.instructions
+        assert kr.acceptance_criteria[0] in packages[0].specialist.instructions
         assert len(requests) == 1
 
 

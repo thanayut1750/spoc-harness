@@ -14,6 +14,7 @@ from typing_extensions import TypedDict
 
 from org_harness.agent_services import AgentServices
 from org_harness.api import create_app
+from org_harness.autonomy import AutonomousCheckpointYield
 from org_harness.config import Settings
 from org_harness.providers import create_model
 from org_harness.reset import regenesis
@@ -268,11 +269,41 @@ async def test_memory_reset_removes_checkpoint_and_long_term_memory(api):
     )
     config = {"configurable": {"thread_id": run["run_id"]}}
     await graph.ainvoke({"value": "old"}, config)
+    private_configs = [
+        {"configurable": {"thread_id": f"{run['run_id']}:private:{suffix}"}}
+        for suffix in ("worker-session", "summary:compacted-prefix")
+    ]
+    unrelated = {"configurable": {"thread_id": "unrelated-private-thread"}}
+    for private in [*private_configs, unrelated]:
+        await graph.ainvoke({"value": "private history"}, private)
     await store.aput(("harness",), "remember", {"secret": "old"})
     storage.register_runtime_resources(saver, store)
     await storage.reset_data()
     assert await saver.aget_tuple(config) is None
+    for private in private_configs:
+        assert await saver.aget_tuple(private) is None
+    assert await saver.aget_tuple(unrelated) is not None
     assert await store.asearch(("harness",)) == []
+
+
+async def test_regenesis_returns_conflict_until_owned_command_cleanup_is_verified(api, monkeypatch):
+    client, storage, settings = api
+    run = await storage.create_run({"user_request": "keep work until cleanup is safe"})
+    directory = settings.data_dir / "workspaces" / run["run_id"]
+    directory.mkdir(parents=True)
+    evidence = directory / "unfinished.txt"
+    evidence.write_text("saved effects")
+
+    async def pending_cleanup(*_):
+        raise AutonomousCheckpointYield("Supervisor is still starting", 5)
+
+    monkeypatch.setattr("org_harness.tools.stop_run_command_processes", pending_cleanup)
+    response = await client.post("/api/regenesis", json={"confirmation": "REGENESIS"})
+    assert response.status_code == 409
+    assert "Command cleanup is still pending" in response.json()["detail"]
+    assert evidence.read_text() == "saved effects"
+    assert (await storage.get_run(run["run_id"]))["cancel_requested"]
+    assert await storage.get_reset_generation() == "initial"
 
 
 @pytest.mark.integration

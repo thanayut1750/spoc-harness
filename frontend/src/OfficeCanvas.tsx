@@ -250,7 +250,7 @@ function draw(
   rect(ctx, 432, 427, 136, 10, "#e5d3b0");
   label(ctx, "HUMAN REVIEW", 500, 458, "#8b7953", 9);
   label(ctx, "INTEGRATIONS", 225, 625, "#847b63", 9);
-  label(ctx, "ENGINEERING SPECIALISTS", 790, 625, "#536f7a", 9);
+  label(ctx, "TASK SPECIALISTS", 790, 625, "#536f7a", 9);
   rect(ctx, 451, 530, 98, 38, "#b6b393");
   rect(ctx, 455, 526, 90, 37, "#d2ceb0");
   label(ctx, "↟", 500, 550, "#829276", 24);
@@ -548,7 +548,7 @@ export function OfficeCanvas({
         <canvas
           ref={canvas}
           role="img"
-          aria-label="Top-down office: executive room north, Tools R&D northeast, research west, engineering east, quality gates center, integrations southwest, Engineering specialist desks southeast."
+          aria-label="Top-down office: executive room north, Tools R&D northeast, research west, engineering east, quality gates center, integrations southwest, task specialist desks southeast."
         />
         <svg
           className="agent-event-connectors"
@@ -631,7 +631,7 @@ export function OfficeCanvas({
               onPage={setIntegrationPage}
             />
             <RosterPager
-              label="Engineering specialists"
+              label="Task specialists"
               count={roster.specialists.length}
               page={roster.specialistPage}
               pages={roster.specialistPages}

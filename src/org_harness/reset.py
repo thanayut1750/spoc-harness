@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from org_harness.autonomy import AutonomousCheckpointYield
 from org_harness.config import Settings
 from org_harness.storage import TERMINAL, ConflictError
 
@@ -34,6 +35,15 @@ async def regenesis(settings: Settings, storage: Any) -> dict:
     while True:
         async with storage.worker_lock() as guard:
             if guard:
+                from org_harness.tools import stop_run_command_processes
+
+                for run in await storage.list_runs():
+                    try:
+                        await stop_run_command_processes(settings, run)
+                    except AutonomousCheckpointYield as exc:
+                        raise ConflictError(
+                            "Command cleanup is still pending. Retry Regenesis after execution stops."
+                        ) from exc
                 root = settings.data_dir.resolve()
                 root.mkdir(parents=True, exist_ok=True)
                 trash = root / ".regenesis-trash"

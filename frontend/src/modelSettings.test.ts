@@ -109,6 +109,18 @@ describe("model selection", () => {
         ?.config,
     ).toBe(run.model_config);
     expect(
+      agentModelSelection(
+        {
+          ...specialist,
+          data: {
+            agent_type: "research_specialist",
+            model_parent: "data_analyst",
+          },
+        },
+        { ...run, agent_model_configs: { data_analyst: override } },
+      ),
+    ).toEqual({ config: override, inheritedFrom: "Data analyst" });
+    expect(
       agentModelSelection({ ...specialist, source: "external" }, run),
     ).toBeUndefined();
     expect(

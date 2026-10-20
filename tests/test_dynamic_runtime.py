@@ -11,7 +11,6 @@ from org_harness.models import (
     EngineeringSpecialistSpec,
     Evaluation,
     TriageDecision,
-    WorkPackage,
     worker_agent_id,
 )
 from org_harness.runtime import build_graph, initial_state, runtime_config
@@ -62,14 +61,20 @@ class DynamicServices:
     async def plan_work(self, kr, constitution, inputs, feedback):
         self.tactical_calls += 1
         return [
-            WorkPackage(
-                work_package_id=f"scene-{index}",
-                kr_id=kr.kr_id,
-                role=self.role,
-                task="Build and verify the scene",
-                acceptance_criteria=("The assigned output works",),
-                specialist=self.specialist,
-            )
+            {
+                "work_package_id": f"scene-{index}",
+                "kr_id": kr.kr_id,
+                "role": self.role,
+                "task": "Build and verify the scene",
+                "acceptance_criteria": ["The assigned output works"],
+                "specialist": {
+                    "name": self.specialist.name,
+                    "instructions": self.specialist.instructions,
+                    "tools": self.specialist.tools,
+                }
+                if self.specialist
+                else None,
+            }
             for index in range(self.package_count)
         ]
 
@@ -156,13 +161,30 @@ async def test_dynamic_engineer_uses_actual_identity_for_notes_events_attempts_a
     assert len(services.evaluations[0][1]) == 2
 
 
-async def test_research_cannot_assign_an_engineering_specialist():
+async def test_research_specialist_cannot_request_unauthorized_engineering_capabilities():
     services = DynamicServices(department="research")
     _, result = await run(services)
     assert result["status"] == "awaiting_review"
     assert not services.executions and not services.evaluations
     assert result["outcomes"]["direct-1"]["escalation"]["kind"] == "invalid_plan"
-    assert "only to Engineering" in result["review"]["reason"]
+
+
+async def test_research_can_assign_a_named_specialist_with_its_existing_capabilities():
+    services = DynamicServices(department="research")
+    services.specialist = EngineeringSpecialistSpec(
+        name="Primary source specialist",
+        instructions="Research the requested topic and preserve sources.",
+        tools=("search_market_data", "read_web_page", "write_file"),
+    )
+    _, result = await run(services)
+    assert result["status"] == "completed"
+    work = services.executions[0][0]
+    actor = worker_agent_id(RUN_ID, work)
+    events = [event for event in services.events if event["agent_id"] == actor]
+    assert events[0]["data"]["agent_type"] == "research_specialist"
+    assert events[0]["data"]["parent_agent_id"] == "research_head"
+    assert events[0]["data"]["model_parent"] == "market_researcher"
+    assert result["outcomes"]["direct-1"]["status"] == "passed"
 
 
 async def test_dynamic_specialists_cannot_introduce_unknown_capabilities():
@@ -217,8 +239,17 @@ async def test_dynamic_rework_preserves_identity_and_uses_the_existing_kr_gate_b
     assert [item["approved"] for item in attempts if item["stage"] == "department"] == [False, True]
 
 
-async def test_rebuilt_graph_retains_checkpointed_specialist_definition_and_actual_identity():
-    services = DynamicServices()
+@pytest.mark.parametrize("department", ["engineering", "research"])
+async def test_rebuilt_graph_retains_checkpointed_specialist_definition_and_actual_identity(
+    department,
+):
+    services = DynamicServices(department=department)
+    if department == "research":
+        services.specialist = EngineeringSpecialistSpec(
+            name="Primary source specialist",
+            instructions="Research the topic and preserve evidence.",
+            tools=("search_market_data", "write_file"),
+        )
     services.crash_once = True
     saver = InMemorySaver()
     with pytest.raises(RuntimeError, match="Simulated worker interruption"):

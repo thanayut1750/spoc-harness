@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import signal
 import subprocess
@@ -15,6 +16,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
+from org_harness.command_runner import process_identity as managed_process_identity
+from org_harness.command_runner import signal_process
 from org_harness.config import Settings
 from org_harness.runtime import runtime_config
 from org_harness.storage import PostgresStorage
@@ -128,6 +131,7 @@ async def test_worker_sigint_preserves_checkpoint_and_requires_review_before_com
     child = None
     group = None
     owned_command_processes = {}
+    owned_supervisor = None
     log = None
     interrupt_sent = False
     try:
@@ -169,6 +173,22 @@ async def test_worker_sigint_preserves_checkpoint_and_requires_review_before_com
             pending = await storage.uncertain_operations(run["run_id"])
             assert len(pending) == 1
             operation_id = pending[0]["operation_id"]
+            manifest = json.loads(
+                (
+                    settings.data_dir
+                    / "artifacts"
+                    / run["run_id"]
+                    / "operations"
+                    / f"{operation_id}.process.json"
+                ).read_text()
+            )
+            supervisor = manifest["process"]
+            assert supervisor["pid"] == supervisor["session"] == supervisor["pgid"]
+            assert supervisor["pid"] != group
+            supervisor_identity = process_identity(supervisor["pid"])
+            assert supervisor_identity is not None
+            assert supervisor_identity[2] == str(supervisor["start_ticks"])
+            owned_supervisor = supervisor
 
             child.send_signal(signal.SIGINT)
             interrupt_sent = True
@@ -233,19 +253,14 @@ async def test_worker_sigint_preserves_checkpoint_and_requires_review_before_com
                 except subprocess.TimeoutExpired:
                     child.kill()
                     await asyncio.to_thread(child.wait, timeout=3)
-        # Signal only a group that still contains a process with its original
-        # recorded start time, rather than a recycled PID from another process.
-        if group is not None and any(
-            (identity := process_identity(pid))
-            and identity[1] == group
-            and identity[2] == started
-            and identity[0] != "Z"
-            for pid, started in owned_command_processes.items()
-        ):
-            try:
-                os.killpg(group, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        # Cleanup pins each exact process, including the supervisor. A raw
+        # group number can be reused after its original leader has exited.
+        for pid, started in owned_command_processes.items():
+            identity = managed_process_identity(pid)
+            if identity and identity["pgid"] == group and str(identity["start_ticks"]) == started:
+                signal_process(identity, signal.SIGKILL)
+        if owned_supervisor is not None:
+            signal_process(owned_supervisor, signal.SIGKILL)
         if log is not None:
             log.close()
         await storage.close()

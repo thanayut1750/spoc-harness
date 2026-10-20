@@ -10,6 +10,27 @@ from org_harness.config import Settings
 from org_harness.storage import MemoryStorage
 
 
+def test_cli_autonomous_explicitly_removes_all_three_caps(monkeypatch):
+    submitted = []
+    monkeypatch.setattr(
+        cli, "request", lambda method, path, *, body: submitted.append(body) or {"status": "queued"}
+    )
+    result = CliRunner().invoke(
+        cli.app, ["run", "Complete a week-long investigation", "--autonomous"]
+    )
+    assert result.exit_code == 0, result.output
+    assert submitted == [
+        {
+            "user_request": "Complete a week-long investigation",
+            "limits": {
+                "max_model_calls": None,
+                "worker_model_calls": None,
+                "max_tool_calls": None,
+            },
+        }
+    ]
+
+
 @pytest.mark.parametrize(
     "saved",
     [

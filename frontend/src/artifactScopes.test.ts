@@ -64,6 +64,12 @@ describe("artifact authorship", () => {
       owned: [files[1]],
       context: [],
     });
+    expect(
+      scopedAgentArtifacts(
+        { ...alpha, data: { agent_type: "research_specialist" } },
+        files,
+      ),
+    ).toMatchObject({ owned: [files[0]], context: [] });
     const rd: AgentActivity = { agent_id: "tools_rd_lead", activity: "idle" };
     expect(scopedAgentArtifacts(rd, files, "run")).toEqual({
       owned: [],
