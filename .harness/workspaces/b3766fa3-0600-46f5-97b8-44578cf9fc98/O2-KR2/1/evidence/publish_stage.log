@@ -250,3 +250,43 @@ ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 (verified immed
 The commit carrying this append cannot embed its own hash; the post-push verification section (appended next)
 records that commit hash plus fresh fetch-backs, hosted-zip and CHECKSUMS re-verification. No PASS verdict is
 issued in this log and no live offer is claimed (certification is WP2's separate audit).
+
+## 2026-10-20T23:35:02Z — RETRY-2 POST-PUSH VERIFICATION (tee'd to /tmp/o2kr2_r2/raw_postpush.log)
+CONTENT-PROOF COMMIT (the append above): d0241c8215ea31b69010398452b67524edecc318
+push output verbatim: "86e769d..d0241c8  codex/spoc-harness-v1 -> codex/spoc-harness-v1" (PUSH_EXIT=0);
+parents: d0241c8 parent 86e769d; diff-tree shows exactly two files, both M:
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/publish_stage.log
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+fresh ls-remote after push: d0241c8215ea31b69010398452b67524edecc318 (tip == HEAD == remote).
+V1 tip state: git fetch exit 0; ls_remote=d0241c8215ea31b69010398452b67524edecc318.
+V2 commit-pinned fetch-backs (base .../spoc-harness/d0241c8215ea31b69010398452b67524edecc318/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2):
+  1/offer/CHECKOUT_INSTRUCTIONS.md -> HTTP=200 bytes=2713 type=text/plain; charset=utf-8
+  1/store/CHECKOUT_LINK.txt        -> HTTP=200 bytes=326  type=text/plain; charset=utf-8
+  1/evidence/BLOCKER_EVIDENCE.md   -> HTTP=200 bytes=7644 type=text/plain; charset=utf-8
+  1/evidence/publish_stage.log     -> HTTP=200 bytes=20009 type=text/plain; charset=utf-8
+  1/mission_log.md                 -> HTTP=200 bytes=11628 type=text/plain; charset=utf-8
+  0/store/OFFER.md                 -> HTTP=200 bytes=5956 type=text/plain; charset=utf-8
+V3 fetched sha256 == pinned local, all six:
+  6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  CHECKOUT_INSTRUCTIONS.md
+  e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  CHECKOUT_LINK.txt
+  532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  BLOCKER_EVIDENCE.md
+  6f1f99001935c9861c48a86d4eca1d7682838fb39f241c36391a3571385014f1  publish_stage.log (pre-V-section state)
+  b818c1ffc345e9522e60b482be1efa6ddf9a5ea826a84101cbc23f816d3b9f0a  mission_log.md
+  1bd65f0d40d58a3243e838a6926f0093d33c1f8c97b1b028b591b6d9d2112cd5  OFFER.md (O2-KR2/0 copy)
+V4 pure-append proof on the FETCHED bytes at d0241c8 (append-only integrity across the wire):
+  head -c 12769 publish_stage.log -> ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 EXACT
+  head -c  8083 mission_log.md    -> bbc65d4fc93a280c0709a3c5c5ef0ce2ecd8552f1c60ec7ed4966ae4c048bea6 EXACT
+V5 hosted zip branch-pinned header: HTTP/2 200, content-type application/zip, content-length 40299.
+V6 hosted zip commit-pinned (a8563e06532ea3fd0af2b51331ba8d3be66eff5b) full GET: HTTP=200 bytes=40299
+   type=application/zip; sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 EXACT;
+   unzip -t: "No errors detected in compressed data".
+V7 sha256sum -c CHECKSUMS.txt in O2-KR2/0/build: "pydevtoolkit-1.0.0.zip: OK" / "pydevtoolkit-1.0.0.tar.gz:
+   OK", SHA256SUM_C_EXIT=0 — the package is byte-identical to the O2-KR1 build (untouched).
+
+## RETRY-2 FINAL NOTE (2026-10-20T23:35:07Z)
+Second append in this file: pure append again — sha256 of the first 20009 bytes equals
+6f1f99001935c9861c48a86d4eca1d7682838fb39f241c36391a3571385014f1 (verified immediately after this append).
+This verification commit also cannot embed its own hash; the tip hash it creates is re-established post-push by
+fresh git ls-remote/fetch and a commit-pinned fetch-back of this log reported with the WP report. Every outcome
+above comes from the tee'd command output — no invented responses. Still no live offer and no PASS verdict
+(certification is WP2's separate audit).
