@@ -102,3 +102,42 @@ present in the committed, pushed blobs. No outcome, claim, or deliverable above 
 
 Non-claims unchanged and restated: **no live offer URL exists**; no checkout link is minted or implied; **no
 PASS verdict** is written here — certification of O2-KR2 remains the separate WP2 audit.
+
+## Addendum 3 — O2-KR2 retry-2 content proof (2026-10-20T23:29:03Z–23:30:25Z, UTC)
+Scope: closes the single residual gap from the first retry — offer/CHECKOUT_INSTRUCTIONS.md had no content
+proof. All commands were run fresh and tee'd to /tmp/o2kr2_r2/raw_content_proof.log
+(sha256 9b477bd123908204bb4fb0987e688db25b8e4fcdffcc41a47cacd926d0cd2047, 80 lines); full verbatim outputs are
+embedded in evidence/publish_stage.log, RETRY-2 PHASES R1–R4. run_command receipts again carried the benign
+execution_stopped flag; every cited outcome below is therefore grounded in the tee'd output, not the receipt.
+
+- Tip state before this repair (fresh fetch/ls-remote, 23:29:03Z): HEAD == origin/codex/spoc-harness-v1 ==
+  86e769d74405646785d814ffc58795a166641342; tree clean; pre-append anchors — evidence/publish_stage.log
+  ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 (12,769 B),
+  mission_log.md bbc65d4fc93a280c0709a3c5c5ef0ce2ecd8552f1c60ec7ed4966ae4c048bea6 (8,083 B).
+- offer/CHECKOUT_INSTRUCTIONS.md content proof (commit-pinned tip fetch: HTTP 200, 2,713 B, sha256
+  6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c, matches local): exactly one action — human
+  creates the product on Gumroad or Lemon Squeezy at $15.00 USD, attaches the hosted zip URL, publishes, pastes
+  the minted checkout link into store/CHECKOUT_LINK.txt (verbatim lines 7–11, closed by line 15 "That is the
+  only action this document requests"); hosted zip URL branch-pinned + commit-pinned (a8563e06532ea3fd0af2b513
+  31ba8d3be66eff5b) with sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99; OFFER.md URL
+  present; URL census = exactly 3 raw.githubusercontent.com URLs, non_github_url_count=0,
+  vendor_checkout_pattern_count=0 — the document mints or implies no checkout link.
+- store/CHECKOUT_LINK.txt re-proof at tip (HTTP 200, 326 B, sha256
+  e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8): 0 URL occurrences, 0 "://" — placeholder
+  only, pending the human dashboard action.
+- evidence/BLOCKER_EVIDENCE.md re-proof at tip (HTTP 200, 7,644 B, sha256
+  532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649), now with the Lemon Squeezy ISO-8601
+  timestamp shown verbatim (line 56: `2026-10-20T22:28:52Z`) alongside HTTP 405, the verbatim 184-byte
+  "The POST method is not supported for route v1/products..." body, source artifacts
+  aed37d178ea4621f07f202b772abb0a2 / 62e2d9c1bd870a81cc0e1d6ccb7060b4; Gumroad POST 401 @
+  2026-10-20T22:28:39Z with artifact 5d807a3b8891908a3e3ccb30e7257804; dashboard-listing human step recorded
+  BLOCKED (no credentials); fallback-host probes 0x0.st 200, litterbox 200, tmpfiles 000, catbox 000, zero
+  uploads. No response was invented or altered — this pass only re-observed published bytes.
+- This addendum and the publish_stage.log RETRY-2 section are pure appends (prefix-hash anchored to the
+  baselines above). The commit carrying them cannot embed its own hash; its hash plus fresh post-push
+  fetch-backs, the hosted-zip re-verification and `sha256sum -c CHECKSUMS.txt` are recorded in the post-push
+  verification section of evidence/publish_stage.log, pushed immediately after this addendum.
+
+Status restated: O2-KR2 remains in its terminal prepared-asset state (Gumroad 401 blocked, Lemon Squeezy 405
+structurally blocked, no credentials exist). There is still NO live offer and NO minted checkout URL anywhere
+in this repository; no PASS verdict is issued here — certification is WP2's separate audit.

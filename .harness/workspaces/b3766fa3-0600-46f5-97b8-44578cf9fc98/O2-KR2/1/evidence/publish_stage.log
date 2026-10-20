@@ -156,3 +156,97 @@ a5592b02125682041e926350f82306e2961c7c7bdce20b5326c040810ee912ed recorded above.
 append cannot embed its own hash; it is re-established post-push by fresh git fetch/ls-remote and
 commit-pinned raw fetch-backs and reported with the WP report. No PASS verdict is issued here; no live offer
 is claimed (certification is WP2's separate audit).
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R1 — TIP STATE + PRE-APPEND BASELINES (fresh, tee'd; fixes the FIRST-RETRY gap: no content proof existed for offer/CHECKOUT_INSTRUCTIONS.md)
+git fetch origin codex/spoc-harness-v1 -> exit 0
+HEAD=86e769d74405646785d814ffc58795a166641342
+origin_tip=86e769d74405646785d814ffc58795a166641342
+ls_remote=86e769d74405646785d814ffc58795a166641342
+tree_dirty_lines=0
+pre-append sha256 baselines (pure-append proof anchors):
+  ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40  evidence/publish_stage.log
+  bbc65d4fc93a280c0709a3c5c5ef0ce2ecd8552f1c60ec7ed4966ae4c048bea6  mission_log.md
+  6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  offer/CHECKOUT_INSTRUCTIONS.md
+  e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  store/CHECKOUT_LINK.txt
+  532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  evidence/BLOCKER_EVIDENCE.md
+receipt_flag: run_command receipts again carried the benign execution_stopped flag; all outputs below are the
+tee'd stdout captured in /tmp/o2kr2_r2/raw_content_proof.log (sha256 9b477bd123908204bb4fb0987e688db25b8e4fcdffcc41a47cacd926d0cd2047, 80 lines).
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R2 — TIP FETCH of offer/CHECKOUT_INSTRUCTIONS.md (commit-pinned 86e769d74405646785d814ffc58795a166641342)
+url_base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/86e769d74405646785d814ffc58795a166641342/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1
+HTTP=200 bytes=2713 type=text/plain; charset=utf-8
+sha256 fetched == local == 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c (SHA_MATCH_LOCAL)
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R2b — REQUIRED-ELEMENT GREP PROOF on the fetched tip blob (verbatim grep output)
+-- [1] single action --
+7:## The one action (must be performed by a human)
+15:That is the only action this document requests. Nothing else needs to change.
+-- [2] human creates Gumroad or Lemon Squeezy at $15.00 --
+9:1. Create the product on **Gumroad or Lemon Squeezy** at **$15.00 USD** (price
+1:# CHECKOUT INSTRUCTIONS — pydevtoolkit 1.0.0 ($15.00 USD)
+9:1. Create the product on **Gumroad or Lemon Squeezy** at **$15.00 USD** (price
+22:| Price | **$15.00 USD** (1500 cents) |
+-- [3] attach hosted zip URL --
+10:   `1500` cents), attach the hosted zip URL below as the product file, **publish** the
+-- [4] publish (lines containing) --
+1
+-- [5] paste minted link into store/CHECKOUT_LINK.txt --
+11:   product, then **paste the minted checkout link into `store/CHECKOUT_LINK.txt`**
+-- [6] hosted zip sha256 --
+25:| Hosted zip **sha256** | `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99` |
+-- [7] branch-pinned hosted zip URL --
+23:| Hosted zip (branch-pinned) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip` |
+-- [8] commit-pinned hosted zip URL --
+24:| Hosted zip (commit-pinned, immutable) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip` |
+-- [9] OFFER.md URL --
+27:| Offer copy (OFFER.md) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/store/OFFER.md` |
+-- [10] no-minted-link check: census of ALL https URLs in the document --
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/store/OFFER.md
+non_github_url_count=0
+vendor_checkout_pattern_count=0
+R2b RESULT: the instruction document contains exactly one action ([1]-[5] verbatim lines 7-11, closed by line 15
+"That is the only action this document requests"), the hosted zip URL with its sha256 [6][7][8], the OFFER.md URL
+[9], and NO minted/example/vendor checkout link (only 3 raw.githubusercontent URLs exist in the file; 0
+non-github URLs; 0 vendor/checkout patterns).
+
+## 2026-10-20T23:29:27Z — RETRY-2 PHASE R3 — TIP FETCH of store/CHECKOUT_LINK.txt (must contain NO link)
+HTTP=200 bytes=326 type=text/plain; charset=utf-8
+sha256 fetched == local == e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8 (SHA_MATCH_LOCAL)
+http_or_url_occurrences=0
+url_scheme_count=0
+R3 RESULT: the checkout placeholder holds no link of any kind (by design, pending the human action).
+
+## 2026-10-20T23:29:27Z — RETRY-2 PHASE R4 — TIP FETCH of evidence/BLOCKER_EVIDENCE.md (incl. the Lemon Squeezy timestamp line, closing the first-retry residual)
+HTTP=200 bytes=7644 type=text/plain; charset=utf-8
+sha256 fetched == local == 532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649 (SHA_MATCH_LOCAL)
+-- Lemon Squeezy started timestamp (verbatim line) --
+56:| Started (UTC) | `2026-10-20T22:28:52Z` |
+-- LS 405 + verbatim body line --
+58:| HTTP status | **405** (Method Not Allowed) |
+67:{"jsonapi":{"version":"1.0"},"errors":[{"detail":"The POST method is not supported for route v1\/products. Supported methods: GET, HEAD.","status":"405","title":"Method Not Allowed"}]}
+59:| Response body | **184 bytes**, sha256 `6b0f03ad5804d8ec500b1345f34e2029710c0daeb21a5e219ced58a581a0ed78` |
+64:Verbatim response body (184 bytes, from artifact `aed37d178ea4621f07f202b772abb0a2`):
+-- Gumroad 401 + artifact ID occurrence counts --
+grep -c '2026-10-20T22:28:39Z' -> 4
+grep -c '5d807a3b8891908a3e3ccb30e7257804' -> 2
+grep -c 'aed37d178ea4621f07f202b772abb0a2' -> 2
+grep -c '62e2d9c1bd870a81cc0e1d6ccb7060b4' -> 2
+-- dashboard human step BLOCKED + fallback probes (verbatim lines) --
+8:dashboard-listing human step is BLOCKED (no credentials). Terminal state: prepared-asset
+82:## 3. Gumroad dashboard-listing human step — BLOCKED (no credentials)
+103:https://0x0.st -> 200
+102:https://litterbox.catbox.moe -> 200
+100:https://tmpfiles.org -> 000
+101:https://catbox.moe -> 000
+grep -c 'Zero uploads were made to any third-party host' -> 1
+R4 RESULT: blocker archive re-proven at the tip, now with the Lemon Squeezy ISO-8601 timestamp
+2026-10-20T22:28:52Z shown verbatim (line 56) alongside the Gumroad 2026-10-20T22:28:39Z entries.
+
+## RETRY-2 APPEND NOTE
+This section is a pure append: sha256 of this file's first 12769 bytes equals the pre-append baseline
+ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 (verified immediately after this append).
+The commit carrying this append cannot embed its own hash; the post-push verification section (appended next)
+records that commit hash plus fresh fetch-backs, hosted-zip and CHECKSUMS re-verification. No PASS verdict is
+issued in this log and no live offer is claimed (certification is WP2's separate audit).
