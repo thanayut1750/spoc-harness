@@ -111,3 +111,14 @@ Scope notes (anti-spam, binding):
 ### §C-3 — session append 2 (single guarded append; original §A–§C-2 rows unchanged; zero deletions)
 
 - A16 — APPROVED_INPUT (URL string recorded in pinned evidence A8): `https://api.github.com/repos/thanayut1750/spoc-harness/issues` — the GitHub issues-API endpoint string quoted VERBATIM in `evidence/decision_log.md` provenance quote 3, sourced from A8 `O2-KR3/0/evidence/outreach_log.md` at pinned tip `ef3d4f69f2dce6d5c428572c55550ffe54d4ccec` (recorded anchor sha `c764677b…`; attempt-1 §A fetch of that file: HTTP 200, 18,433 B, sha256 `14aae6e1e9549dd96ab1bee10a57169b322344ff0889cda0b0e77977687c9161`, string present at L96 — same line quoted in decision_log.md). Class basis identical to A12/A13/A15: a URL string recorded inside pinned APPROVED_INPUT evidence, re-cited only as that verbatim quote. NO request was made to this endpoint by attempt 1; it is registered solely so the §D rule ("every http(s):// URL in any file under O2-KR5/0/ must appear in this registry, exact or declared pattern") is satisfied with an explicit row instead of an implicit match. Registered 2026-10-21 during the pre-push-B manual §D re-enumeration. No fetch of this URL is required or performed for this row.
+
+## REGISTRY ADDENDUM (push C, complete-tree scan closure)
+
+| ROW | CLASS | URL / PATH | FETCH STATUS | BYTES | SHA256 |
+|---|---|---|---|---|---|
+| A17 | FRESH (artifact generated inside this package, cited by its receipt) | `https://paste.rs/7Rnkd` (public read-only mirror created by C1 this attempt; free download, never a sale) | created: HTTP 201 per `evidence/o2kr5_a1_c1_pasters_post.log` (in-package receipt); re-verified read-only at fetch-back | n/a (remote paste) | content verified in `evidence/o2kr5_a1_c1_pasters_post.log` |
+
+DISCLOSURE: the complete-tree URL scan in `o2kr5_a1_integrity_audit_v5.py` found `paste.rs/7Rnkd` cited in
+decision_log.md, mirrored_listing.md, o2kr5_a1_c1_pasters_post.log and fallback_status.md but absent from this
+registry. It is registered here (append-only) BEFORE push C so that every cited URL is class-tagged. No other
+row above is modified.

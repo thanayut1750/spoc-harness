@@ -1,0 +1,26 @@
+O2-KR5 ATTEMPT-1 FINAL VERIFICATION (v5, complete-tree)
+RUN_UTC: 2026-10-21T10:52Z
+SCRIPT: o2kr5_a1_integrity_audit_v5.py (py_compiled, no network)
+BASE: 780d7fd0e57b3e1ca1f9f91ca9b9374ff1e2b459
+TIP: a9f2c82295b5d8b098c62ec6906aeb312cafd9c6 (HEAD==origin verified in AUDIT0)
+REGISTRY: citations.md (sha d13228df...) + C3 raw-fetchback pattern + C6 AP-pin pattern
+DISCLOSURE: AUDIT1 excludes the audit script's own source file (URL patterns are built from
+concatenated fragments so no literal unregistered URL exists in it); any re-scan of this log
+should apply the same exclusion for the echoed pattern strings.
+FALLBACK_STATUS_FINAL_SHA: 62b1228d356aea9b4220121fd9adf153ab4d686ab6717f32978848eb8d681061
+LEDGER: total_earned 0.0 / entry_count 0 / no add ever accepted / $100.00 gap UNMET / 0 sales
+
+CHECK|AUDIT0|PASS|HEAD==origin==TIP (a9f2c82295b5d8b098c62ec6906aeb312cafd9c6 / a9f2c82295b5d8b098c62ec6906aeb312cafd9c6 / a9f2c82295b5d8b098c62ec6906aeb312cafd9c6)
+CHECK|AUDIT1|PASS|URL registry containment: 83 URL occurrences, 0 violations
+CHECK|AUDIT2|PASS|numstat 780d7fd0..a9f2c822: 26 files, deletions=0, non-O2-KR5/0 rows=0
+CHECK|AUDIT3|PASS|tip blobs == worktree for all committed files (0 mismatches); citations@push-B-tip d13228df OK=True, citations worktree incl. A17 addendum b48e5316 OK=True; decision anchor OK=True; fallback_status@tip=8ec8039e OK=True, worktree(incl. PB)=62b1228d OK=True
+CHECK|AUDIT4|PASS|4 attempt-0 files created-once and never modified since base (all clean)
+CHECK|AUDIT5|PASS|chain log contains mirrored/gig/adjusted/fallback chain derivation
+CHECK|AUDIT6|PASS|ledger rerun: total_earned 0.0, entry_count 0 (no add ever accepted)
+CHECK|AUDIT7|PASS|gig/upwork probe withheld: 0 probe logs ([]), decision_log ENTRY-2 withheld marker present
+CHECK|AUDIT8|PASS|A12 zip URL present in all three offer files; 0 commerce-pattern URLs tree-wide (none)
+CHECK|AUDIT9|PASS|worktree modified set == expected push-C set (['.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md', '.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/fallback_status.md']); unexpected untracked: none
+
+CHECKS_RUN: 10  PASSED: 10  FAILED: 0
+VIOLATIONS: none
+FINAL: PASS
