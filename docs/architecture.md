@@ -14,10 +14,14 @@ flowchart TD
     Plan --> Schedule[Deterministic KR scheduler]
     Schedule -->|dependency-ready / at most two| Dept[Private department subgraph]
     Dept --> Head[Department tactical plan]
-    Head --> Specialist[LangChain specialist agent]
+    Head --> WorkSchedule[Validated work dependencies]
+    WorkSchedule -->|two ready async assignments or one sync| Specialist[LangChain specialist agent]
     Head --> Dynamic[Task-specific Research/Engineering specialists]
     Plan -->|on demand| RD[Tools R&D lead]
     Head -->|Engineering only / on demand| RD
+    Plan -->|independent start/check/join| RDJobs[Durable background R&D tasks]
+    Head -->|Engineering only| RDJobs
+    RDJobs --> RD
     RD --> Catalog[Tested mission tool catalog]
     Dynamic --> Tool
     Catalog --> Tool
@@ -100,7 +104,7 @@ External webhooks update external display identities only. They cannot change ru
 
 Research and Engineering tactical plans can include an immutable specialist definition in each work package: a display name, task-specific instructions, and an optional subset of the base role’s execution tools. The core artifact protocol (`write_file`, `read_artifact`, `escalate_blocker`) remains available under narrowing; shell execution and other optional capabilities require selection. Python derives its identity from the run, KR, package, base role, and definition. The model cannot assign a privileged actor ID. The definition is persisted before execution in the department checkpoint. Notes, tool journals, handoffs, deliverables, and attempt records use the same identity; model selection inherits the saved base-role override. Research uses the same immutable identity protocol with its own role capabilities. Triage retains its existing role, and fast-track work adds no planning or R&D call.
 
-Planner and Engineering lead have a bounded tool-enabled planning loop. Its final plan is validated locally, with a repair call only when its JSON fails validation. Planning journals include a canonical hash of the invocation context: unchanged checkpoint replay reuses completed work, while revised feedback or dependency inputs receive a distinct scope even if the provider reuses a tool-call ID. Only these two actors receive the R&D consultation binding, and the server independently validates the caller. The R&D lead cannot delegate further agents. Its research or tool-development work shares the original constitution and run budgets; a report or tool definition does not approve any KR.
+Planner and Engineering lead have a bounded tool-enabled planning loop. Its final plan is validated locally, with a repair call when its JSON fails validation. Planning journals include a canonical hash of the invocation context: unchanged checkpoint replay reuses completed work, while revised feedback or dependency inputs receive a distinct scope even if the provider reuses a tool-call ID. Only these two actors receive the R&D consultation binding, and the server independently validates the caller. The R&D lead cannot delegate further agents. Background R&D jobs return stable IDs immediately, retain journaled lifecycle state outside message history, and use separate child services/checkpoints under the owning mission worker. Planning joins required results and reconciles every ordered result page through metered model calls before returning its final plan. Completed page receipts survive replay. Jobs cannot outlive execution ownership or open model/tool clients. Its research or tool-development work shares the original constitution and run budgets; a report or tool definition does not approve any KR.
 
 Each specialist receives a server-authored assignment artifact with its exact identity and work definition. Verified public R&D consultation references from the current KR version or Planner accompany the assignment into review; private model history does not. Successful tool invocations record their definition, source hash, arguments, output, and execution receipts. Assignment metadata and materialized support files are excluded from substantive evidence checks. Each R&D consultation has an isolated managed workspace, including when the mission uses an external workspace.
 
@@ -113,3 +117,7 @@ This is a trusted local host deployment with loopback networking and no authenti
 ## Autonomous long-running missions
 
 See [the operational contract](long-running-autonomy.md) for policy activation, private conversation chunks and compaction, durable cooldowns and database reconnection, supervised command recovery, operator controls, and verification. The [research record](long-running-autonomy-research.md) links primary sources and explains the adopted patterns.
+
+## Async execution policy
+
+See [the async role analysis and execution contract](async-subagents.md). Independent named specialists use explicit dependencies and isolated managed workspaces in native `Send` batches. Legacy ordered packages keep their existing path. A batch joins before the next starts; required gates and serial project integration retain their dependencies. Background Tools R&D has a separate nonblocking start/check lifecycle. Both mechanisms use the existing mission budgets, operation journal, PostgreSQL checkpoint saver, and authoritative pause/cancel controls.

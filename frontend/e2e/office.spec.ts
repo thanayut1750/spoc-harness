@@ -15,6 +15,196 @@ function eventBubble(page: Page, agentKey: string) {
 function summaryBubble(page: Page, summary: string) {
   return page.locator(".agent-event-bubble").filter({ hasText: summary });
 }
+
+test("independent Tools R&D task actors keep private files, activity, and inherited models", async ({
+  page,
+}) => {
+  const alpha = "specialist:run-fixture:rd-alpha";
+  const beta = "specialist:run-fixture:rd-beta";
+  await fixture(
+    page,
+    {
+      agent_model_configs: {
+        tools_rd_lead: {
+          provider: "zai",
+          model: "rd-private-model",
+          reasoning_effort: "high",
+        },
+      },
+    },
+    [
+      {
+        artifact_id: "rd-alpha",
+        name: "alpha-report.md",
+        media_type: "text/plain",
+        run_id: runId,
+        kr_id: "KR2",
+        scope: JSON.stringify(["rd-job-alpha", 0, alpha]),
+        size: 300,
+      },
+      {
+        artifact_id: "rd-beta",
+        name: "beta-tool.py",
+        media_type: "text/plain",
+        run_id: runId,
+        kr_id: "KR2",
+        scope: JSON.stringify(["rd-job-beta", 0, beta]),
+        size: 400,
+      },
+      {
+        artifact_id: "legacy-rd",
+        name: "legacy-role-report.md",
+        media_type: "text/plain",
+        run_id: runId,
+        kr_id: "KR2",
+        scope: JSON.stringify(["legacy-job", 0, "tools_rd_lead"]),
+        size: 200,
+      },
+    ],
+  );
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit;
+    for (const [index, id, name, parent] of [
+      [
+        0,
+        "specialist:run-fixture:rd-alpha",
+        "Source adapter research",
+        "planner",
+      ],
+      [
+        1,
+        "specialist:run-fixture:rd-beta",
+        "Parser tool build",
+        "engineering_head",
+      ],
+      [2, "specialist:run-fixture:rd-alpha", "External R&D mirror", "planner"],
+    ] as const)
+      emit({
+        event_id: `rd-task-${index}`,
+        seq: 70 + index,
+        source: index === 2 ? "external-rd" : "harness",
+        agent_id: id,
+        run_id: "run-fixture",
+        kr_id: "KR2",
+        activity: "writing",
+        summary: `Saved private R&D evidence ${index}`,
+        data: {
+          agent_type: "tools_rd_task",
+          display_name: name,
+          parent_agent_id: parent,
+          department: "engineering",
+          model_parent: "tools_rd_lead",
+          base_role: "tools_rd_lead",
+        },
+        timestamp: "2026-10-21T10:00:00Z",
+      });
+  });
+  await expect(
+    page.getByText("Task specialists 1–2 of 2", { exact: true }),
+  ).toBeVisible();
+  await expect(eventBubble(page, alpha)).toContainText(
+    "Source adapter research",
+  );
+  await expect(eventBubble(page, beta)).toContainText("Parser tool build");
+  await page
+    .getByRole("button", {
+      name: "Source adapter research: Writing. Inspect agent",
+      exact: true,
+    })
+    .click();
+  const inspector = page.getByRole("complementary", { name: "Selected agent" });
+  await expect(inspector).toContainText("Tools R&D task");
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Parent" }),
+  ).toContainText("Planner");
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "rd-private-model",
+  );
+  await expect(inspector.locator(".agent-model-note")).toContainText(
+    "Inherited from Tools R&D lead",
+  );
+  await expect(
+    inspector.getByRole("button", { name: "Send guidance to agent" }),
+  ).toBeDisabled();
+  await expect(inspector).toContainText(
+    "Only Planner or Engineering lead may call this agent.",
+  );
+  await page.getByRole("tab", { name: /^Files/ }).click();
+  await expect(
+    inspector.getByText("alpha-report.md", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("beta-tool.py", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    inspector.getByText("legacy-role-report.md", { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", {
+      name: "Parser tool build: Writing. Inspect agent",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("tab", { name: /^Files/ }).click();
+  await expect(
+    inspector.getByText("beta-tool.py", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("alpha-report.md", { exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() =>
+    (
+      window as unknown as { __officeEmit: (event: unknown) => void }
+    ).__officeEmit({
+      event_id: "rd-alpha-progress",
+      seq: 73,
+      source: "harness",
+      agent_id: "specialist:run-fixture:rd-alpha",
+      run_id: "run-fixture",
+      kr_id: "KR2",
+      activity: "reading",
+      summary: "Checking the adapter's saved proof",
+      data: { tool_name: "read_artifact" },
+      timestamp: "2026-10-21T10:00:01Z",
+    }),
+  );
+  await expect(eventBubble(page, alpha)).toHaveAttribute(
+    "title",
+    /Source adapter research.*Checking the adapter's saved proof/,
+  );
+  await page
+    .getByRole("button", {
+      name: "Source adapter research: Reading. Inspect agent",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    inspector.getByText("Checking the adapter's saved proof", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("Saved private R&D evidence 1", { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", {
+      name: "External R&D mirror: Writing. Inspect agent",
+      exact: true,
+    })
+    .click();
+  await expect(
+    inspector.locator(".detail-row").filter({ hasText: "Department" }),
+  ).toContainText("Integrations");
+  await expect(inspector.locator(".agent-model-note")).toHaveCount(0);
+  await page.getByRole("tab", { name: /^Files/ }).click();
+  await expect(
+    inspector.getByText("alpha-report.md", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    inspector.getByText("beta-tool.py", { exact: true }),
+  ).toHaveCount(0);
+});
 const defaultSettings: WorkspaceSettings = {
   defaults: {
     provider: "configured",

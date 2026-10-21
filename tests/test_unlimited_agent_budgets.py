@@ -5,6 +5,7 @@ import sys
 import pytest
 from langchain.agents.middleware import ModelCallLimitMiddleware
 from test_agent_services import assignment, services_with_provider, tool_call
+from test_dynamic_services import PLANNING_TOOL_NAMES
 from test_exa_agent_tools import extracted_deliverable
 
 from org_harness import agent_services
@@ -138,10 +139,7 @@ async def test_unlimited_planning_agents_complete_more_than_a_hundred_turns(
 
     def script(body, requests):
         assert not body.get("response_format")
-        assert {item["function"]["name"] for item in body["tools"]} == {
-            "consult_tools_rd",
-            "run_mission_tool",
-        }
+        assert {item["function"]["name"] for item in body["tools"]} == PLANNING_TOOL_NAMES
         if len(requests) == 101:
             return {
                 "content": strategic.model_dump_json()

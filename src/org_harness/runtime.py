@@ -34,6 +34,7 @@ from org_harness.models import (
     StrategicObjective,
     TriageDecision,
     WorkPackage,
+    normalized_work_dependencies,
     worker_agent_id,
     worker_agent_metadata,
     worker_tool_names,
@@ -148,6 +149,18 @@ class DepartmentState(TypedDict, total=False):
     execution_mode: str
     revision_limit: int
     direct_worker_role: str
+    dependency_plan: bool
+    work_dependencies: dict[str, list[str]]
+    work_results: Annotated[dict[str, JSON], merge_keyed]
+    work_attempts: dict[str, int]
+    work_feedback: dict[str, str]
+    work_generation: int
+    wave_ids: list[str]
+    worker_dispatches: list[JSON]
+    dispatch_work: JSON
+    dispatch_attempt: int
+    dispatch_generation: int
+    dispatch_inputs: list[JSON]
 
 
 class WorkerState(TypedDict, total=False):
@@ -238,7 +251,13 @@ def validate_plan(objectives: Sequence[StrategicObjective | JSON]) -> list[Strat
 
 
 def _validate_work_plan(value: Any, kr: KeyResult) -> list[WorkPackage]:
-    packages = TypeAdapter(list[WorkPackage]).validate_python(value)
+    # Revalidate model instances too: model_copy can bypass contract validators.
+    raw = (
+        [item.model_dump() if isinstance(item, WorkPackage) else item for item in value]
+        if isinstance(value, (list, tuple))
+        else value
+    )
+    packages = TypeAdapter(list[WorkPackage]).validate_python(raw)
     if not 1 <= len(packages) <= 4:
         raise ValueError("A tactical plan needs 1–4 work packages")
     if len({p.work_package_id for p in packages}) != len(packages):
@@ -250,11 +269,18 @@ def _validate_work_plan(value: Any, kr: KeyResult) -> list[WorkPackage]:
             continue
         if not set(package.specialist.tools) <= worker_tool_names(package.role):
             raise ValueError("Specialist tools must use the assigned role's existing capabilities")
+    normalized_work_dependencies(packages)
     return packages
 
 
 def _worker_event_data(work: WorkPackage) -> JSON:
-    return dict(worker_agent_metadata(work))
+    return {
+        **worker_agent_metadata(work),
+        "work_package_id": work.work_package_id,
+        "execution_attempt": work.execution_attempt,
+        "task_execution_mode": work.execution_mode,
+        "depends_on": list(work.depends_on) if work.depends_on is not None else None,
+    }
 
 
 async def _validated_response[ResponseT](
@@ -374,11 +400,11 @@ def worker_context(state: DepartmentState, work: WorkPackage) -> WorkerState:
         "kr": state["kr"],
         # Attempt identity belongs to the deterministic coordinator. A model may
         # propose a package, but cannot select/reuse an earlier execution scope.
-        "work": work.model_copy(update={"execution_attempt": state.get("revisions", 0)}).model_dump(
-            mode="json"
-        ),
+        "work": work.model_copy(
+            update={"execution_attempt": state.get("dispatch_attempt", state.get("revisions", 0))}
+        ).model_dump(mode="json"),
         "epoch": state["epoch"],
-        "inputs": state.get("inputs", []) + state.get("accepted", []),
+        "inputs": state.get("dispatch_inputs", state.get("inputs", []) + state.get("accepted", [])),
         "feedback": state.get("feedback", "")[-12000:],
         "execution_mode": state.get("execution_mode", "FULL_PYRAMID"),
     }
@@ -449,14 +475,16 @@ def _attempt(
     evaluation: Evaluation | None = None,
     escalation: Escalation | None = None,
     approved: bool = False,
+    selected_work: WorkPackage | None = None,
+    execution_attempt: int | None = None,
 ) -> AttemptRecord:
     kr = KeyResult.model_validate(state["kr"])
-    work = (
+    work = selected_work or (
         WorkPackage.model_validate(state["work_packages"][state["work_index"]])
         if stage == "worker"
         else None
     )
-    revision = state.get("revisions", 0)
+    revision = state.get("revisions", 0) if execution_attempt is None else execution_attempt
     package = work.work_package_id if work else "department"
     return AttemptRecord(
         attempt_id=f"{state['run_id']}:{kr.kr_id}:v{kr.version}:e{state['epoch']}:{stage}:{package}:a{revision}",
@@ -498,6 +526,25 @@ def _outcome(
     attempt: AttemptRecord | None = None,
 ) -> JSON:
     kr = KeyResult.model_validate(state["kr"])
+    attempts = [
+        AttemptRecord.model_validate(item)
+        for item in {
+            **state.get("attempts", {}),
+            **({attempt.attempt_id: attempt.model_dump(mode="json")} if attempt else {}),
+        }.values()
+    ]
+    if state.get("dependency_plan"):
+        order = {
+            raw["work_package_id"]: index
+            for index, raw in enumerate(state.get("work_packages", []))
+        }
+        attempts.sort(
+            key=lambda item: (
+                order.get(item.work_package_id or "", len(order)),
+                item.execution_attempt,
+                item.attempt_id,
+            )
+        )
     return DepartmentOutcome(
         kr_id=kr.kr_id,
         version=kr.version,
@@ -506,13 +553,7 @@ def _outcome(
         escalation=escalation,
         deliverable=deliverable,
         evaluation=evaluation,
-        attempts=tuple(
-            AttemptRecord.model_validate(item)
-            for item in {
-                **state.get("attempts", {}),
-                **({attempt.attempt_id: attempt.model_dump(mode="json")} if attempt else {}),
-            }.values()
-        ),
+        attempts=tuple(attempts),
     ).model_dump(mode="json")
 
 
@@ -1044,6 +1085,8 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             )
             return {
                 "work_packages": [package.model_dump(mode="json")],
+                "work_dependencies": {package.work_package_id: []},
+                "dependency_plan": False,
                 "work_index": 0,
                 "accepted": [],
                 "route": "worker",
@@ -1075,16 +1118,29 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
                 "outcome": _outcome(state, escalation=_escalation(state, kind, str(exc))),
                 "route": "done",
             }
+        dependency_plan = any(package.depends_on is not None for package in packages)
         return {
             "work_packages": [p.model_dump(mode="json") for p in packages],
+            "work_dependencies": {
+                key: list(value) for key, value in normalized_work_dependencies(packages).items()
+            },
+            "dependency_plan": dependency_plan,
+            "work_generation": state.get("work_generation", 0) + 1,
+            "work_results": Overwrite({}),
+            "work_attempts": {
+                package.work_package_id: state.get("revisions", 0) for package in packages
+            },
+            "work_feedback": {package.work_package_id: feedback for package in packages},
+            "wave_ids": [],
             "work_index": 0,
             "accepted": [],
             "feedback": feedback,
-            "route": "worker",
+            "route": "schedule" if dependency_plan else "worker",
         }
 
     async def run_worker(state: DepartmentState, config: RunnableConfig) -> JSON:
-        work = WorkPackage.model_validate(state["work_packages"][state["work_index"]])
+        dispatch = state.get("dispatch_work")
+        work = WorkPackage.model_validate(dispatch or state["work_packages"][state["work_index"]])
         result = await worker.ainvoke(worker_context(state, work), config)
         attempt = _attempt(
             state,
@@ -1099,18 +1155,35 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             if result.get("escalation")
             else None,
             approved=bool(result.get("approved")),
+            selected_work=work,
+            execution_attempt=state.get("dispatch_attempt") if dispatch else None,
         )
         # Do not copy worker transcript/private channels into department or executive state.
+        selected_result = {
+            key: result[key]
+            for key in ("deliverable", "evaluation", "escalation", "approved")
+            if key in result
+        }
         return {
-            "worker_result": {
-                key: result[key]
-                for key in ("deliverable", "evaluation", "escalation", "approved")
-                if key in result
-            },
+            **(
+                {
+                    "work_results": {
+                        work.work_package_id: {
+                            "generation": state["dispatch_generation"],
+                            "attempt": state["dispatch_attempt"],
+                            "result": selected_result,
+                        }
+                    }
+                }
+                if dispatch
+                else {"worker_result": selected_result}
+            ),
             "attempts": {attempt.attempt_id: attempt.model_dump(mode="json")},
         }
 
     async def collect_worker(state: DepartmentState) -> JSON:
+        if state.get("dependency_plan"):
+            return collect_wave(state)
         result = state["worker_result"]
         if result.get("escalation"):
             return {
@@ -1139,6 +1212,153 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
             }
         evaluation = Evaluation.model_validate(result["evaluation"])
         return revision(state, evaluation.feedback, "worker")
+
+    def current_work_results(state: DepartmentState) -> dict[str, JSON]:
+        return {
+            key: value["result"]
+            for key, value in state.get("work_results", {}).items()
+            if value.get("generation") == state.get("work_generation")
+            and value.get("attempt") == state.get("work_attempts", {}).get(key)
+        }
+
+    def work_resolved(work: WorkPackage, result: JSON) -> bool:
+        return not result.get("escalation") and (
+            bool(result.get("approved"))
+            or bool(not work.critical and result.get("deliverable", {}).get("fallback"))
+        )
+
+    async def schedule_workers(state: DepartmentState) -> JSON:
+        if escalation := await boundary(state):
+            return {"outcome": _outcome(state, escalation=escalation), "route": "done"}
+        packages = [WorkPackage.model_validate(raw) for raw in state["work_packages"]]
+        results = current_work_results(state)
+        resolved = {
+            work.work_package_id
+            for work in packages
+            if work.work_package_id in results
+            and work_resolved(work, results[work.work_package_id])
+        }
+        if len(resolved) == len(packages):
+            return {"route": "gate", "wave_ids": []}
+        ready = [
+            work
+            for work in packages
+            if work.work_package_id not in resolved
+            and set(state["work_dependencies"][work.work_package_id]) <= resolved
+        ]
+        if not ready:
+            raise ValueError("Persisted tactical dependencies cannot advance")
+        selected = (
+            [ready[0]]
+            if ready[0].execution_mode == "sync"
+            else [work for work in ready if work.execution_mode == "async"][:2]
+        )
+        dispatches = []
+        for work in selected:
+            dependencies = set(state["work_dependencies"][work.work_package_id])
+            inputs = [
+                results[item.work_package_id]["deliverable"]
+                for item in packages
+                if item.work_package_id in dependencies
+            ]
+            dispatches.append(
+                {
+                    "run_id": state["run_id"],
+                    "kr": state["kr"],
+                    "constitution": state["constitution"],
+                    "epoch": state["epoch"],
+                    "execution_mode": state.get("execution_mode", "FULL_PYRAMID"),
+                    "feedback": state.get("work_feedback", {}).get(
+                        work.work_package_id, state.get("feedback", "")
+                    ),
+                    "revisions": state.get("revisions", 0),
+                    "dispatch_work": work.model_dump(mode="json"),
+                    "dispatch_attempt": state["work_attempts"][work.work_package_id],
+                    "dispatch_generation": state["work_generation"],
+                    "dispatch_inputs": [*state.get("inputs", []), *inputs],
+                }
+            )
+        return {
+            "route": "dispatch",
+            "worker_dispatches": dispatches,
+            "wave_ids": [work.work_package_id for work in selected],
+        }
+
+    def collect_wave(state: DepartmentState) -> JSON:
+        packages = [WorkPackage.model_validate(raw) for raw in state["work_packages"]]
+        results = current_work_results(state)
+        wave = [work for work in packages if work.work_package_id in state.get("wave_ids", [])]
+        if not wave or any(work.work_package_id not in results for work in wave):
+            raise ValueError("Tactical wave completed without all checkpointed results")
+        accepted = [
+            results[work.work_package_id]["deliverable"]
+            for work in packages
+            if work.work_package_id in results
+            and work_resolved(work, results[work.work_package_id])
+        ]
+        escalated = [
+            (work, Escalation.model_validate(results[work.work_package_id]["escalation"]))
+            for work in wave
+            if results[work.work_package_id].get("escalation")
+        ]
+        if escalated:
+            priority = {
+                "constitution_violation": 0,
+                "unknown_operation": 1,
+                "policy_violation": 2,
+                "cancelled": 3,
+                "suspended": 5,
+            }
+            work, escalation = min(escalated, key=lambda item: priority.get(item[1].kind, 4))
+            result = results[work.work_package_id]
+            return {
+                "accepted": accepted,
+                "route": "done",
+                "outcome": _outcome(
+                    state,
+                    escalation=escalation,
+                    deliverable=Deliverable.model_validate(result["deliverable"])
+                    if result.get("deliverable")
+                    else None,
+                    evaluation=Evaluation.model_validate(result["evaluation"])
+                    if result.get("evaluation")
+                    else None,
+                ),
+            }
+        rejected = [work for work in wave if not work_resolved(work, results[work.work_package_id])]
+        if rejected:
+            evaluations = {
+                work.work_package_id: Evaluation.model_validate(
+                    results[work.work_package_id]["evaluation"]
+                )
+                for work in rejected
+            }
+            feedback = "\n".join(
+                f"{work.work_package_id}: {evaluations[work.work_package_id].feedback}"
+                for work in rejected
+            )
+            first = results[rejected[0].work_package_id]
+            update = revision(
+                state,
+                feedback,
+                "schedule",
+                deliverable=Deliverable.model_validate(first["deliverable"]),
+                evaluation=evaluations[rejected[0].work_package_id],
+            )
+            if update["route"] != "done":
+                update["work_attempts"] = {
+                    **state["work_attempts"],
+                    **{work.work_package_id: update["revisions"] for work in rejected},
+                }
+                update["work_feedback"] = {
+                    **state["work_feedback"],
+                    **{
+                        work.work_package_id: evaluations[work.work_package_id].feedback[-12000:]
+                        for work in rejected
+                    },
+                }
+            return {**update, "accepted": accepted, "wave_ids": []}
+        return {"accepted": accepted, "wave_ids": [], "route": "schedule"}
 
     def revision(
         state: DepartmentState,
@@ -1308,14 +1528,28 @@ def build_graph(services: RuntimeServices, *, checkpointer: Any = None, store: A
     department_builder.add_node("plan", plan_work)
     department_builder.add_node("worker", run_worker)
     department_builder.add_node("collect", collect_worker)
+    department_builder.add_node("schedule", schedule_workers)
     department_builder.add_node("gate", department_gate)
     department_builder.add_edge(START, "plan")
     department_builder.add_conditional_edges(
-        "plan", lambda state: state["route"], {"worker": "worker", "done": END}
+        "plan",
+        lambda state: state["route"],
+        {"worker": "worker", "schedule": "schedule", "done": END},
     )
     department_builder.add_edge("worker", "collect")
     department_builder.add_conditional_edges(
-        "collect", lambda state: state["route"], {"worker": "worker", "gate": "gate", "done": END}
+        "collect",
+        lambda state: state["route"],
+        {"worker": "worker", "schedule": "schedule", "gate": "gate", "done": END},
+    )
+    department_builder.add_conditional_edges(
+        "schedule",
+        lambda state: (
+            [Send("worker", item) for item in state["worker_dispatches"]]
+            if state["route"] == "dispatch"
+            else state["route"]
+        ),
+        {"worker": "worker", "gate": "gate", "done": END},
     )
     department_builder.add_conditional_edges(
         "gate", lambda state: state["route"], {"plan": "plan", "done": END}

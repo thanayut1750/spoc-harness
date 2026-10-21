@@ -170,12 +170,14 @@ async def test_rd_dispatch_and_nested_work_share_the_tool_budget_and_replay_once
             assert await services.plan_work(kr, Constitution(), [], "")
             saved = await storage.get_run(run["run_id"])
             assert (saved["model_calls"], saved["tool_calls"]) == (6, 4)
-            assert len(storage.operations) == 4  # Dispatch, two R&D tools, final report write.
+            assert sum(item["kind"] == "tool" for item in storage.operations.values()) == 4
+            assert sum(item["kind"] == "rd_delegation" for item in storage.operations.values()) == 1
             artifacts = await storage.list_artifacts(run["run_id"])
+            operation_ids = set(storage.operations)
             assert await services.plan_work(kr, Constitution(), [], "")
             saved = await storage.get_run(run["run_id"])
             assert (saved["model_calls"], saved["tool_calls"]) == (6, 4)
-            assert len(storage.operations) == 4 and len(requests) == 6
+            assert set(storage.operations) == operation_ids and len(requests) == 6
             assert len(await storage.list_artifacts(run["run_id"])) == len(artifacts)
         else:
             with pytest.raises(EscalationSignal) as error:

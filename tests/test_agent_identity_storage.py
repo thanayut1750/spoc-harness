@@ -5,16 +5,34 @@ import pytest
 from org_harness.storage import MemoryStorage, PostgresStorage
 
 
-async def _exercise_identity_projection(storage: MemoryStorage | PostgresStorage) -> dict:
+async def _exercise_identity_projection(
+    storage: MemoryStorage | PostgresStorage, agent_type: str = "engineering_specialist"
+) -> dict:
     specialist = "specialist:run-one:1234567890abcdef"
     identity = {
-        "agent_type": "engineering_specialist",
+        "agent_type": agent_type,
         "display_name": "Browser verification specialist",
         "parent_agent_id": "engineering_head",
         "department": "engineering",
         "model_parent": "backend_coder",
         "base_role": "backend_coder",
     }
+    if agent_type == "research_specialist":
+        identity.update(
+            parent_agent_id="research_head",
+            department="research",
+            model_parent="market_researcher",
+            base_role="market_researcher",
+        )
+    elif agent_type == "tools_rd_task":
+        identity.update(
+            parent_agent_id="planner",
+            model_parent="tools_rd_lead",
+            base_role="tools_rd_lead",
+            task_id="durable-research-job",
+            parent_task_id="planner-invocation",
+            execution_mode="async",
+        )
     initial = {
         "source": "harness",
         "agent_id": specialist,
@@ -107,17 +125,25 @@ async def _exercise_identity_projection(storage: MemoryStorage | PostgresStorage
     return snapshot
 
 
-async def test_memory_projection_retains_only_scoped_internal_identity():
-    await _exercise_identity_projection(MemoryStorage())
+@pytest.mark.parametrize(
+    "agent_type", ["engineering_specialist", "research_specialist", "tools_rd_task"]
+)
+async def test_memory_projection_retains_only_scoped_internal_identity(agent_type):
+    await _exercise_identity_projection(MemoryStorage(), agent_type)
 
 
 @pytest.mark.integration
-async def test_postgres_projection_and_history_retain_identity_after_reopen(postgres_url):
+@pytest.mark.parametrize(
+    "agent_type", ["engineering_specialist", "research_specialist", "tools_rd_task"]
+)
+async def test_postgres_projection_and_history_retain_identity_after_reopen(
+    postgres_url, agent_type
+):
     storage = PostgresStorage(postgres_url)
     await storage.open()
     try:
         await storage.migrate()
-        snapshot = await _exercise_identity_projection(storage)
+        snapshot = await _exercise_identity_projection(storage, agent_type)
         history = await storage.events_after()
     finally:
         await storage.close()

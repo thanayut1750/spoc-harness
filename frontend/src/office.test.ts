@@ -16,6 +16,7 @@ import {
   followRosterPage,
   isTaskSpecialist,
   isEngineeringSpecialist,
+  isToolsResearchTask,
 } from "./office";
 import type { ActivityEvent } from "./types";
 const event = (
@@ -32,6 +33,68 @@ const event = (
   ...extras,
 });
 describe("office projection", () => {
+  it("keeps independent Tools R&D task identities, sparse progress, and external mirrors separate", () => {
+    const alpha = event(70, {
+      agent_id: "specialist:run:rd-alpha",
+      run_id: "run",
+      kr_id: "KR1",
+      data: {
+        agent_type: "tools_rd_task",
+        display_name: "Source adapter research",
+        parent_agent_id: "planner",
+        department: "engineering",
+        model_parent: "tools_rd_lead",
+        base_role: "tools_rd_lead",
+      },
+    });
+    const beta = event(71, {
+      ...alpha,
+      seq: 71,
+      event_id: "rd-beta",
+      agent_id: "specialist:run:rd-beta",
+      data: {
+        ...alpha.data,
+        display_name: "Parser tool build",
+        parent_agent_id: "engineering_head",
+      },
+    });
+    const external = normalizeAgent(
+      event(72, { ...alpha, source: "external-rd", seq: 72 }),
+    );
+    let projected = [alpha, beta, external].reduce(
+      projectEvent,
+      initialAgents(),
+    );
+    projected = projectEvent(
+      projected,
+      event(73, {
+        agent_id: alpha.agent_id,
+        run_id: "run",
+        kr_id: "KR1",
+        activity: "reading",
+        data: { tool_name: "read_artifact" },
+      }),
+    );
+    expect(isToolsResearchTask(projected[alpha.agent_id])).toBe(true);
+    expect(roleFor(projected[alpha.agent_id])).toMatchObject({
+      name: "Source adapter research",
+      title: "Tools R&D task",
+      department: "Engineering",
+      parent_agent_id: "planner",
+      model_parent: "tools_rd_lead",
+      kind: "specialist",
+    });
+    expect(roleFor(beta).parent_agent_id).toBe("engineering_head");
+    expect(roleFor(external).kind).toBe("external");
+    expect(isToolsResearchTask(external)).toBe(false);
+    const roster = officeRoster(Object.values(projected));
+    expect(roster.specialists.map((agent) => agent.agent_id)).toEqual([
+      alpha.agent_id,
+      beta.agent_id,
+    ]);
+    expect(roster.integrations).toEqual([external]);
+    expect(projected.tools_rd_lead.activity).toBe("idle");
+  });
   it("starts each internal role idle and projects only supplied facts", () => {
     const agents = initialAgents();
     expect(Object.keys(agents)).toHaveLength(11);

@@ -8,6 +8,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 from test_agent_services import assignment, services_with_provider, tool_call
+from test_dynamic_services import PLANNING_TOOL_NAMES
 
 from org_harness import agent_services
 from org_harness.models import (
@@ -219,6 +220,7 @@ async def test_leads_delegate_exa_research_and_specialists_consume_its_saved_evi
         if prompt.startswith("You are tools_rd_lead"):
             assert {"search_market_data", "read_web_page"} <= names
             assert "consult_tools_rd" not in names and "register_mission_tool" not in names
+            assert names.isdisjoint(PLANNING_TOOL_NAMES - {"run_mission_tool"})
             if not results:
                 return {
                     "tool_calls": [tool_call("search_market_data", {"query": QUERY}, "rd-search")]
@@ -229,7 +231,8 @@ async def test_leads_delegate_exa_research_and_specialists_consume_its_saved_evi
                 }
             assert json.loads(results[-1]["content"])["result"]["response"]["provider"] == "exa"
             return {"content": "The documented reference supports this implementation approach."}
-        if names == {"consult_tools_rd", "run_mission_tool"}:
+        if "consult_tools_rd" in names:
+            assert names == PLANNING_TOOL_NAMES
             if not results:
                 return {
                     "tool_calls": [
@@ -252,6 +255,7 @@ async def test_leads_delegate_exa_research_and_specialists_consume_its_saved_evi
                 else TacticalPlan(work_packages=(work,)).model_dump_json()
             }
         assert "search_market_data" not in names
+        assert names.isdisjoint(PLANNING_TOOL_NAMES - {"run_mission_tool"})
         if not results:
             return {
                 "tool_calls": [

@@ -26,6 +26,9 @@ _AGENT_IDENTITY_FIELDS = (
     "department",
     "model_parent",
     "base_role",
+    "task_id",
+    "parent_task_id",
+    "execution_mode",
 )
 
 
@@ -64,7 +67,7 @@ def _internal_agent_type(event: dict) -> str | None:
     if (
         isinstance(agent_id, str)
         and agent_id.startswith("specialist:")
-        and agent_type in {"engineering_specialist", "research_specialist"}
+        and agent_type in {"engineering_specialist", "research_specialist", "tools_rd_task"}
     ) or (agent_id == "tools_rd_lead" and agent_type == "tools_rd_lead"):
         return agent_type
     return None
@@ -688,6 +691,20 @@ class MemoryStorage:
     async def get_operation(self, operation_id: str) -> dict | None:
         async with self.lock:
             return copy.deepcopy(self.operations.get(operation_id))
+
+    async def list_operations(self, run_id: str, *, kind: str | None = None) -> list[dict]:
+        """Recover durable child tasks independently of compacted model history."""
+        async with self.lock:
+            return copy.deepcopy(
+                sorted(
+                    (
+                        item
+                        for item in self.operations.values()
+                        if item["run_id"] == run_id and (kind is None or item["kind"] == kind)
+                    ),
+                    key=lambda item: (item["created_at"], item["operation_id"]),
+                )
+            )
 
     async def uncertain_operations(self, run_id: str) -> list[dict]:
         async with self.lock:
@@ -1361,6 +1378,18 @@ class PostgresStorage:
                 )
             ).fetchone()
             return row["data"] if row else None
+
+    async def list_operations(self, run_id: str, *, kind: str | None = None) -> list[dict]:
+        async with self.pool.connection() as conn:
+            rows = await (
+                await conn.execute(
+                    "SELECT data FROM harness_operations WHERE run_id=%s "
+                    "AND (%s::text IS NULL OR data->>'kind'=%s) "
+                    "ORDER BY data->>'created_at',operation_id",
+                    (run_id, kind, kind),
+                )
+            ).fetchall()
+            return [row["data"] for row in rows]
 
     async def uncertain_operations(self, run_id: str) -> list[dict]:
         async with self.pool.connection() as conn:

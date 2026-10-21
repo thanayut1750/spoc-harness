@@ -530,15 +530,34 @@ class HostTools:
         version: int = 1,
         work_package_id: str = "",
         attempt: int = 0,
+        actor_id: str | None = None,
+        isolated_workspace: bool = False,
     ):
         self.storage, self.artifacts, self.run = storage, artifacts, run
         self.kr_id, self.department, self.epoch, self.role = kr_id, department, epoch, role
+        self.actor_id = actor_id or role
+        self.isolated_workspace = isolated_workspace
         self.version = version
-        self.scope = json.dumps([work_package_id or role, attempt, role])
+        self.scope = json.dumps([work_package_id or role, attempt, self.actor_id])
         self._operation_locks: dict[str, asyncio.Lock] = {}
         self.emit = emit
         configured = run.get("workspace_path")
-        if configured:
+        if isolated_workspace:
+            identity = hashlib.sha256(
+                json.dumps([work_package_id or role, self.actor_id]).encode()
+            ).hexdigest()[:24]
+            managed = (artifacts.root.parent.parent / "workspaces").resolve()
+            try:
+                self.workspace = (
+                    managed / run["run_id"] / kr_id / str(version) / str(epoch) / "async" / identity
+                ).resolve()
+                self.workspace.relative_to(managed / run["run_id"])
+                self.workspace.mkdir(parents=True, exist_ok=True)
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise EscalationSignal(
+                    "missing_resource", "Private task workspace could not be created"
+                ) from exc
+        elif configured:
             try:
                 self.workspace = Path(configured).expanduser().resolve()
                 if not self.workspace.is_dir():
@@ -557,9 +576,12 @@ class HostTools:
     def path(self, path: str) -> Path:
         try:
             value = Path(path).expanduser()
-            return value.resolve() if value.is_absolute() else (self.workspace / value).resolve()
+            target = value.resolve() if value.is_absolute() else (self.workspace / value).resolve()
         except (OSError, ValueError, RuntimeError) as exc:
             raise ExpectedToolInputError(f"Invalid host path ({type(exc).__name__})") from exc
+        if self.isolated_workspace and not target.is_relative_to(self.workspace):
+            raise ExpectedToolInputError("Task path must stay within its private workspace")
+        return target
 
     def operation_id(self, call_id: str, name: str) -> str:
         identity = [
@@ -723,7 +745,7 @@ class HostTools:
                 original_path=str(target),
             )
             await self.emit(
-                self.role,
+                self.actor_id,
                 "writing",
                 f"Wrote {target.name}",
                 kr_id=self.kr_id,
@@ -768,7 +790,7 @@ class HostTools:
                 original_path=str(target),
             )
             await self.emit(
-                self.role,
+                self.actor_id,
                 "writing",
                 f"Published {target.name}",
                 kr_id=self.kr_id,
@@ -794,7 +816,7 @@ class HostTools:
                     f"Host file cannot be read ({type(exc).__name__})"
                 ) from exc
             content = readable_text(body, partial=len(body) == 262148)[:65536]
-            await self.emit(self.role, "reading", f"Read {target.name}", kr_id=self.kr_id)
+            await self.emit(self.actor_id, "reading", f"Read {target.name}", kr_id=self.kr_id)
             return {"path": str(target), "content": content}
 
         return await self.journal(call_id, "read_file", {"path": path}, execute)
@@ -879,12 +901,12 @@ class HostTools:
             "epoch": self.epoch,
             "version": self.version,
             "scope": self.scope,
-            "actor_id": self.role,
+            "actor_id": self.actor_id,
         }
         process = None
         spawn = None
         cancelled = False
-        await self.emit(self.role, "executing", command[:160], kr_id=self.kr_id)
+        await self.emit(self.actor_id, "executing", command[:160], kr_id=self.kr_id)
 
         async def finish(*, commit: bool, emit_event: bool = True) -> dict:
             nonlocal process
@@ -910,7 +932,7 @@ class HostTools:
                 await self.storage.complete_operation(operation_id, result)
             if emit_event:
                 await self.emit(
-                    self.role,
+                    self.actor_id,
                     "executing",
                     "Command interrupted; inspect its saved receipt before repair"
                     if result["interrupted"]
@@ -993,7 +1015,7 @@ class HostTools:
                 ),
             )
             await self.emit(
-                self.role,
+                self.actor_id,
                 "reading",
                 f"Retrieved {name}",
                 kr_id=self.kr_id,

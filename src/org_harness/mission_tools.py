@@ -409,7 +409,7 @@ class MissionToolCatalog:
                         "tool_id": tool_id,
                         "tool_name": definition["name"],
                         "registered_by": definition["created_by"],
-                        "invoked_by": host.role,
+                        "invoked_by": host.actor_id,
                         "definition_artifact_id": metadata["artifact_id"],
                         "source_artifact_id": definition["source_artifact_id"],
                         "source_sha256": definition["source_sha256"],

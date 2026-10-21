@@ -26,6 +26,30 @@ const file = (
 });
 
 describe("artifact authorship", () => {
+  it("isolates R&D job actor aliases even when their capability role is identical", () => {
+    const first: AgentActivity = {
+      ...alpha,
+      data: { agent_type: "tools_rd_task", base_role: "tools_rd_lead" },
+    };
+    const second: AgentActivity = { ...first, agent_id: beta.agent_id };
+    const files = [
+      file("first", first.agent_id),
+      file("second", second.agent_id),
+      file("role", "tools_rd_lead"),
+      file("legacy"),
+    ];
+    expect(scopedAgentArtifacts(first, files)).toEqual({
+      owned: [files[0]],
+      context: [],
+    });
+    expect(scopedAgentArtifacts(second, files)).toEqual({
+      owned: [files[1]],
+      context: [],
+    });
+    expect(
+      scopedAgentArtifacts({ ...first, source: "external-rd" }, files),
+    ).toEqual({ owned: [], context: [] });
+  });
   it("uses only a valid server scope tuple as an actor claim", () => {
     expect(artifactActor(file("valid", alpha.agent_id))).toBe(alpha.agent_id);
     for (const scope of [

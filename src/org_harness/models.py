@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+from collections.abc import Sequence
 from typing import Annotated, Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -207,12 +208,56 @@ class WorkPackage(Contract):
     execution_attempt: int = Field(default=0, ge=0)
     critical: bool = True
     specialist: TaskSpecialistSpec | None = None
+    execution_mode: Literal["sync", "async"] = "sync"
+    depends_on: tuple[str, ...] | None = None
 
     @model_validator(mode="after")
     def legal_specialist_capabilities(self) -> "WorkPackage":
         if self.specialist and not set(self.specialist.tools) <= worker_tool_names(self.role):
             raise ValueError("Specialist tools must use capabilities of the inherited worker role")
+        if self.execution_mode == "async" and (self.depends_on is None or self.specialist is None):
+            raise ValueError("Async work requires explicit dependencies and a named specialist")
+        if self.depends_on is not None and (
+            any(not value.strip() or value == self.work_package_id for value in self.depends_on)
+            or len(set(self.depends_on)) != len(self.depends_on)
+        ):
+            raise ValueError(
+                "Work dependencies must be distinct, nonblank, and not self references"
+            )
         return self
+
+
+def normalized_work_dependencies(packages: Sequence[WorkPackage]) -> dict[str, tuple[str, ...]]:
+    """Validate a complete tactical DAG while retaining legacy predecessor ordering."""
+    ids = [work.work_package_id for work in packages]
+    if len(set(ids)) != len(ids) or any(not value.strip() for value in ids):
+        raise ValueError("Work package IDs must be unique and nonblank")
+    dependencies = {
+        work.work_package_id: tuple(ids[:index]) if work.depends_on is None else work.depends_on
+        for index, work in enumerate(packages)
+    }
+    for name, requirements in dependencies.items():
+        if any(value not in dependencies for value in requirements):
+            raise ValueError(f"Unknown work package dependency for {name}")
+        if name in requirements or len(set(requirements)) != len(requirements):
+            raise ValueError("Work dependencies must be distinct and not self references")
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in visiting:
+            raise ValueError("Work package dependencies contain a cycle")
+        if name in visited:
+            return
+        visiting.add(name)
+        for requirement in dependencies[name]:
+            visit(requirement)
+        visiting.remove(name)
+        visited.add(name)
+
+    for name in ids:
+        visit(name)
+    return dependencies
 
 
 def worker_agent_id(run_id: str, work: WorkPackage) -> str:
@@ -249,6 +294,11 @@ def worker_agent_metadata(work: WorkPackage) -> dict[str, str]:
 
 class TacticalPlan(Contract):
     work_packages: tuple[WorkPackage, ...] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def valid_dependencies(self) -> "TacticalPlan":
+        normalized_work_dependencies(self.work_packages)
+        return self
 
 
 class ArtifactRef(Contract):

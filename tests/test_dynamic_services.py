@@ -22,6 +22,16 @@ from org_harness.models import (
 )
 from org_harness.runtime import gate_approved
 
+PLANNING_TOOL_NAMES = {
+    "consult_tools_rd",
+    "run_mission_tool",
+    "start_async_task",
+    "check_async_task",
+    "list_async_tasks",
+    "cancel_async_task",
+    "wait_async_task",
+}
+
 
 def extracted_deliverable(body):
     payload = json.loads(body["messages"][-1]["content"])
@@ -84,7 +94,7 @@ async def test_engineering_lead_creates_real_task_specific_worker_in_one_plannin
         prompt = body["messages"][0]["content"]
         names = {item["function"]["name"] for item in body["tools"]}
         if len(requests) == 1:
-            assert names == {"consult_tools_rd", "run_mission_tool"}
+            assert names == PLANNING_TOOL_NAMES
             assert "task-specific" in prompt
             return {"content": TacticalPlan(work_packages=(work,)).model_dump_json()}
         assert spec.instructions in prompt
@@ -142,10 +152,7 @@ async def test_planner_with_optional_rd_tools_still_uses_one_call_for_ordinary_p
 
     def script(body, requests):
         assert not body.get("response_format")
-        assert {item["function"]["name"] for item in body["tools"]} == {
-            "consult_tools_rd",
-            "run_mission_tool",
-        }
+        assert {item["function"]["name"] for item in body["tools"]} == PLANNING_TOOL_NAMES
         return {"content": plan.model_dump_json()}
 
     async with services_with_provider(tmp_path, script) as (services, storage, run, requests, _):
@@ -339,7 +346,8 @@ async def test_consultation_replay_reuses_evidence_and_rejects_changed_mode(tmp_
         await services.plan_work(kr, Constitution(), [], "")
         await services.plan_work(kr, Constitution(), [], "")
         assert delegations == ["research"]
-        assert len(storage.operations) == 1
+        assert sum(item["kind"] == "tool" for item in storage.operations.values()) == 1
+        assert sum(item["kind"] == "rd_delegation" for item in storage.operations.values()) == 1
         requested_mode = "build_tool"
         with pytest.raises(EscalationSignal) as error:
             await services.plan_work(kr, Constitution(), [], "")

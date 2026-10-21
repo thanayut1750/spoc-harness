@@ -57,6 +57,7 @@ import {
   activeActivities,
   activityLabels,
   displayActivity,
+  isToolsResearchTask,
   pretty,
   progressStatus,
   roleFor,
@@ -805,6 +806,7 @@ function Inspector({
     !!run &&
     !terminalStatuses.has(run.status) &&
     agent.agent_id !== "tools_rd_lead" &&
+    !isToolsResearchTask(agent) &&
     role.kind !== "internal" &&
     (!agent.source || agent.source === "harness");
   const fileScope = scopedAgentArtifacts(agent, artifacts, run?.run_id);
@@ -1067,7 +1069,7 @@ function Inspector({
         <small aria-live="polite">
           {sent
             ? "Guidance queued for the next agent boundary."
-            : agent.agent_id === "tools_rd_lead"
+            : agent.agent_id === "tools_rd_lead" || isToolsResearchTask(agent)
               ? "Only Planner or Engineering lead may call this agent."
               : role.kind === "internal"
                 ? "Internal routing follows the mission requirements."

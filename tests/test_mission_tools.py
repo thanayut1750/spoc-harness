@@ -92,6 +92,48 @@ async def test_tool_survives_catalog_rebuild_and_runs_in_another_kr(tmp_path):
     assert not any(a["kind"] == "source" for a in current)  # Runtime copies are supporting data.
 
 
+async def test_background_tool_use_keeps_instance_identity_and_capability_authority(tmp_path):
+    storage, run, artifacts, catalog, rd, _ = await environment(tmp_path)
+    tool = await register(catalog, rd)
+
+    async def emit(*_args, **_kwargs):
+        pass
+
+    actor = f"specialist:{run['run_id']}:0123456789abcdef"
+    background = HostTools(
+        storage,
+        artifacts,
+        run,
+        kr_id="tools-rd",
+        department="engineering",
+        epoch=0,
+        role="tools_rd_lead",
+        actor_id=actor,
+        work_package_id="background-reuse",
+        isolated_workspace=True,
+        emit=emit,
+    )
+    result = await catalog.invoke(
+        background, "use", tool_id=tool["tool_id"], arguments={"value": 8}
+    )
+    assert result["output"] == {"doubled": 16}
+    usages = [
+        item
+        for item in await storage.list_artifacts(run["run_id"])
+        if item["kind"] == "mission_tool_use"
+    ]
+    assert len(usages) == 1
+    _, body = await artifacts.read(usages[0]["artifact_id"])
+    assert json.loads(body)["invoked_by"] == actor
+    assert json.loads(usages[0]["scope"])[2] == actor
+    assert background.role == "tools_rd_lead"
+
+    # A display identity never grants R&D's registration capability.
+    background.role = "backend_coder"
+    with pytest.raises(EscalationSignal, match="Only Tools R&D"):
+        await register(catalog, background, call="forged-registration")
+
+
 async def test_catalog_and_usage_preserve_revised_kr_version_and_epoch(tmp_path):
     storage, run, _, catalog, rd, host = await environment(tmp_path)
     rd.version = 2

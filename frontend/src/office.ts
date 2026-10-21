@@ -202,9 +202,15 @@ export function isTaskSpecialist(agent: AgentActivity): boolean {
   return (
     agent.source === "harness" &&
     agent.agent_id.startsWith("specialist:") &&
-    ["engineering_specialist", "research_specialist"].includes(
+    ["engineering_specialist", "research_specialist", "tools_rd_task"].includes(
       agentMetadata(agent, "agent_type") ?? "",
     )
+  );
+}
+export function isToolsResearchTask(agent: AgentActivity): boolean {
+  return (
+    isTaskSpecialist(agent) &&
+    agentMetadata(agent, "agent_type") === "tools_rd_task"
   );
 }
 export function isExternalAgent(agent: AgentActivity): boolean {
@@ -231,15 +237,21 @@ export function roleFor(value: string | AgentActivity, index = 0): OfficeRole {
       parent_agent_id: agentMetadata(agent, "parent_agent_id"),
     };
   if (isTaskSpecialist(agent)) {
-    const department = isEngineeringSpecialist(agent)
-      ? "Engineering"
-      : "Research";
+    const toolsResearch = isToolsResearchTask(agent);
+    const department =
+      agentMetadata(agent, "agent_type") === "research_specialist"
+        ? "Research"
+        : "Engineering";
     return {
       id,
       name: name ?? `${department} specialist`,
-      title: `${department} specialist`,
+      title: toolsResearch ? "Tools R&D task" : `${department} specialist`,
       department,
-      color: department === "Engineering" ? "#a6c9e6" : "#b4cd96",
+      color: toolsResearch
+        ? "#c1b3e0"
+        : department === "Engineering"
+          ? "#a6c9e6"
+          : "#b4cd96",
       x: [640, 740, 840, 940][Math.max(0, index) % specialistsPerPage],
       y: 575,
       kind: "specialist",
@@ -248,7 +260,8 @@ export function roleFor(value: string | AgentActivity, index = 0): OfficeRole {
         `${department.toLowerCase()}_head`,
       model_parent:
         agentMetadata(agent, "model_parent") ??
-        agentMetadata(agent, "base_role"),
+        agentMetadata(agent, "base_role") ??
+        (toolsResearch ? "tools_rd_lead" : undefined),
     };
   }
   if (!external)

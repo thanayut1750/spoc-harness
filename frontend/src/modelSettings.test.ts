@@ -121,6 +121,19 @@ describe("model selection", () => {
       ),
     ).toEqual({ config: override, inheritedFrom: "Data analyst" });
     expect(
+      agentModelSelection(
+        {
+          ...specialist,
+          data: {
+            agent_type: "tools_rd_task",
+            model_parent: "tools_rd_lead",
+            base_role: "tools_rd_lead",
+          },
+        },
+        run,
+      ),
+    ).toEqual({ config: override, inheritedFrom: "Tools R&D lead" });
+    expect(
       agentModelSelection({ ...specialist, source: "external" }, run),
     ).toBeUndefined();
     expect(
