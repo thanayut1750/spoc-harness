@@ -210,3 +210,13 @@ FB-KEY | HTTP_STATUS=200 FETCHED_SHA256=7924396c520f5a6dececd0fd4eb62c61c6f130be
 FB-KEY | LOCAL_SHA256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f
 FB-KEY | KEY_FILE_CONTENT_IS_EXACT_32HEX_KEY=03d3363d8c5f23bfe7ce970e0ac7cd08
 FB-KEY | VERDICT=MATCH
+
+SELF-VERIFY (commit B = 91895496da2ea1b2443adee01fa0c6d56a2517d7, pushed 6bb5530..9189549, PUSH_EXIT=0):
+SV01 | UTC=2026-10-21T04:21:35Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_fetchback.log | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/91895496da2ea1b2443adee01fa0c6d56a2517d7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_fetchback.log
+SV01 | HTTP_STATUS=200 FETCHED_SHA256=b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7 LOCAL_SHA256=db81fbfd02c5d948f6aca58f7615ead3dc372010dbc0ba8cdec9cd5fc81e7696 VERDICT=MISMATCH
+SV02 | UTC=2026-10-21T04:21:36Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/fetchback_run.sh | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/91895496da2ea1b2443adee01fa0c6d56a2517d7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/fetchback_run.sh
+SV02 | HTTP_STATUS=200 FETCHED_SHA256=5a852f08eef6d792186c4ace806c607c64a301dcd147930cfd47ed45815c968b LOCAL_SHA256=5a852f08eef6d792186c4ace806c607c64a301dcd147930cfd47ed45815c968b VERDICT=MATCH
+SELF_VERIFY_SUMMARY: rows=2 MATCH=1 MISMATCH=1
+NOTE: this section documents commit-B fetch-backs; the log itself was amended with this section in a follow-up commit, whose tip is verified fresh in the closing check.
+SV01-CLARIFICATION | UTC=2026-10-21T04:22:01Z | sha256(git show 9189549:<log>) = b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7
+SV01-CLARIFICATION | VERDICT_COMMITTED_CONTENT=BYTE_EXACT_MATCH (fetched b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7 == committed-at-B sha) — SV01 MISMATCH was caused solely by the subsequent local amendment that produced this SELF-VERIFY section, not by any fetch difference.
