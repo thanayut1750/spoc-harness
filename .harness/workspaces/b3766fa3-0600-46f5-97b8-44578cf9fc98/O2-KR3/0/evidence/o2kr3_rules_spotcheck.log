@@ -1,0 +1,12 @@
+# O2-KR3 AUDIT ATTEMPT 2 — R5 RULES SPOT-CHECK (fresh re-fetch of cited RULES_CHECKED URLs)
+# UTC: 2026-10-21T04:58:31Z  auditor: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:9f7a62e5bf9d9852
+# Method: curl -sS -m 60 -o <tmp> -w '%{http_code}'; fragment matched after HTML-tag strip + case-insensitive grep.
+[hn] fresh GET https://news.ycombinator.com/newsguidelines.html
+  curl_exit=0 http_code=200 bytes=5864 fragment="primarily for promotion" hits(normalized)=1 quoted_by=ENTRY 7 rule_text_plausibly_present=YES
+[indexnow] fresh GET https://www.indexnow.org/documentation
+  curl_exit=0 http_code=200 bytes=28555 fragment="ownership of the host" hits(normalized)=1 quoted_by=ENTRY 1 rule_text_plausibly_present=YES
+[ghterms] fresh GET https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+  curl_exit=0 http_code=200 bytes=366804 fragment="for spamming purposes" hits(normalized)=3 quoted_by=ENTRY 8 rule_text_plausibly_present=YES
+[mastodon] fresh GET https://mastodon.social/api/v1/instance
+  curl_exit=0 http_code=200 bytes=23352 fragment="dogpiling" hits(normalized)=4 quoted_by=ENTRY 5 rule_text_plausibly_present=YES
+R5_DEDUCED: rules_urls_refetched_fresh=4 with_HTTP200_and_quote_present=4 (assignment minimum: >=2)

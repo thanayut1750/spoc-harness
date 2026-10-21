@@ -1,0 +1,10 @@
+# O2-KR3 AUDIT ATTEMPT 2 — R6 POSITIVE CONFIRMATION RE-VERIFY (fresh GETs)
+# UTC: 2026-10-21T04:58:34Z
+[key] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+  curl_exit=0 curl -w: code=200 type=text/plain; charset=utf-8 size=32
+  content=[03d3363d8c5f23bfe7ce970e0ac7cd08] exact_key_match=YES (expected 03d3363d8c5f23bfe7ce970e0ac7cd08) fetched_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f local_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f sha_match=YES
+[zip] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+  curl_exit=0 curl -w: code=200 type=application/zip size=40299
+  downloaded_bytes=40299 (expected 40299) sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+  sha256_match=YES (expected f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99) content_type_ok=YES
+  fresh HEAD: HTTP/2 200  content-type: application/zip|content-length: 40299
