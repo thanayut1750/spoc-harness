@@ -1,0 +1,92 @@
+==================================================================================
+O2-KR3 OUTREACH EVIDENCE AUDIT — WP-O2KR3-2-AUDIT (independent verification only)
+Auditor: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:9f7a62e5bf9d9852
+Repo: https://github.com/thanayut1750/spoc-harness  branch: codex/spoc-harness-v1
+Workspace audited: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0
+HEADER_UTC: Wed Oct 21 04:36:12 UTC 2026
+AUDIT_STARTED: 2026-10-21T04:36:12Z
+HEAD_AT_AUDIT_START: 000e58d062032a63ee1995e62b05423e0e8ed281
+ORIGIN_TIP_AT_AUDIT_START: 000e58d062032a63ee1995e62b05423e0e8ed281  (IN_SYNC=yes)
+Git tree clean: 0 modified/untracked path(s)
+Scope note: read-only audit. No posts, no marketing, no edits to outreach_log.md or prior evidence.
+==================================================================================
+[PRE-FLIGHT] local sha256 anchors:
+  c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+  cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_fetchback.log
+  430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+  7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+
+  ENTRIES=8
+  E1 ts=2026-10-21T03:24:28Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E2 ts=2026-10-21T03:26:05Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E3 ts=2026-10-21T03:28:39Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E4 ts=2026-10-21T03:40:34Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E5 ts=2026-10-21T03:40:28Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E6 ts=2026-10-21T03:40:29Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E7 ts=2026-10-21T03:40:28Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  E8 ts=2026-10-21T03:43:12Z ts_ok=True missing=none rules_url=True rules_status=True rules_quote=True
+  UTC_DATED=8
+  SCHEMA_FAIL_ENTRIES=none
+  CLASSES=1:1 2:1 3:1 4:2 5:2 6:1
+  UNIQUE_DESTINATIONS=8 TOTAL_DEST_LINES=8
+  RULES_CHECKED_ALL_STRUCT_OK=yes
+  OUTCOMES=blocked:7 posted:1
+
+--- R1 LOG EXISTS / DATED ---
+R1 LOG_EXISTS_DATED: PASS — evidence: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md exists (19398 B, sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007); parse: ENTRIES=8 UTC_DATED=8 (ISO-8601 Z regex); pointer: evidence/outreach_log.md ENTRY 1-8 UTC_TIMESTAMP lines
+
+--- R2 ENTRY SCHEMA ---
+R2 ENTRY_SCHEMA: PASS — evidence: parse output above (per-entry missing=none; every RULES_CHECKED contains a fetched URL + HTTP status + verbatim quote); all 8 mandatory fields (UTC_TIMESTAMP, CHANNEL_CLASS, DESTINATION, RULES_CHECKED, LINK_SENT, TEXT_SENT, CONFIRMATION, OUTCOME) non-empty in all 8 entries; pointer: evidence/outreach_log.md ENTRY 1-8
+
+--- R3 CHANNEL COVERAGE (classes 1-6, each with archived evidence) ---
+R3 CHANNEL_COVERAGE: PASS — evidence: parse CLASSES=1:1 2:1 3:1 4:2 5:2 6:1 ; archived per-channel logs all non-empty: evidence/outreach/{indexnow,pingomatic,reddit,x,mastodon,devto,hn,github}.log ; OUTCOMES=blocked:7 posted:1
+
+--- R4 ANTI-SPAM (one attempt per destination; rules checked; posted-claim spot-check) ---
+  fresh GET (spot-check of the only 'posted' claim, ENTRY 8 fallback):
+    URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+    curl -w http_code=200 curl_exit=0 fetched_sha256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 local_sha256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91
+R4 ANTI_SPAM: PASS — evidence: UNIQUE_DESTINATIONS=8 over 8 entries (8 distinct hosts: api.indexnow.org, rpc.pingomatic.com, oauth.reddit.com, api.twitter.com, mastodon.social, dev.to, news.ycombinator.com, api.github.com); RULES_CHECKED_ALL_STRUCT_OK per R2; only 'posted' claim (ENTRY 8 ANNOUNCEMENT.md fallback) re-fetched fresh at branch tip: HTTP 200, byte-identical to local (sha256 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91); no duplicate successful posts (outcomes blocked:7 posted:1)
+
+--- R5 RULES SPOT-CHECK (fresh re-fetch of cited RULES_CHECKED URLs) ---
+  [hn] fresh GET https://news.ycombinator.com/newsguidelines.html
+    curl -w http_code=200 curl_exit=0 ; fragment "primarily for promotion" hits(normalized)=1 ; archived-at-run-time: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn-guidelines.html (ENTRY 7 quote)
+  [indexnow] fresh GET https://www.indexnow.org/documentation
+    curl -w http_code=200 curl_exit=0 ; fragment "ownership of the host" hits(normalized)=1 ; archived-at-run-time: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow-doc.html (ENTRY 1 quote)
+  [gith Terms] fresh GET https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+    curl -w http_code=200 curl_exit=0 ; fragment "for spamming purposes" hits(normalized)=1 ; archived-at-run-time: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-terms.html (ENTRY 8 quote)
+  [mastodon] fresh GET https://mastodon.social/api/v1/instance
+    curl -w http_code=200 curl_exit=0 ; fragment "dogpiling" hits(normalized)=1 ; archived-at-run-time: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-instance-rules.json (ENTRY 5 quote)
+R5 RULES_SPOT_CHECK: PASS — evidence: 4/4 cited rules URLs re-fetched fresh this audit with HTTP 200 + quoted rule text plausibly present (HN guidelines, IndexNow documentation, GitHub ToS, mastodon.social instance rules); fresh statuses recorded above
+
+--- R6 POSITIVE CONFIRMATION RE-VERIFY (IndexNow key file + hosted zip) ---
+  fresh GET key file: https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+    curl -w http_code=200 curl_exit=0 ; content=[03d3363d8c5f23bfe7ce970e0ac7cd08] exact_key_match=yes ; fetched_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f local_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f
+  fresh GET zip: https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+    GET curl -w: http_code=200 curl_exit=0 ; downloaded_bytes=40299 ; sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+    HEAD_code=200 content_type=application/zip (HEAD)
+R6 POSITIVE_CONFIRMATION_REVERIFY: PASS — evidence: key file fresh GET HTTP 200 with EXACT key 03d3363d8c5f23bfe7ce970e0ac7cd08 (sha256 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f == local 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f); zip fresh GET HTTP 200, content-type application/zip, 40299 B, sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (expected f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99); curl -w results recorded above
+
+--- R7 PUBLICATION (pushed commit; branch-tip fetch-back byte-identical) ---
+  git ls-tree HEAD: 38 O2-KR3/0 deliverable paths tracked (outreach_log.md, o2kr3_fetchback.log, evidence/outreach/*, ANNOUNCEMENT.md, key file)
+  local==origin tip: yes (000e58d062032a63ee1995e62b05423e0e8ed281)
+  evidence/o2kr3_fetchback.log exists: yes (sha256 cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d)
+  fresh branch-tip fetch-back of outreach_log.md:
+    URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+    curl -w http_code=200 curl_exit=0 fetched_sha256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 local_sha256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+R7 PUBLICATION: PASS — evidence: deliverables tracked in pushed commit 000e58d062032a63ee1995e62b05423e0e8ed281 on codex/spoc-harness-v1 (= origin tip); fresh raw.githubusercontent branch-tip fetch-back of evidence/outreach_log.md HTTP 200 byte-identical (sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 == local c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007); evidence/o2kr3_fetchback.log present (sha256 cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d, prior run recorded 38/38 files MATCH)
+
+--- R8 MISSION_LOG INTEGRITY (O2-KR3 addendum additions-only) ---
+  git diff --numstat 7368190..HEAD -- mission_log: 44	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md (additions must be >=0, deletions must be 0)
+  raw minus-lines in cumulative diff (excluding '---' header lines): 0
+  addendum-introducing commit diff 6bb5530^..6bb5530: 44	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+  current mission_log: 339 lines, sha256 553e5f2396c86822974d674c0804512e4396fb93be2ce82a16bd3ad529f595b5, ADDENDUM 9 at line 297
+R8 MISSION_LOG_INTEGRITY: PASS — evidence: git diff 7368190..HEAD on .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md = +44/-0 lines, 0 minus-lines; ADDENDUM 9 introduced additions-only in 6bb5530 (44	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md); no prior line removed or altered
+
+==================================================================================
+SUMMARY
+AUDIT_STARTED: 2026-10-21T04:36:12Z
+AUDIT_FINISHED: 2026-10-21T04:36:15Z
+CHECKS_RUN: 8 (R1,R2,R3,R4,R5,R6,R7,R8) — R1:PASS R2:PASS R3:PASS R4:PASS R5:PASS R6:PASS R7:PASS R8:PASS
+FAILED_CHECKS: none
+BRANCH_OUTCOME: branch codex/spoc-harness-v1 tip 000e58d062032a63ee1995e62b05423e0e8ed281 in sync with origin at audit start; existing deliverables unmodified (read-only audit; only additions: this audit log + its script, and the mission_log ADDENDUM appended after this block); outreach evidence re-verified fresh from live endpoints
+O2KR3_OUTREACH_AUDIT: PASS

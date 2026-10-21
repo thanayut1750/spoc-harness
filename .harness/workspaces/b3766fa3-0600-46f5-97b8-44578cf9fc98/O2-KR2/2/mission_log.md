@@ -337,3 +337,29 @@ Artifacts: evidence/outreach_log.md, evidence/outreach_credentials_sweep.log,
 evidence/outreach/*.log + archived rule/request/response bodies, offer/ANNOUNCEMENT.md,
 offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt. Post-push raw fetch-back of every committed file
 recorded in evidence/o2kr3_fetchback.log (follow-up commit).
+
+ADDENDUM 10 - WP-O2KR3-2-AUDIT (independent O2-KR3 outreach-evidence audit, run 0 auditor): verdict PASS - 2026-10-21T04:40:12Z
+Independent auditor specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:9f7a62e5bf9d9852 re-verified
+evidence/outreach_log.md read-only (sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007,
+unchanged) against all three KR acceptance criteria with fresh live re-verification. Audit log (tee'd,
+dated header 2026-10-21T04:36:12Z, R1-R8 lines each with evidence pointer, summary block, exact final
+line "O2KR3_OUTREACH_AUDIT: PASS"): .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_audit.log
+(sha256 d9ed213930184721b166e3e67b08bb971bf52f633fc393f8a8fc1000d996ecf7, 10,721 B; script archived as
+evidence/o2kr3_audit_script.sh). Results - R1 PASS (log exists, 8/8 entries ISO-8601 Z UTC-dated);
+R2 PASS (8/8 entries, zero empty mandatory fields; every RULES_CHECKED has fetched URL + HTTP status +
+verbatim quote); R3 PASS (classes 1:1 2:1 3:1 4:2 5:2 6:1, all 8 archived per-channel logs non-empty);
+R4 PASS (8 entries over 8 distinct destinations, one attempt each, outcomes blocked:7 posted:1, no
+duplicate posts; the single "posted" claim - ENTRY 8 ANNOUNCEMENT.md fallback - re-fetched fresh at
+branch tip: HTTP 200 byte-identical, sha256 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91);
+R5 PASS (4/4 cited rules URLs re-fetched fresh HTTP 200 with quoted rule text present: HN newsguidelines
+"primarily for promotion", IndexNow documentation "ownership of the host", GitHub ToS "for spamming
+purposes", mastodon.social instance "dogpiling"); R6 PASS (fresh GET IndexNow key file HTTP 200 with
+EXACT key 03d3363d8c5f23bfe7ce970e0ac7cd08, sha256 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f;
+fresh GET hosted zip HTTP 200 application/zip 40,299 B sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99,
+curl -w results recorded in the audit log); R7 PASS (38 deliverable paths tracked in pushed commit
+000e58d062032a63ee1995e62b05423e0e8ed281 = origin tip; fresh branch-tip raw fetch-back of
+evidence/outreach_log.md HTTP 200 byte-identical, sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+== local; evidence/o2kr3_fetchback.log present sha256 cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d);
+R8 PASS (git diff 7368190..HEAD on mission_log.md = +44/-0, 0 minus-lines; ADDENDUM 9 additions-only in
+6bb5530). FAILED_CHECKS: none. Audit was non-mutating toward existing deliverables; additions this
+audit: evidence/o2kr3_audit.log, evidence/o2kr3_audit_script.sh, this ADDENDUM 10.
