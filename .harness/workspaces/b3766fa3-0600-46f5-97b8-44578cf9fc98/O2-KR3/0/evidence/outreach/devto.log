@@ -1,0 +1,23 @@
+DEV.TO CHANNEL LOG (O2-KR3)
+== RULES CHECK (rules-first) ==
+UTC: 2026-10-21T03:40:27Z
+FETCH1 terms https://dev.to/p/terms :
+  HTTP_CODE=404 CONTENT_TYPE=text/html; charset=UTF-8 SIZE=5077 FINAL_URL=https://dev.to/p/terms
+FETCH2 API doc https://developers.forem.com/api/v0 :
+  HTTP_CODE=200 CONTENT_TYPE=text/html; charset=UTF-8 SIZE=703999 FINAL_URL=https://developers.forem.com/api/v0
+VERBATIM from fetched bodies:
+All endpoints that don&#x27;t require authentication are CORS enabled.
+All endpoints that don&#x27;t require authentication are CORS enabled.
+== SUBMISSION (ONE attempt, unauthenticated, blocker-evidence probe) ==
+UTC: 2026-10-21T03:40:29Z
+REQUEST_BODY_SHA256: b7161bd82a857ab9d8bb2c7ca52bfb3156676c68f3a2143a482cc0a32da67f41
+HTTP_CODE=401 CONTENT_TYPE=application/json; charset=utf-8 SIZE=37
+CURL_EXIT: 0
+RESPONSE_BODY_SHA256: ff8e893bf7a7cd8d84cc6176e41f963d4d825e867cbb61cb6e15decf530588bc
+RESPONSE_BODY (first 500 B):
+{"error":"unauthorized","status":401}
+== FILES ==
+3cf6465c919e56a52c0fad2c1479070236d07acca7f1355db54f6e81ade6600b  evidence/outreach/devto-terms.html
+48057ec8f9f0234f8fa38966c91bfcc007d9c7d8a2b6a4ee0e30b3b80b702597  evidence/outreach/devto-apidoc.html
+ff8e893bf7a7cd8d84cc6176e41f963d4d825e867cbb61cb6e15decf530588bc  evidence/outreach/devto-post-body.json
+b7161bd82a857ab9d8bb2c7ca52bfb3156676c68f3a2143a482cc0a32da67f41  /tmp/devto-post-request.json

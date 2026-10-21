@@ -1,0 +1,36 @@
+MASTODON CHANNEL LOG (O2-KR3) - instance: mastodon.social
+== RULES CHECK (rules-first) ==
+UTC: 2026-10-21T03:40:27Z
+FETCH1 API auth doc https://docs.joinmastodon.org/client/token/ :
+  HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=27429 FINAL_URL=https://docs.joinmastodon.org/client/token/
+FETCH2 instance rules https://mastodon.social/about :
+  HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=49285 FINAL_URL=https://mastodon.social/about
+VERBATIM from fetched bodies:
+ient/token/"><meta name=description content="Getting accustomed to the basics of authentication and authorization."><meta property="og:description" content="Getting accustomed to the basics of authentication and a
+<main><h1>Obtaining client app access</h1><p>Getting accustomed to the basics of authentication and authorization.</p><aside><nav id=TableOfContents><ul><li><ul><li><a href=#auth>Authentication and authorization</
+== SUBMISSION (ONE attempt, unauthenticated, blocker-evidence probe) ==
+UTC: 2026-10-21T03:40:28Z
+TEXT_ATTEMPTED: PyDevToolkit v1.0.0: free Python CLI toolkit zip (pending Gumroad listing). Zip: https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip Repo: https://github.com/thanayut1750/spoc-harness
+HTTP_CODE=401 CONTENT_TYPE=application/json; charset=utf-8 SIZE=39
+CURL_EXIT: 0
+RESPONSE_BODY_SHA256: 070da09d0b2013413ace4c33aded04c6d5886309471986c9da6f1bf65f25e8af
+RESPONSE_BODY (first 500 B):
+{"error":"The access token is invalid"}
+== FILES ==
+1225860b4868495c17da2c53eaa158d864d47f07adb0ae412d0e63337294bec2  evidence/outreach/mastodon-docs.html
+40dbf236b20dbbdbac6543864ba2981e95d0f9b1475ff8de1756ea6a5791e14f  evidence/outreach/mastodon-about.html
+070da09d0b2013413ace4c33aded04c6d5886309471986c9da6f1bf65f25e8af  evidence/outreach/mastodon-post-body.json
+== RULES FETCH (Mastodon) #3 ==
+UTC: 2026-10-21T03:42:12Z
+FETCH3 server rules API https://mastodon.social/api/v1/instance :
+HTTP_CODE=200 CONTENT_TYPE=application/json; charset=utf-8 SIZE=23352
+VERBATIM server rules (rules array):
+SERVER: None
+RULE 1 : Sexually explicit or violent media must be marked as sensitive or with a content warning
+RULE 2 : No racism, sexism, homophobia, transphobia, ableism, xenophobia, or casteism.
+RULE 3 : No incitement of violence or promotion of violent ideologies
+RULE 4 : No harassment, block evasion, dogpiling, or doxxing of others
+RULE 7 : Do not share information widely-known to be false and misleading
+RULE 1008 : Content created by others must be attributed, and use of generative AI must be disclosed
+== FILES ==
+1c9ef131651ff98ae4dc6f0c246ad00f837b5fd3cb0695f468f23dede18efff8  evidence/outreach/mastodon-instance-rules.json

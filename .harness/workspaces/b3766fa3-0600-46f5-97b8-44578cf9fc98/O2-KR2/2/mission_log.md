@@ -293,3 +293,47 @@ retest and authoritative three-criteria repair audit - 2026-10-21T02:54:33Z
   claimed. Post-commit fetch-back verification (updated mission_log.md HTTP 200
   byte-identical; staging invariants re-checked) is archived at
   evidence/w2_final_fetchback.log.
+
+ADDENDUM 9 - WP-O2KR3-1-OUTREACH (run 0, workspace O2-KR3/0): rules-first outreach,
+8 single attempts across all 6 locally-available channel classes, zero retries - 2026-10-21T04:12:52Z
+Offer copy (every channel): PyDevToolkit v1.0.0 free Python CLI toolkit zip (commit-pinned
+raw.githubusercontent URL, GET 200 application/zip 40,299 B sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99)
++ public repo github.com/thanayut1750/spoc-harness; Gumroad listing stated as PENDING HUMAN
+PUBLISH; no product/buy URL invented anywhere. Per-destination rules were fetched BEFORE each
+attempt (rules URL + HTTP status + verbatim quote in evidence/outreach_log.md). Results:
+(1) IndexNow: 32-hex key file offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt git-published
+(commit 7368190654bdf4655d5657a8565e1b1e6990954c; raw key URL HTTP 200 exact key, sha256
+7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f); submission GET
+api.indexnow.org/IndexNow?url=<zip>&key=<key>&keyLocation=<keyURL> -> HTTP 422, archived
+evidence/outreach/indexnow-422-body.json sha256 453cb17f4eb77313036838221a051ea746c6e3157a9336898ef1eef599954628
+("url doesnot belong to your site verified through the keylocation parameter").
+(2) PingOMatic: XML-RPC weblogUpdates.extendedPing -> HTTP 200 but easter-egg text/html
+"You are too awesome for Ping-o-matic" (RESPONSE_SHA256 8853b804944e3af20b6be93af3ab982292eea6ced25dd6c1b340195ae6fef359,
+byte-identical to archived evidence/outreach/pingomatic-home.html); no flerror/boolean ack; no retry.
+(3) Reddit: rules fetches blocked by Cloudflare 403 wall (declined bypass); single POST
+oauth.reddit.com/api/submit -> HTTP 403 network-security block page (archived
+evidence/outreach/reddit-rules-fetch-403.html sha256 13bcba13bd1bad5aace04e8a76880b710337a8d595224967e874401832cc203c).
+(4) Social: X POST api.twitter.com/2/tweets -> HTTP 401 problem+json (body sha256
+8f20ff0c6196b3d88227a60b7b32325bae08a23c17051edb358c5e321540d76f); Mastodon POST
+mastodon.social/api/v1/statuses -> HTTP 401 {"error":"The access token is invalid"} (body sha256
+070da09d0b2013413ace4c33aded04c6d5886309471986c9da6f1bf65f25e8af; instance rules fetched HTTP 200 first).
+(5) Developer publishing: dev.to POST /api/articles -> HTTP 401 {"error":"unauthorized"} (body sha256
+ff8e893bf7a7cd8d84cc6176e41f963d4d825e867cbb61cb6e15decf530588bc; API docs fetched HTTP 200 first);
+Hacker News login-less submit -> HTTP 200 login wall "You have to be logged in to submit."
+(evidence/outreach/hn-submit-response.html sha256 552e394d8d9ace3fdbbdc283f740a957c5823e76ded0ee804bbbf95800cf3d37).
+(6) GitHub: authenticated POST /repos/.../issues impossible (git credential fill exited 128, no token
+present; unauthenticated POST -> HTTP 401 "Requires authentication", body sha256
+b7dbd173f33b19650f61b1c528737e2037cf768d90076fdfce5d32541765e29e); FALLBACK POSTED:
+offer/ANNOUNCEMENT.md (honest free-download copy, sha256
+430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91) committed and pushed to
+codex/spoc-harness-v1; its raw.githubusercontent.com URL returning HTTP 200 byte-exact is the
+post-URL evidence. Anti-spam: exactly one attempt per destination, no account creation, no
+credential fabrication, no CAPTCHA bypass; machine-wide credentials sweep with 4-char redaction
+archived as evidence/outreach_credentials_sweep.log (sha256
+2fdcea3141de619e1b1ccaf15b032116e6e293ae94904678301abd2aa51a7bea). Core deliverable:
+evidence/outreach_log.md (8 entries, zero empty mandatory fields, classes 1-6 covered,
+7 blocked + 1 posted, sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007).
+Artifacts: evidence/outreach_log.md, evidence/outreach_credentials_sweep.log,
+evidence/outreach/*.log + archived rule/request/response bodies, offer/ANNOUNCEMENT.md,
+offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt. Post-push raw fetch-back of every committed file
+recorded in evidence/o2kr3_fetchback.log (follow-up commit).

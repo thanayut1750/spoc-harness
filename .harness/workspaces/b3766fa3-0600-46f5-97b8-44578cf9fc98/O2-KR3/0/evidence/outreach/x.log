@@ -1,0 +1,39 @@
+X (TWITTER) CHANNEL LOG (O2-KR3)
+== RULES CHECK (rules-first) ==
+UTC: 2026-10-21T03:40:27Z
+FETCH1 rules/API doc https://developer.x.com/en/docs/twitter-api :
+  HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=627980 FINAL_URL=https://docs.x.com/overview
+FETCH2 automation rules https://help.x.com/en/rules-and-policies/x-automation :
+  HTTP_CODE=403 CONTENT_TYPE=text/html; charset=UTF-8 SIZE=5513 FINAL_URL=https://help.x.com/en/rules-and-policies/x-automation
+VERBATIM from fetched bodies (grep -o on first 2 matches):
+abled\",\"enabled\":false,\"feature_enabled\":true},\"impressionData\":false},{\"name\":\"automations-pr-grouping\",\"enabled\":true,\"variant\":{\"name\":\"disabled\",\"enabled\":false,\"fe
+abled\",\"enabled\":false,\"feature_enabled\":true},\"impressionData\":false},{\"name\":\"automations-fable\",\"enabled\":true,\"variant\":{\"name\":\"disabled\",\"enabled\":false,\"feature_
+== SUBMISSION (ONE attempt, unauthenticated, blocker-evidence probe) ==
+UTC: 2026-10-21T03:40:34Z
+REQUEST_BODY_SHA256: b7c34e0e3c6df957cc66a07348dcea6bad738076f9fda26f5133eaeabffb1480
+HTTP_CODE=401 CONTENT_TYPE=application/problem+json SIZE=99
+CURL_EXIT: 0
+RESPONSE_BODY_SHA256: 8f20ff0c6196b3d88227a60b7b32325bae08a23c17051edb358c5e321540d76f
+RESPONSE_BODY (first 500 B):
+{
+  "title": "Unauthorized",
+  "type": "about:blank",
+  "status": 401,
+  "detail": "Unauthorized"
+}
+== FILES ==
+eae86ef7fdc825e883df93937a5fb1c70ccbc8d5650f27e37ab86bbd3285122a  evidence/outreach/x-docs.html
+0f7225d0c85a7c93c3687f7e50b742a53e68be7cd6bccb31b6c1ede6edd12444  evidence/outreach/x-automation.html
+8f20ff0c6196b3d88227a60b7b32325bae08a23c17051edb358c5e321540d76f  evidence/outreach/x-post-body.json
+b7c34e0e3c6df957cc66a07348dcea6bad738076f9fda26f5133eaeabffb1480  /tmp/x-post-request.json
+== RULES FETCH (X) #3 ==
+UTC: 2026-10-21T03:42:12Z
+FETCH3 auth overview https://docs.x.com/fundamentals/authentication/overview :
+HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=591895 FINAL_URL=https://docs.x.com/fundamentals/authentication/overview
+VERBATIM auth-requirement text:
+tication, OAuth, OAuth 1.0a, OAuth 2.0, API authentication, bearer token, access tokens, API keys, user context, app only, PKCE, authorization code, basic authentication","publisher":{"@id":"https://docs.x.com/#organization"},"isPar
+ping\"}]},{\"group\":\"OAuth 1.0a\",\"pages\":[{\"title\":\"API Key and Secret\",\"sidebarTitle\":\"API Key and Secret\",\"href\":\"/fundamentals/authentication/oauth-1-0a/api-key-and-secret\"},{\"title\":\"Obtaining Access Tokens using 3
+rview\"},{\"title\":\"App only authentication and OAuth 2.0 Bearer Token\",\"sidebarTitle\":\"OAuth 2.0 App-Only (Bearer Token)\",\"href\":\"/fundamentals/authentication/oauth-2-0/application-only\"},{\"title\":\"Using and generatin
+g an app-only Bearer Token\",\"sidebarTitle\":\"Generating and using app-only Bearer Tokens\",\"href\":\"/fundamentals/authentication/oauth-2-0/bearer-tokens\"},{\"title\":\"OAuth 2.0 Au
+== FILES ==
+5c2096f637c0062433381cbc02bbce554f3defde386a1abbc083eddf5585458f  evidence/outreach/x-auth-overview.html

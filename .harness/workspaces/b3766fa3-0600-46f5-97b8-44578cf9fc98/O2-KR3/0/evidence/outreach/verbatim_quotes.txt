@@ -1,0 +1,20 @@
+== VERBATIM QUOTE EXTRACTION (local grep of archived bodies) ==
+UTC: 2026-10-21T03:41:22Z
+--- HN guidelines: promotion-related lines ---
+found on another site, submit the latter. <p> Please don't use HN primarily for promotion. It's ok to post your own stuff part of the time, but the primary use of the site should be for curiosity. 
+t when they run across something they personally find interesting&mdash;not for promotion. 
+t abuse, email hn@ycombinator.com and we'll look at the data. <p> If a story is spam or off-topic, flag it. Don't feed egregious comments by replying; 
+--- HN guidelines: title ---
+<title>Hacker News Guidelines
+--- Mastodon about: server rules text ---
+--- dev.to apidoc: articles + api-key requirement ---
+n> <span class="token parameter variable">-H</span> <span class="token string">"api-key: API_KEY"</span> https://dev.to/api/articles/me </pre></div></div></div></div><div><h3 class="sc-kpDqfm jhTHfM"> <!-- -->Response samples<!
+n> <span class="token parameter variable">-H</span> <span class="token string">"api-key: API_KEY"</span> https://dev.to/api/articles/me/published </pre></div></div></div></div><div><h3 class="sc-kpDqfm jhTHfM"> <!-- -->Response
+n> <span class="token parameter variable">-H</span> <span class="token string">"api-key: API_KEY"</span> https://dev.to/api/articles/me/unpublished </pre></div></div></div></div><div><h3 class="sc-kpDqfm jhTHfM"> <!-- -->Respon
+--- x docs overview: auth requirement text ---
+ords hyphens-auto">Developer Console</span></div></div></a></li><li data-title="Authentication" data-group-tag="" class="space-y-px"><button class="group flex items-start pr-3 py-1.5 cursor-pointer gap-x-3 text-lef
+e" class="size-4 bg-transparent dark:bg-transparent"/></div><div class=""><span>Authentication</span></div><div class="h-[1lh] flex items-center shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="
+",\"icon\":\"grid-2\",\"href\":\"/fundamentals/developer-portal\"},{\"group\":\"Authentication\",\"icon\":\"/icons/xds/icon-key.svg\",\"pages\":[{\"title\":\"Authentication\",\"sidebarTitle\":\"Overview\",\"href\":
+\"/fundamentals/authentication/overview\"},{\"group\":\"Guides\",\"pages\":[{\"title\":\"Log in with X\",\"href\":\"/fundamentals/authentication/guide
+--- x automation 403 page: any visible text ---
+<title>Just a moment...
