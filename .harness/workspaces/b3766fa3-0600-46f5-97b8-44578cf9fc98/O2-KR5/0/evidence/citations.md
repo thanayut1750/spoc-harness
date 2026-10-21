@@ -122,3 +122,18 @@ DISCLOSURE: the complete-tree URL scan in `o2kr5_a1_integrity_audit_v5.py` found
 decision_log.md, mirrored_listing.md, o2kr5_a1_c1_pasters_post.log and fallback_status.md but absent from this
 registry. It is registered here (append-only) BEFORE push C so that every cited URL is class-tagged. No other
 row above is modified.
+
+## REGISTRY ADDENDUM 2 (gig-chain close-out, appended additions-only)
+REGISTERED (append-only) citations of the WP-O2KR5-2 gig-chain package, class-tagged per §D:
+| Class | Item | URL / pattern | Receipt |
+|---|---|---|---|
+| FRESH-COMMITTED | refined probe script | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe.sh` | push A receipt `11d7003cc855ca28a0d011db99e950ca` (PUSH_A_EXIT=0; anonymous ls-remote == ec18db2c298876efc003719b33ae0d1d67708dd1) |
+| FRESH-COMMITTED | upwork probe log | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log` | same push A receipt |
+| FRESH-COMMITTED | upwork archived body (verbatim 403 response) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html` | same push A receipt |
+| FRESH-COMMITTED | gig channels log (deliverable) | path `…/O2-KR5/3/evidence/o2kr5_gig_channels.log` @ this package's push B tip | byte-exact fetch-back recorded in `…/O2-KR5/3/evidence/o2kr5_gig_fetchback.log` |
+| FRESH-COMMITTED | gig fetch-back log | path `…/O2-KR5/3/evidence/o2kr5_gig_fetchback.log` @ this package's push C tip | self fetch-back at tip C recorded in the package close-out receipts |
+No row above is modified; zero deletions to this registry. Out-of-class audit note: the
+network destinations used by this package are (a) raw.githubusercontent.com fetch-backs
+(read-only integrity checks) and (b) exactly ONE probe GET to `https://www.upwork.com/`
+(first and only contact; see evidence/o2kr5_gig_channels.log ROW 2/2). Fiverr was NOT
+re-contacted (recorded receipt B3 re-verified at its pinned commit instead).

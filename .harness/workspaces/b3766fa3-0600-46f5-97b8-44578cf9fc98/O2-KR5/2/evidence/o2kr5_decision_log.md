@@ -63,3 +63,31 @@ Pre-work remote tip (`git ls-remote`, 2026-10-21T10:45:44Z, LS_REMOTE_EXIT=0):
   not a sale; no sale, price, order URL, or receipt is fabricated, and no ledger write
   is performed. Execution evidence for this chosen channel is recorded in
   `evidence/o2kr5_mirrored_listing.log`.
+
+## ENTRY 2 — O2-KR5 gig-platform fallback (WP-O2KR5-2): probe executed + chain close-out
+- Appended additions-only (no existing line modified).
+- Scope: gig platforms only (Fiverr, Upwork) per the documented chain (mission_log.md
+  @ 553e5f23…, L228-229: "fallback chain Lemon Squeezy -> Fiverr/Upwork -> prepared-asset
+  mode per playbook section 4"). Mirrored listing = ENTRY 1; adjusted offer out of scope.
+- UPWORK: the prepared attempt-1 probe (evidence/o2kr5_a1_gig_probe.sh) was never executed
+  (its `git grep -i upwork HEAD`-zero precheck assumption is obsolete — legitimate
+  documentation mentions exist). This package executed its refined successor
+  evidence/o2kr5_a2_gig_probe.sh (idempotency guard + contact-record precheck): single
+  anonymous GET https://www.upwork.com/ at 2026-10-21T11:24:51Z -> HTTP 403, Cloudflare
+  block page ("Attention Required! | Cloudflare"; verbatim body strings: "Sorry, you have
+  been blocked"; "captcha-container"; "Cloudflare Ray ID: a4dfe5f8a919d326"), archived
+  body 5017 B sha256 61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7.
+  Zero prior upwork contacts (precheck COUNT:0); exactly one request, no retries, no
+  account creation, no credentials. Probe log: evidence/o2kr5_a2_gig_probe_upwork.log
+  @ commit ec18db2c298876efc003719b33ae0d1d67708dd1.
+- FIVERR: NOT re-contacted — attempt-0 receipt B3 stands (HTTP 403, PXCR10002539
+  "It needs a human touch"); pinned citations.md @ 6c83c9dfc29ec1d04b5980734da5f822a99b9817
+  re-fetched fresh this session: HTTP 200, byte-exact (sha256 b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401).
+- Chain result: both documented gig platforms are UNAVAILABLE with concrete blockers
+  (HTTP status + verbatim quotes) — evidence/o2kr5_gig_channels.log, one row per platform.
+  No submission, no fabricated URLs.
+- HONEST OUTCOME: publication/probe only, not a sale. Cumulative net revenue unchanged
+  $0.00, 0 ledger entries, gap $100.00; no ledger write performed.
+- Receipt-honesty note: command receipts in this session may carry execution_stopped=true;
+  every state claim above is corroborated from disk / raw.githubusercontent.com
+  (byte-exact fetch-backs recorded in evidence/o2kr5_gig_fetchback.log).
