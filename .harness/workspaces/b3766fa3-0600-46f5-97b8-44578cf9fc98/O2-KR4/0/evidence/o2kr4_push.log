@@ -25,3 +25,8 @@ FB evidence/zero_confirmed_sales_check.md           HTTP=200 local=421331a2cc3e 
 FB evidence/o2kr4_sha256_manifest.txt               HTTP=200 local=a562d1acd51b remote=a562d1acd51b MATCH
 
 FETCHBACK_RESULT: pass=16 fail=0
+
+--- self-verification (appended at 2026-10-21T06:40:31Z) ---
+commit2 (this log's first version): d8a8981f8435d25c204733df9511e3ca2e90c9a9; PUSH2_EXIT=0
+fetch-back of this log at commit2: HTTP=200 local_sha=80864daaace7289aeea926c95703aebb3aba14d386910a274148569d4ccdd2f0 remote_sha=80864daaace7289aeea926c95703aebb3aba14d386910a274148569d4ccdd2f0 BYTE-IDENTICAL
+final log version (with this appended block) pushed as commit3 and re-fetched for byte-identity in the finish verification
