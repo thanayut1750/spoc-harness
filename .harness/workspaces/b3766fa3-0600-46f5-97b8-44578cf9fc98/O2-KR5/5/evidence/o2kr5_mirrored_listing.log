@@ -84,3 +84,22 @@ recorded in (a) the POST-PUSH-1 receipt below for this log's first commit and (b
 assignment close-out summary, which also carries the final-tip fetch-back of this file
 (HTTP 200 + sha256 byte-exact) and the clean-tree receipt. No further O2-KR5 commits
 follow the log's final commit.
+
+## SECTION 6 — POST-PUSH-1 RECEIPT (appended after the log's first push)
+
+- LOG_COMMIT_L1: a97e93ca0a4ae0e4e8b0609e0301e4bd2834a094 (parent
+  1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7; single new file, 86 insertions(+),
+  additions-only; pre-commit scope check passed: only this log file staged).
+- PUSH_L1_EXIT=0 (push output: "1dac17e..a97e93c  codex/spoc-harness-v1 ->
+  codex/spoc-harness-v1").
+- LOG v1 FETCH-BACK at L1 (raw.githubusercontent.com):
+  URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/a97e93ca0a4ae0e4e8b0609e0301e4bd2834a094/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/evidence/o2kr5_mirrored_listing.log
+  HTTP_STATUS: 200
+  FETCHED_SHA256: f4dd59c901be22496d36fd476640d554e6741712695ddcb5311a19167da28a05
+  LOCAL_SHA256:   f4dd59c901be22496d36fd476640d554e6741712695ddcb5311a19167da28a05
+  VERDICT: MATCH — byte-exact (cmp exit 0).
+- This addendum is committed as the final O2-KR5 commit of this work package (L2; the
+  only staged change is this file's append). The L2 SHA, the clean-tree receipt, the
+  full-range scope check (9b4a802..L2 = exactly the 4 new O2-KR5/5 files), and the
+  byte-exact fetch-back of this final version at L2 are recorded in the assignment
+  close-out summary (a commit cannot embed its own SHA).
