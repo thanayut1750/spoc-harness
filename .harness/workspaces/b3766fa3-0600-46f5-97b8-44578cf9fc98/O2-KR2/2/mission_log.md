@@ -363,3 +363,12 @@ evidence/outreach_log.md HTTP 200 byte-identical, sha256 c764677b7d8369253f6ad11
 R8 PASS (git diff 7368190..HEAD on mission_log.md = +44/-0, 0 minus-lines; ADDENDUM 9 additions-only in
 6bb5530). FAILED_CHECKS: none. Audit was non-mutating toward existing deliverables; additions this
 audit: evidence/o2kr3_audit.log, evidence/o2kr3_audit_script.sh, this ADDENDUM 10.
+ADDENDUM 11 - WP-O2KR3-2-AUDIT re-presentation (audit attempt 2, run 0 auditor): verdict PASS - 2026-10-21T05:04:45Z
+  Purpose: discharge the prior rejection (truncated evidence excerpts). Attempt-2 audit log published untruncated; fresh HTTP re-verification captured in dedicated logs.
+  Audit log: evidence/o2kr3_audit2.log (sha256 30e33a4b3a6b303d999f9ac4257e8b7f533a2316399d83c6286587d57b4599e5, 13,342 B, 107 lines, tee'd, AUDIT_STARTED 2026-10-21T04:58:31Z / FINISHED 04:58:36Z; CHECKS_RUN 8, R1-R8 all PASS, FAILED_CHECKS: none, final line 'O2KR3_OUTREACH_AUDIT: PASS').
+  Attempt-1 log re-presented in full (unchanged, sha256 d9ed213930184721b166e3e67b08bb971bf52f633fc393f8a8fc1000d996ecf7, 10,721 B).
+  Dedicated fresh-HTTP evidence: evidence/o2kr3_rules_spotcheck.log (R5: 4/4 cited rules URLs fresh GET 200 with quoted rule text present - hn.algolia.com 200/5864B/1 hit, indexnow.org 200/28555B/1, github.com/site/terms 200/366804B/3, mastodon.social 200/23352B/4; exceeds 2-URL minimum) and evidence/o2kr3_positive_reverify.log (R6: IndexNow key file GET 200 text/plain exact key 03d3363d8c5f23bfe7ce970e0ac7cd08; hosted zip GET 200 application/zip 40,299 B sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99).
+  Non-mutation proof: outreach_log.md sha256 c764677b... and attempt-1 audit log sha256 d9ed2139... verified unchanged at tip (FB2/FB3 in evidence/o2kr3_audit2_fetchback.log, all HTTP 200 byte-exact).
+  Clarification: attempt-1 log lines 'ADDENDUM 9 present: 0; ADDENDUM 10 present: 0' are a grep-pattern false negative ('^## ADDENDUM 9' vs actual prefix-less headers at mission_log L297/L341); R8 verdict rests on git diff --numstat 0 minus-lines and is unaffected. No audit bytes altered.
+  Publication: commits e7a5d23140ca47667d0adbe7a7f4ba31da90722f (4 audit files, 384 insertions, PUSH_EXIT=0) and this ADDENDUM-11 commit; fetch-back evidence/o2kr3_audit2_fetchback.log (FB1 audit2 log at tip HTTP 200 byte-exact).
+  Terminal: O2-KR3 outreach-evidence audit PASS; verdict recorded by independent auditor; no marketing actions taken, no external posts.
