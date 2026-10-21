@@ -1,0 +1,130 @@
+================================================================================
+evidence/o2kr5_gig_fetchback.log - fresh fetch-back receipts for the WP-O2KR5-2
+gig-platform chain close-out. All GETs anonymous via curl (no credentials).
+UTC=2026-10-21T11:33:53Z
+Push A: ec18db2c298876efc003719b33ae0d1d67708dd1 (PUSH_A_EXIT=0, anonymous ls-remote tip == ec18db2c298876efc003719b33ae0d1d67708dd1, receipt 11d7003cc855ca28a0d011db99e950ca)
+Push B: e2e7e23f2e6106e9796b31ce19786bc3ff23036d (PUSH_B_EXIT=0, anonymous ls-remote tip == e2e7e23f2e6106e9796b31ce19786bc3ff23036d, receipt 99a2491d4414ea6d4dcf957227711eb1)
+Verify rule: HTTP 200 AND sha256(fetched) == sha256(local committed copy) (byte-exact).
+================================================================================
+FB 1_gig_channels.log | HTTP_STATUS=200 | FETCHED_SHA256=e4f229b7498343cba0087f5786dd5dd01bf488b48e61a2f0398fb6cf946cff34 | LOCAL_SHA256=e4f229b7498343cba0087f5786dd5dd01bf488b48e61a2f0398fb6cf946cff34 | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/o2kr5_gig_channels.log
+sha256sum: /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/../0/evidence/o2kr5_a2_gig_probe_upwork.log: No such file or directory
+FB 2_upwork_probe_log_at_pinned_A | HTTP_STATUS=200 | FETCHED_SHA256=0e80d642d65013f168f5f30d35452dea6add1d1ebec839200f5adbc9cf73556d | LOCAL_SHA256= | VERDICT=MISMATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log
+sha256sum: /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/../0/evidence/o2kr5_a2_upwork_body.html: No such file or directory
+FB 3_upwork_body_at_pinned_A | HTTP_STATUS=200 | FETCHED_SHA256=61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7 | LOCAL_SHA256= | VERDICT=MISMATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html
+sha256sum: /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/../0/evidence/o2kr5_a2_gig_probe.sh: No such file or directory
+FB 4_probe_script_at_pinned_A | HTTP_STATUS=200 | FETCHED_SHA256=d02b97f98154e42d8e8104d99f356dc4838fbe183e2e3a03a673fa52cfca4141 | LOCAL_SHA256= | VERDICT=MISMATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe.sh
+FB 5_decision_log_at_B | HTTP_STATUS=200 | FETCHED_SHA256=b1a8cf617b7f5bb19ede10a61ace80c53ba34ed3ad18d398a2d6a51c44929ebe | LOCAL_SHA256=b1a8cf617b7f5bb19ede10a61ace80c53ba34ed3ad18d398a2d6a51c44929ebe | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/evidence/o2kr5_decision_log.md
+FB 6_citations_at_B | HTTP_STATUS=200 | FETCHED_SHA256=3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475 | LOCAL_SHA256=3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475 | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md
+FB 7_citations_pinned_B3_evidence | HTTP_STATUS=200 | FETCHED_SHA256=b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401 | LOCAL_SHA256=b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401 | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6c83c9dfc29ec1d04b5980734da5f822a99b9817/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md
+--- content spot-checks on fetched bytes ---
+ROW_MARKERS_IN_FETCHED_GIG_LOG=2 (required 2)
+FIVERR_VERBATIM_IN_FETCHED_GIG_LOG=2 (required >=1)
+UPWORK_VERBATIM_IN_FETCHED_GIG_LOG=1 (required >=1)
+UPWORK_BLOCK_QUOTE_IN_FETCHED_BODY=1 (required >=1)
+UPWORK_CLOUDFLARE_TITLE_IN_FETCHED_BODY=1 (required >=1)
+B3_ROW_IN_PINNED_CITATIONS=1 (required >=1)
+================================================================================
+FETCHBACK_RESULT: pass=4 fail=3 (7 fetch-backs expected; all must be HTTP 200 + byte-exact)
+FETCHBACK: HAS_MISMATCH
+================================================================================
+================================================================================
+CORRECTION - appended additions-only at CORRECTION_UTC=2026-10-21T11:46:39Z
+(Appended to this log; every original line above - including the FB 2/3/4
+ MISMATCH rows and the FETCHBACK: HAS_MISMATCH verdict - is preserved verbatim
+ and NOT rewritten. Generator: evidence/o2kr5_gig_fetchback_correction.sh,
+ committed alongside this log; its run receipt is cited in the close-out
+ receipts and in this session's published evidence artifacts.)
+--------------------------------------------------------------------------------
+WHAT WAS WRONG:
+  The original FB 2/3/4 LOCAL_SHA256 cells were recorded empty with
+  VERDICT=MISMATCH because their run-time sha256sum calls returned
+  "No such file or directory" for the three absolute paths
+    /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe.sh
+    /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log
+    /tmp/o2kr5_a2/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html
+  even though the same three fetches had already returned HTTP 200 with
+  FETCHED_SHA256 values equal to the pinned committed content.
+RUN-TIME CAUSE - NOT REPRODUCIBLE; EARLIER "PATHS ABSENT" NOTE CORRECTED:
+  Fresh inspection shows those three files present at exactly those paths
+  since 2026-10-21T11:24:38-52Z (mtimes = the single upwork probe that
+  created them; committed at ec18db2c298876efc003719b33ae0d1d67708dd1).
+  The clone reflog records no checkout/reset/clean/deletion between file
+  creation and the fetch-back run at 11:33:53Z, and a fresh re-hash of the
+  same absolute paths succeeds and equals the original FETCHED_SHA256 values
+  (FBX rows below). The earlier session note that the paths were "absent
+  from the /tmp/o2kr5_a2 working tree" is therefore wrong and is corrected
+  here: the paths are present; the run-time ENOENT cause is undetermined
+  (transient clone copy-state at run time vs a script-local path defect;
+  neither is asserted as fact).
+REMOTE INTEGRITY - UNAFFECTED:
+  Every original row had HTTP_STATUS=200, and every original FETCHED_SHA256
+  already equaled the committed content; the MISMATCH verdicts were
+  comparison-side only, never remote-content failures.
+METHOD OF CORRECTION:
+  All 7 fetch-backs re-executed fresh (anonymous curl, no credentials;
+  read-only raw.githubusercontent.com GETs only - no contact destination is
+  retried or re-contacted), each now verified against BOTH the local
+  committed copy AND the git object at its pinned commit
+  (git cat-file -p <commit>:<path> | sha256sum). Content spot-checks re-run
+  on the fresh fetched bytes.
+--------------------------------------------------------------------------------
+FBX 1_gig_channels.log_at_B | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=e4f229b7498343cba0087f5786dd5dd01bf488b48e61a2f0398fb6cf946cff34 | LOCAL_SHA256=e4f229b7498343cba0087f5786dd5dd01bf488b48e61a2f0398fb6cf946cff34 (basis=worktree) | GIT_OBJECT_SHA256=e4f229b7498343cba0087f5786dd5dd01bf488b48e61a2f0398fb6cf946cff34 (at pinned e2e7e23) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/o2kr5_gig_channels.log
+FBX 2_upwork_probe_log_at_pinned_A | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=0e80d642d65013f168f5f30d35452dea6add1d1ebec839200f5adbc9cf73556d | LOCAL_SHA256=0e80d642d65013f168f5f30d35452dea6add1d1ebec839200f5adbc9cf73556d (basis=worktree) | GIT_OBJECT_SHA256=0e80d642d65013f168f5f30d35452dea6add1d1ebec839200f5adbc9cf73556d (at pinned ec18db2) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log
+FBX 3_upwork_body_at_pinned_A | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7 | LOCAL_SHA256=61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7 (basis=worktree) | GIT_OBJECT_SHA256=61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7 (at pinned ec18db2) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html
+FBX 4_probe_script_at_pinned_A | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=d02b97f98154e42d8e8104d99f356dc4838fbe183e2e3a03a673fa52cfca4141 | LOCAL_SHA256=d02b97f98154e42d8e8104d99f356dc4838fbe183e2e3a03a673fa52cfca4141 (basis=worktree) | GIT_OBJECT_SHA256=d02b97f98154e42d8e8104d99f356dc4838fbe183e2e3a03a673fa52cfca4141 (at pinned ec18db2) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe.sh
+FBX 5_decision_log_at_B | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=b1a8cf617b7f5bb19ede10a61ace80c53ba34ed3ad18d398a2d6a51c44929ebe | LOCAL_SHA256=b1a8cf617b7f5bb19ede10a61ace80c53ba34ed3ad18d398a2d6a51c44929ebe (basis=worktree) | GIT_OBJECT_SHA256=b1a8cf617b7f5bb19ede10a61ace80c53ba34ed3ad18d398a2d6a51c44929ebe (at pinned e2e7e23) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/evidence/o2kr5_decision_log.md
+FBX 6_citations_at_B | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475 | LOCAL_SHA256=3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475 (basis=worktree) | GIT_OBJECT_SHA256=3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475 (at pinned e2e7e23) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/e2e7e23f2e6106e9796b31ce19786bc3ff23036d/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md
+FBX 7_citations_pinned_B3_evidence | HTTP_STATUS=200 | CURL_EXIT=0 | FETCHED_SHA256=b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401 | LOCAL_SHA256=b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401 (basis=pinned-git-object) | GIT_OBJECT_SHA256=b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401 (at pinned 6c83c9d) | VERDICT=MATCH
+     URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6c83c9dfc29ec1d04b5980734da5f822a99b9817/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md
+--- content spot-checks on fresh fetched bytes ---
+ROW_MARKERS_IN_FETCHED_GIG_LOG=2 (required 2)
+FIVERR_PXCR_VERBATIM_IN_FETCHED_GIG_LOG=2 (required >=1)
+FIVERR_HUMAN_TOUCH_VERBATIM=2 (required >=1)
+UPWORK_BLOCK_VERBATIM_IN_FETCHED_GIG_LOG=1 (required >=1)
+OUTCOME_UNAVAILABLE_ROWS=2 (required 2)
+EXHAUSTED_STATE_IN_FETCHED_GIG_LOG=1 (required >=1)
+PROBE_LOG_HTTP403=1 (required >=1)
+PROBE_LOG_CURL_EXIT_0=1 (required >=1)
+UPWORK_CLOUDFLARE_TITLE_IN_FETCHED_BODY=1 (required >=1)
+UPWORK_RAY_ID_IN_FETCHED_BODY=2 (required >=1)
+ENTRY2_IN_FETCHED_DECISION_LOG=1 (required >=1)
+B3_ROW_IN_PINNED_CITATIONS=1 (required 1)
+FBX_RESULT: pass=7 fail=0 (7 fetch-backs expected; all must be HTTP 200 + sha256(fetched) == local committed copy == git object at pinned commit)
+FETCHBACK_AFTER_CORRECTION: ALL_MATCH (pass=7 fail=0; the original HAS_MISMATCH verdict above is superseded by this corrected verdict and retained for the record)
+CORRECTION_UTC=2026-10-21T11:46:41Z
+================================================================================
+================================================================================
+SELF FETCH-BACK AT PUSH-C TIP (receipt appended additions-only AFTER the fetch)
+PUSH_C: COMMIT_C=9eb8fd0489c103b6fdaa028e3c7a16af533f812a PUSH_C_EXIT=0 FETCH_C_EXIT=0 TEMP_REF=refs/tmp-kr5/c deleted
+REMOTE_TIP_AT_C_VERIFIED_BY_ANONYMOUS_LS_REMOTE=9eb8fd0489c103b6fdaa028e3c7a16af533f812a
+FB_TIPC | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/9eb8fd0489c103b6fdaa028e3c7a16af533f812a/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/o2kr5_gig_fetchback.log | HTTP_STATUS=200 | FETCHED_SHA256=c42b4e7539675e24b2ca567344fd3cbc9ee180671d6bb870592000780bbf0721 | LOCAL_SHA256=c42b4e7539675e24b2ca567344fd3cbc9ee180671d6bb870592000780bbf0721 | VERDICT=MATCH (byte-exact, cmp IDENTICAL, 12617 B)
+NOTE: A log cannot contain the receipt of its own future bytes; this tip-C
+receipt is therefore written after the tip-C fetch and added additions-only in
+the follow-up commit, whose final log is re-fetched from raw.githubusercontent.com
+and verified byte-exact the same way (that verification is cited in the session
+close-out alongside the published final-log artifact).
+ADDENDUM-2 DISPOSITION: row 1 (fetchback log at push-C tip) = the CORRECTION block
+above, fetched back at tip C HTTP 200 byte-exact (FB_TIPC); row 2 (self fetch-back
+at tip C) = this FB_TIPC receipt, recorded inside the log at the follow-up commit.
+HONEST OUTCOME (unchanged): gig chain EXHAUSTED - Fiverr documented UNAVAILABLE on
+the recorded O2-KR3 receipt (403, B3 f0c68766b0e2651f0c35783b537ab39e, cited in
+pinned citations.md @ 6c83c9d, NOT re-contacted); Upwork documented UNAVAILABLE on
+one fresh compliant probe (HTTP 403 Cloudflare block page, no account creation, no
+credentials). This is publication/probe evidence only - NOT a sale. Cumulative net
+revenue $0.00 USD, 0 ledger entries, remaining gap $100.00; revenue_ledger.json
+absent and untouched (no writes this session); no retries, no fabricated URLs.
+CORRECTION_CLOSE_UTC=2026-10-21T11:55:00Z
+================================================================================

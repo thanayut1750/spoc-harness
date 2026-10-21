@@ -1,0 +1,252 @@
+# O2-KR5 MIRRORED-LISTING EXECUTION LOG — WP-O2KR5-1-TRIGGER-MIRROR (workspace O2-KR5/4)
+
+WRITTEN_UTC: 2026-10-21T13:10:13Z (fresh `date -u` receipt, command artifact
+095c793a8b7047d9c4f58759857441e8)
+Branch: `codex/spoc-harness-v1` (https://github.com/thanayut1750/spoc-harness)
+Pre-work tip: `0bff7b36edcbe7160bb14f9441688ed0a67528ae` (main workspace repo HEAD,
+worktree clean, re-verified fresh this session, same receipt)
+Stage-1 publication tip (COMMIT_A): `64464c5418e67a527802763a3fdb73dfef14142d`
+Scope of this log: fallback channel 1 of the documented chain "(mirrored listing, gig
+platforms, adjusted offer)" (verbatim KR O2-KR5 description text, recorded at
+`O2-KR5/0/evidence/citations.md` row A14). Gig platforms, adjusted offer, chain
+close-out and the post-fallback ledger rerun are NOT executed here; this file and
+`evidence/o2kr5_decision_log.md` stay appendable for the following work packages.
+
+## 1. TRIGGER CONTEXT (pointer to the decision record)
+
+- Decision log ENTRY 1 — TRIGGER_DECISION: FIRED; CHOSEN_CHANNEL: mirrored listing —
+  lives in `evidence/o2kr5_decision_log.md` (4,988 bytes, sha256
+  3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c).
+- Ledger zero-state corroboration: `evidence/o2kr5_ledger_recheck.log` (1,910 bytes,
+  sha256 9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311):
+  total_earned 0, entry_count 0, entries [], remaining 100.0, goal_reached false,
+  `revenue_ledger.json` ABSENT. Gap to goal: $100.00. NO ledger write occurred in
+  this package.
+- Both files freshly triple-verified this session: LOCAL == `git show` @ COMMIT_A ==
+  raw fetch HTTP 200 (see section 4).
+
+## 2. MIRROR CONSTRUCTION (workspace file + committed bytes)
+
+- `listing/MIRROR_O2KR5.md` = 9-line HTML-comment provenance header (lines 1-9,
+  1,257 bytes) + verbatim mirror body from line 10 (header line 9 is the
+  "BEGIN VERBATIM MIRROR" marker; no END marker, body runs to EOF).
+- MIRROR_BYTES=2851; MIRROR_SHA256=
+  acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f.
+- BYTE-EXACT body proof at tip A (fresh receipts, command artifacts
+  2505e362358072190744a35fc69df4df / 4b89a9f2ba45edebfd82b741905ecb0d):
+  `git show 64464c54…:listing/MIRROR_O2KR5.md | tail -n +10 | sha256sum`
+  = 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 ==
+  sha256(ANNOUNCEMENT.md @ 6bb55308e7dd8e2436e182a32814e7a64cea5444) at the same tip
+  (1,594 bytes). The mirrored body is byte-identical to the pinned announcement.
+- URL guard (recorded earlier in this run, artifacts
+  847680d7fe52eb7ed6cbd7abd7e5d6e9 / 51488463cc162e6ac10e3dcc3c1229ae): the mirror
+  body contains ZERO purchase/checkout/gumroad/lemonsqueezy URLs; its only links are
+  the repository URL and the already-pinned FREE zip URL
+  (raw.githubusercontent.com/.../O2-KR2/0/build/pydevtoolkit-1.0.0.zip) — the same
+  inventory the announcement itself carries. No price added, no sale claimed, no
+  buy/order/checkout URL invented.
+- Provenance header points at the original announcement commit
+  `6bb55308e7dd8e2436e182a32814e7a64cea5444` and discloses that a prior in-repo
+  mirror exists at `O2-KR5/2/listing/MIRROR_O2KR5.md` and is left untouched.
+
+## 3. PUSH A (mirrored listing + decision log + ledger recheck)
+
+- Staging: fresh clone at the pre-work tip; exactly the 3 workspace files were copied
+  in and `git add -f`-ed (force required because the repo `.gitignore` ignores
+  `.harness/` — the same mechanism by which every prior KR workspace evidence file
+  entered this repo); the staged set was verified to be exactly the 3 new O2-KR5/4
+  paths.
+- COMMIT_A: `64464c5418e67a527802763a3fdb73dfef14142d`, dated
+  2026-10-21T19:54:06+07:00, subject "O2-KR5 stage-1 (WP-O2KR5-1, dir 4):
+  trigger-evaluation decision log ENTRY 1 + mirrored listing of pinned announcement
+  (additions-only)"; numstat 82/0, 32/0, 44/0 insertions/deletions (additions-only).
+- PUSH_EXIT=0 (recorded push receipt of this run, artifacts
+  847680d7fe52eb7ed6cbd7abd7e5d6e9 / 51488463cc162e6ac10e3dcc3c1229ae). Transport
+  (disclosed): the staging clone has no push credentials, so COMMIT_A was fetched
+  from the clone into the main workspace repo as temp ref `refs/tmp-kr5/d4-head`,
+  pushed via that repo's configured authenticated origin, and the temp ref deleted.
+  The main worktree was verified untouched before and after (HEAD `0bff7b36…`,
+  clean — re-verified fresh this session, artifact 095c793a8b7047d9c4f58759857441e8).
+- Independent fresh remote corroboration (this session): anonymous
+  `git ls-remote https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1`
+  -> `64464c5418e67a527802763a3fdb73dfef14142d  refs/heads/codex/spoc-harness-v1`
+  == COMMIT_A (command artifact e4c230fb024c0d581454e0dda9ddac23).
+
+## 4. FETCH-BACK AT COMMIT_A (raw.githubusercontent.com) — fresh, this session
+
+```
+FB|file=evidence/o2kr5_decision_log.md|HTTP=200|BYTES=4988|REMOTE_SHA256=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|LOCAL_SHA256=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|GIT_SHA256=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|VERDICT=MATCH
+FB|file=evidence/o2kr5_ledger_recheck.log|HTTP=200|BYTES=1910|REMOTE_SHA256=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|LOCAL_SHA256=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|GIT_SHA256=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|VERDICT=MATCH
+FB|file=listing/MIRROR_O2KR5.md|HTTP=200|BYTES=2851|REMOTE_SHA256=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|LOCAL_SHA256=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|GIT_SHA256=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|VERDICT=MATCH
+```
+
+- Result: 3/3 HTTP 200, 3/3 byte-exact MATCH (LOCAL == GIT == REMOTE), 0 mismatches.
+  Receipts: command artifacts caedbfa3d62cfd672d921955b7f5ab7a /
+  42e32b0f9c6a24d263676a6cdbd87973.
+- Mirror-body refetch check: `tail -n +10` of the FETCHED `MIRROR_O2KR5.md` =
+  430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 == pinned
+  announcement -> BODY_MATCH (artifact 095c793a8b7047d9c4f58759857441e8).
+- Fetch-back URLs (base = raw.githubusercontent.com/thanayut1750/spoc-harness/
+  64464c5418e67a527802763a3fdb73dfef14142d/.harness/workspaces/
+  b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/):
+  - evidence/o2kr5_decision_log.md
+  - evidence/o2kr5_ledger_recheck.log
+  - listing/MIRROR_O2KR5.md
+
+## 5. SCOPE + ANCHOR SWEEP AT COMMIT_A (fresh, this session)
+
+- `git diff --name-status 0bff7b36… 64464c54…` -> exactly 3 rows, all `A`:
+  - A .harness/workspaces/.../O2-KR5/4/evidence/o2kr5_decision_log.md
+  - A .harness/workspaces/.../O2-KR5/4/evidence/o2kr5_ledger_recheck.log
+  - A .harness/workspaces/.../O2-KR5/4/listing/MIRROR_O2KR5.md
+  -> ADDITIONS-ONLY; O2-KR5/{0,2,3} and every other path untouched
+  (artifact 59dfa836689b9de520009ca9f27cd1cd).
+- Anchor sweep @ COMMIT_A (sha256):
+  - ANNOUNCEMENT.md (.harness/.../O2-KR3/0/offer/) = 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 MATCH
+  - outreach_log.md (.harness/.../O2-KR3/0/evidence/) = c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 MATCH
+  - mission_log.md (.harness/.../O2-KR2/2/) = 2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4 MATCH
+  (artifact 0cd2feb150221d392196fe06f677da98).
+
+## 6. ANCHOR_DRIFT INVESTIGATION AND RESOLUTION (dir-2 prior mirror)
+
+Symptom: this run's transient scratch anchor list expected
+`O2-KR5/2/listing/MIRROR_O2KR5.md` sha256
+652c0247e66802a823a71ab372648947162a40931cb6cf98327f071342e0b88c; the observed value
+was 652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261 (first 8 hex
+characters equal).
+
+Forensics (all fresh, this session):
+- (a) Wrong-root path error: the file does NOT exist at repo-root
+  `O2-KR5/2/listing/...`; `git show` at that root path fails "path does not exist"
+  (artifacts 8d539c13fc76b691938f9546dc097992 / fc9d14ca5e591c288af38ba38dbc216f /
+  66a639919a42577ee02a4174b38b0fff). The file lives at the full workspace path
+  `.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/listing/MIRROR_O2KR5.md`.
+- (b) `git ls-tree` @ pre-work tip: blob
+  efb3b886d81a5b7fc21b628a23bcdc3e540d2bd9 at that full path.
+- (c) sha256 @ pre-work tip `0bff7b36…` == sha256 @ COMMIT_A `64464c54…` ==
+  652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261 (identical at both
+  tips; artifact 59dfa836689b9de520009ca9f27cd1cd).
+- (d) History: exactly ONE commit reachable from the pre-work tip ever touched the
+  path — d088536198004f42c7c5d466c9bf9af9a252e234 (2026-10-21T17:49:16+07:00, the
+  O2-KR5 dir-2 attempt-2 commit). No later change exists.
+- (e) Fresh raw fetch-backs of the file at BOTH commits: HTTP 200, 2,635 bytes,
+  sha256 652c024753be… at both; `cmp` of tip-copy vs pre-work-tip-copy: IDENTICAL
+  (artifacts f5c21087bfb20db19d2e309943beac04 / 642bd5621726450e285cc9d188c06c9b).
+- (f) Dir-2's own evidence agrees: `…/O2-KR5/2/evidence/o2kr5_mirrored_listing.log`
+  @ pre-work tip, line 52 `MIRROR_SHA256=652c024753be…` and line 83
+  `FB|file=listing/MIRROR_O2KR5.md|HTTP=200|REMOTE_SHA256=652c024753be…|LOCAL_SHA256=652c024753be…|VERDICT=MATCH`
+  — the observed value equals the file's own recorded construction hash and
+  fetch-back evidence (artifact cfc55a777674012d43185a658b97046c).
+- (g) The "expected" value 652c0247e668… appears NOWHERE: recursive grep across ALL
+  workspace files and `git grep` in the committed trees @ `0bff7b36…` and
+  @ `64464c54…` -> ZERO hits (artifact d2e99461a8f02b44141a0edaca386924). It has no
+  provenance in any persisted artifact.
+
+VERDICT: NO GENUINE DRIFT. The in-repo dir-2 mirror is byte-stable and agrees with
+its own recorded evidence end-to-end. The anomalous "expected" hash was a
+mis-recorded transient expectation in this run's scratch anchor list (8-hex-prefix
+collision with the true hash; consistent with a transcription of the value out of
+context — see (a)). CORRECTED ANCHOR VALUE:
+sha256(.harness/.../O2-KR5/2/listing/MIRROR_O2KR5.md) =
+652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261.
+No repo repair is needed: COMMIT_A did not touch the path, and no dir-2 (or other
+prior-KR) file was edited. No acceptance criterion of this package is impaired, so
+this is documented here instead of being escalated as a blocker.
+
+## 7. HONEST TERMINAL STATE
+
+- No sale exists and none is claimed: ledger total $0.00 USD, entry_count 0, gap
+  $100.00 (section 1). The mirrored listing is a PUBLICATION ATTEMPT with push +
+  fetch-back evidence; the honest expected commercial outcome of this stage remains
+  $0.00. No price, order, buy or checkout URL was created or implied.
+- One-attempt discipline held: no external outreach destination was contacted in this
+  package; the only network actions were raw.githubusercontent.com fetch-backs of
+  files this package itself published.
+- Anti-fabrication: `revenue_ledger.json` remains ABSENT; every numeric claim above
+  cites a receipt (command artifact id or explicit command chain).
+
+## 8. POST-PUSH VERIFICATION OF THIS LOG
+
+PENDING: this log is pushed as the follow-up additions-only commit (LOG_COMMIT) on
+`codex/spoc-harness-v1`; a POST-PUSH section is then appended below and pushed as the
+final stage-1 commit. A git commit cannot contain its own hash, so the final tip is
+corroborated via an anonymous `git ls-remote` receipt recorded in the run close-out
+rather than inside this file.
+
+<!-- APPEND POST-PUSH SECTION BELOW THIS LINE -->
+
+### POST-PUSH RESULTS (appended 2026-10-21T13:20:53Z, after LOG_COMMIT was pushed)
+
+RECEIPT-FLAG DISCLOSURE: every command receipt returned by this run's execution
+environment carries the flag `execution_stopped=true` (with "interrupted receipt"
+recovery guidance) even when `exit_code=0`, stdout is complete and process duration
+is sub-second. No receipt here is trusted in isolation: each effect below is
+corroborated by an independent read-only state inspection (fresh sha256 of the
+files, `git rev-parse`/`git diff` in two independent clones, anonymous
+`git ls-remote`, and raw.githubusercontent.com fetch-backs). No interrupted command
+was replayed; each step was performed exactly once.
+
+#### LOG_COMMIT (first publication commit of this log)
+
+- LOG_COMMIT: `a06fc845d6cd3b99b117d9862daec5a7ad0a1620` (parent
+  `64464c5418e67a527802763a3fdb73dfef14142d` = COMMIT_A; author date
+  2026-10-21T20:19:37+07:00; subject "O2-KR5 stage-1 (WP-O2KR5-1, dir 4):
+  mirrored-listing execution log (sections 1-7 + trigger/push/fetch-back evidence;
+  additions-only)"; numstat 176 added / 0 deleted on the single path = this file).
+  Receipts: staging artifacts bbe72130c3fcac1f52bcfd3cf9066d09 /
+  a48fda660eaf8c635d41423b8b4ac686; commit artifacts 961d17b11af425efae04d78ee76db4c5
+  / fdf4c40d1ddf1f1c569a0fdc1046ce40.
+- Committed blob sha256 (`git show` @ LOG_COMMIT) =
+  101800480dec9a604f121bb7a41b96d871845b87cad93943bd3a64511ea4cd0e == workspace
+  copy sha256 at push time (11,604 bytes).
+- Push: PUSH_EXIT=0; remote range `64464c5..a06fc84` on
+  refs/heads/codex/spoc-harness-v1 (receipt artifacts
+  cadad91d155a24bab58d1651136d6ba8 / d8c3ff43c85de2b944a6bd2a96c9d1d2 /
+  0f36003741679ffbff6d018b5ec97adb). Transport as disclosed in section 3: the
+  staging clone has no push credentials, so LOG_COMMIT was fetched into the main
+  workspace repo as temp ref `refs/tmp-kr5/d4-head`, pushed via that repo's
+  authenticated origin, and the temp ref was deleted (TEMPREFS_REMAINING=0); the
+  main worktree was verified untouched before and after (HEAD `0bff7b36…`,
+  0 porcelain lines).
+- Independent corroboration: anonymous `git ls-remote
+  https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1`
+  -> `a06fc845d6cd3b99b117d9862daec5a7ad0a1620  refs/heads/codex/spoc-harness-v1`
+  (artifact 1d2ffc6065bc9578f18339e48efca936).
+
+#### FRESH FETCH-BACK AT LOG_COMMIT (raw.githubusercontent.com) — 4/4 MATCH
+
+```
+FB|file=evidence/o2kr5_decision_log.md|HTTP=200|BYTES=4988|SHA256=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=evidence/o2kr5_ledger_recheck.log|HTTP=200|BYTES=1910|SHA256=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=listing/MIRROR_O2KR5.md|HTTP=200|BYTES=2851|SHA256=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=evidence/o2kr5_mirrored_listing.log|HTTP=200|BYTES=11604|SHA256=101800480dec9a604f121bb7a41b96d871845b87cad93943bd3a64511ea4cd0e|LOCAL==GIT==REMOTE|VERDICT=MATCH
+```
+
+- Result: MATCH_COUNT=4, MISMATCH_COUNT=0. The three COMMIT_A files are unchanged
+  at the new tip; this log's pushed bytes equal the pre-append workspace copy.
+  Receipt: artifact 1d2ffc6065bc9578f18339e48efca936 (fetch-back base =
+  raw.githubusercontent.com/thanayut1750/spoc-harness/
+  a06fc845d6cd3b99b117d9862daec5a7ad0a1620/.harness/workspaces/
+  b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/).
+
+#### SCOPE SWEEP 0bff7b36..LOG_COMMIT — ADDITIONS-ONLY (receipt artifact 8d62ca3ab7e63ad5fa9b74664433bba8)
+
+- Exactly 4 rows, all `A`, all under `…/O2-KR5/4/`:
+  `evidence/o2kr5_decision_log.md`, `evidence/o2kr5_ledger_recheck.log`,
+  `evidence/o2kr5_mirrored_listing.log`, `listing/MIRROR_O2KR5.md`.
+  NUMSTAT total: 334 added, 0 deleted. NON_ADD_ROWS=0; ROWS_OUTSIDE_DIR4=0.
+  O2-KR5/{0,2,3} and every other path untouched.
+
+#### CLOSING NOTE
+
+- The push of THIS section (the final stage-1 commit) cannot contain its own hash;
+  its commit SHA, PUSH_EXIT and anonymous ls-remote corroboration are recorded in
+  the run close-out, not here. After that push, a fresh raw fetch-back of this file
+  at the final tip is compared byte-exact against the workspace copy as the last
+  close-out check.
+- Stage-1 scope unchanged: mirrored listing is the only fallback channel executed
+  in this package; gig platforms, adjusted offer, chain close-out and the
+  post-fallback ledger rerun remain for the following work packages (this file and
+  `evidence/o2kr5_decision_log.md` stay appendable). Honest commercial state: no
+  sale exists, ledger total $0.00 USD, entry_count 0, gap $100.00; no price, order,
+  buy or checkout URL was created or implied.

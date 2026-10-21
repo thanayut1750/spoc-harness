@@ -1,0 +1,49 @@
+O2-KR5 WP-O2KR5-3 LEDGER RERUN (post adjusted-offer push) — evidence/o2kr5_ledger_rerun.log
+=============================================================================================
+RERUN_UTC        : 2026-10-21T12:30:53Z
+ORDER            : executed AFTER the adjusted-offer push. Push receipt: commit
+                   864ecb768ffbb0173df836763565d05cea3d5ed9 on codex/spoc-harness-v1
+                   (a792259..864ecb7, PUSH_EXIT=0; stderr: "a792259..864ecb7  codex/spoc-harness-v1 -> codex/spoc-harness-v1";
+                   origin tip cross-checked via anonymous `git ls-remote origin refs/heads/codex/spoc-harness-v1`
+                   -> "864ecb768ffbb0173df836763565d05cea3d5ed9  refs/heads/codex/spoc-harness-v1").
+TOOL             : tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger)
+CALLS_THIS_SESSION: exactly 2 read-only `summary` invocations total (1 pre-push for the
+                   DECISION-LOG-O2KR5-1 LEDGER_TOTAL field, 1 post-push rerun below);
+                   ZERO `add` invocations this session — no sale exists and none may be
+                   invented; revenue_ledger.json is never hand-edited.
+
+VERBATIM run_mission_tool OUTPUT (post-push rerun)
+-------------------------------------------------------------------------------------------
+{
+  "tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852",
+  "output": {
+    "status": "ok",
+    "action": "summary",
+    "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json",
+    "currency": "USD",
+    "goal": 100.0,
+    "total_earned": 0,
+    "remaining": 100.0,
+    "progress_percent": 0.0,
+    "goal_reached": false,
+    "entry_count": 0,
+    "average_per_entry": 0.0,
+    "entries_needed_at_average": 0,
+    "last_entry": null,
+    "entries": []
+  }
+}
+-------------------------------------------------------------------------------------------
+
+EXPECTED-CHECK (per assignment)
+  total_earned 0.0 == 0            -> MATCH
+  remaining 100.0                  -> MATCH
+  goal_reached false               -> MATCH
+  entry_count 0, entries []        -> MATCH
+
+READING: cumulative net revenue is $0.00 USD; remaining gap $100.00; goal UNMET. The
+$0.00 is a real zero (no accepted ledger entry has ever existed), not a pending amount.
+Re-run artifact receipts from the tool call: aa75fdfa7bc75009bbfb3663a263d18b,
+0dc67a201dbed862eaf9a2f293a39695, 1f563d5f921fa3c32ea52642da952eb7. Pre-push summary
+receipts (same arguments, for DECISION-LOG-O2KR5-1): 5289956e31c6c8d272a4e174c1fc8975,
+13dd5fff7a6d04abaf298b7dc11896f4, 0303fe55d47c5597ce13cae9a5990f18.

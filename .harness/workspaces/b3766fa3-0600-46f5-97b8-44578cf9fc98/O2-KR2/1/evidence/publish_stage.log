@@ -1,0 +1,292 @@
+# publish_stage.log — WP-O2KR2-1-STAGE fresh verification (all timestamps UTC)
+# Purpose: terminal prepared-asset staging evidence for O2-KR2. Append-only, chronological.
+# Note: run_command receipts in this environment may show a benign execution_stopped flag;
+# every outcome cited here is established or re-established by an independent fresh check
+# (HTTP fetch or hash) before being recorded.
+
+## 2026-10-20T22:42:03Z — FRESH GUMROAD PROBE (real request, no credentials; identical template to artifact 5d807a3b8891908a3e3ccb30e7257804)
+started: 2026-10-20T22:42:03Z
+cmd: curl -sS -m 30 -o /tmp/fresh_gr_body.bin -w '%{http_code}' -X POST 'https://api.gumroad.com/v2/products' -d 'access_token=' --data-urlencode 'name=pydevtoolkit-1.0.0' -d 'price=1500'
+curl_exit=0
+http_status=401
+body_bytes=0
+body_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+body(raw): <empty>
+finished: 2026-10-20T22:42:04Z
+RESULT: reproduces the recorded Gumroad HTTP 401 / 0-byte body (channel BLOCKED).
+
+## 2026-10-20T22:42:03Z — LOCAL PACKAGE INTEGRITY (O2-KR2/0/build — package untouched by publish work)
+stat: 40299 bytes pydevtoolkit-1.0.0.zip
+sha256: f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+$ sha256sum -c CHECKSUMS.txt
+pydevtoolkit-1.0.0.zip: OK
+pydevtoolkit-1.0.0.tar.gz: OK
+SHA256SUM_C_EXIT=0
+$ unzip -t pydevtoolkit-1.0.0.zip (tail)
+No errors detected in compressed data of pydevtoolkit-1.0.0.zip.
+
+## 2026-10-20T22:43:14Z — RECORDED FILES STILL REACHABLE (fresh unauthenticated fetch)
+OFFER_md: 200 text/plain; charset=utf-8 5956
+  url: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/store/OFFER.md
+mission_log: 200 text/plain; charset=utf-8 3993
+  url: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/mission_log.md
+
+## GIT — stage deliverables (commit hash recorded below after push)
+(files: evidence/BLOCKER_EVIDENCE.md, evidence/publish_stage.log, offer/CHECKOUT_INSTRUCTIONS.md, store/CHECKOUT_LINK.txt, mission_log.md; git add -f required because .gitignore excludes .harness/)
+
+## 2026-10-20T22:50:10Z — GIT — DELIVERABLES COMMITTED AND PUSHED (push re-established by fresh fetch after receipt flag)
+deliverables_commit: 532c449a72d0c535b0cdb99cf6cf05be871400b5 (short 532c449)
+parent_commit: a8563e06532ea3fd0af2b51331ba8d3be66eff5b
+branch: codex/spoc-harness-v1
+files_committed (index sha256 == on-disk sha256 verified before commit):
+  evidence/BLOCKER_EVIDENCE.md   532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649
+  evidence/publish_stage.log     084179326ce79aabd76f99a3886df67303f16ccd04d70525ed1cbd5bdad88469  (pre-append state; this file's update is committed immediately after)
+  mission_log.md                 8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94
+  offer/CHECKOUT_INSTRUCTIONS.md 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c
+  store/CHECKOUT_LINK.txt        e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8
+push_output_verbatim: "a8563e0..532c449  codex/spoc-harness-v1 -> codex/spoc-harness-v1"
+receipt_flag: push receipt carried the benign execution_stopped flag -> treated as unproven and re-established:
+fresh_fetch_check: git fetch origin codex/spoc-harness-v1 -> origin/codex/spoc-harness-v1 = 532c449a72d0c535b0cdb99cf6cf05be871400b5 -> REMOTE_AT_EXPECTED_COMMIT=YES
+independent_http_confirmation: the commit-pinned raw fetch-backs below (all HTTP 200 at commit 532c449a72d0c535b0cdb99cf6cf05be871400b5) prove the commit is reachable on GitHub.
+
+## 2026-10-20T22:51:15Z — POST-PUSH FETCH-BACKS (raw.githubusercontent.com, unauthenticated, commit-pinned 532c449a72d0c535b0cdb99cf6cf05be871400b5; sha256 must equal on-disk bytes)
+url_base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/532c449a72d0c535b0cdb99cf6cf05be871400b5/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1
+started_utc=2026-10-20T22:51:15Z
+FETCH_BACK evidence/BLOCKER_EVIDENCE.md -> 200 7644 sha256=532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649 SHA_MATCH_LOCAL
+FETCH_BACK evidence/publish_stage.log -> 200 2238 sha256=084179326ce79aabd76f99a3886df67303f16ccd04d70525ed1cbd5bdad88469 SHA_MATCH_LOCAL (state at commit 532c449, before this post-push append)
+FETCH_BACK offer/CHECKOUT_INSTRUCTIONS.md -> 200 2713 sha256=6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c SHA_MATCH_LOCAL
+FETCH_BACK store/CHECKOUT_LINK.txt -> 200 326 sha256=e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8 SHA_MATCH_LOCAL
+FETCH_BACK mission_log.md -> 200 5718 sha256=8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94 SHA_MATCH_LOCAL
+finished_utc=2026-10-20T22:51:18Z
+RESULT: all five staged deliverables fetch HTTP 200 from the pushed commit and match local bytes exactly.
+
+## 2026-10-20T22:51:28Z — HOSTED ZIP RE-VERIFICATION (unauthenticated; $15 package must be untouched and reachable)
+branch-pinned URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+started_utc=2026-10-20T22:51:28Z
+HEAD: HTTP/2 200 | content-type: application/zip | content-length: 40299
+GET: 200 40299 application/zip
+sha256: f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (EXACT match)
+unzip -t: "No errors detected in compressed data of /tmp/hosted.zip." UNZIP_T_EXIT=0
+commit-pinned URL (branch name replaced by a8563e06532ea3fd0af2b51331ba8d3be66eff5b):
+GET: 200 40299 application/zip
+sha256: f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (EXACT match)
+
+## 2026-10-20T22:51:39Z — LOCAL PACKAGE INTEGRITY re-check (O2-KR2/0/build)
+$ sha256sum -c CHECKSUMS.txt
+pydevtoolkit-1.0.0.zip: OK
+pydevtoolkit-1.0.0.tar.gz: OK
+SHA256SUM_C_EXIT=0
+checked_at_utc: 2026-10-20T22:51:39Z
+
+## TERMINAL STATE NOTE
+Prepared-asset mode STAGED at deliverables commit 532c449a72d0c535b0cdb99cf6cf05be871400b5 on codex/spoc-harness-v1.
+Single instruction document: offer/CHECKOUT_INSTRUCTIONS.md — exactly one action: a human creates the Gumroad
+or Lemon Squeezy product at $15.00 USD, attaches the hosted zip URL, publishes, and pastes the minted checkout
+link into store/CHECKOUT_LINK.txt. Hosted zip (branch-pinned):
+https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+No checkout link exists; no live offer exists. No PASS verdict is issued in this log (certification is WP2's
+separate audit). This post-push section is committed and pushed immediately after 532c449; the resulting
+log-update commit hash is re-established by fresh fetch and fetch-back and reported with the WP report
+(it cannot be embedded in this file without self-reference).
+
+## 2026-10-20T23:11:34Z — RETRY PASS (evidentiary re-verification, append-only) — PHASE 1: TIP STATE
+Nothing in this session may rest on a run_command receipt alone (benign execution_stopped flags observed), so
+this retry pass re-establishes every criterion with fresh, timestamped, tee'd command output.
+tip_at_phase1: 90585ffb68d9c29fbdfdbbdec77c02d4cb7d5eaf (local HEAD == origin/codex/spoc-harness-v1 via git fetch + ls-remote)
+tree_clean: yes
+five fetch-backs at tip 90585ff (raw.githubusercontent.com, unauthenticated): all HTTP 200 with sha256 == local:
+  evidence/BLOCKER_EVIDENCE.md   532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649
+  evidence/publish_stage.log     a5592b02125682041e926350f82306e2961c7c7bdce20b5326c040810ee912ed  (pre-this-append state)
+  mission_log.md                 8468abe7540a4e60e6539aedee9ff0f101d09ea752e32536e8865951061fba94
+  offer/CHECKOUT_INSTRUCTIONS.md 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c
+  store/CHECKOUT_LINK.txt        e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8
+full log: /tmp/o2kr2_retry/phase1_tip_state.log (sha256 1e4e7c5ae267233d1c135bd2618d74c5d9518f3630d74908774850171bb2ecda)
+
+## 2026-10-20T23:09:33Z — RETRY PHASE 2 — GREP PROOF: every required string shown INSIDE the tip blobs (not excerpted)
+Method: re-fetched evidence/BLOCKER_EVIDENCE.md and mission_log.md from raw.githubusercontent.com at commit
+90585ffb68d9c29fbdfdbbdec77c02d4cb7d5eaf (branch tip), sha256-verified identical to local bytes, then ran
+grep -c / grep -n -F for each acceptance-required string. RESULT: 33/33 patterns matched, MISSING_count=0;
+log end marker verified at 2026-10-20T23:10:47Z. Full output: /tmp/o2kr2_retry/phase2_grep_proof.log
+(sha256 c7cffca5c06ae42537de367a8ff529bba4b67ebf3c8704bdd6ba4d7c73a8cf2f).
+evidence/BLOCKER_EVIDENCE.md (fetched from tip) verbatim-line matches (line numbers from grep -n):
+  L13/17/31/38 'https://api.gumroad.com/v2/products' + POST; L19/20 '2026-10-20T22:28:39Z' (4 total);
+  L21 '| HTTP status | **401** |'; L26/34 source artifact '5d807a3b8891908a3e3ccb30e7257804';
+  L50/54 'https://api.lemonsqueezy.com/v1/products'; L56 '2026-10-20T22:28:52Z';
+  L58 '| HTTP status | **405** (Method Not Allowed) |'; L67 verbatim body '"The POST method is not supported
+  for route v1\/products. Supported methods: GET, HEAD."'; L59/64 '184 bytes';
+  L62/64/70 artifacts 'aed37d178ea4621f07f202b772abb0a2' and '62e2d9c1bd870a81cc0e1d6ccb7060b4';
+  L8/82 'dashboard-listing human step' + 'BLOCKED (no credentials)'; L86 'no Gumroad or Lemon Squeezy';
+  L100-103 'https://0x0.st -> 200', 'https://litterbox.catbox.moe -> 200', 'https://tmpfiles.org -> 000',
+  'https://catbox.moe -> 000'; L108 'Zero uploads were made to any third-party host'.
+mission_log.md (fetched from tip) verbatim-line matches:
+  L28/33 'offer/CHECKOUT_INSTRUCTIONS.md' (staged instruction document path); L36 hosted zip URL
+  'https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip';
+  L38 package sha256 'f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99';
+  L20 'BLOCKED — HTTP 401' at '2026-10-20T22:28:39Z' + artifact '5d807a3b8891908a3e3ccb30e7257804';
+  L21 'BLOCKED — HTTP 405' + verbatim 'The POST method is not supported for route v1/products. Supported
+  methods: GET, HEAD.' + artifacts 'aed37d178ea4621f07f202b772abb0a2', '62e2d9c1bd870a81cc0e1d6ccb7060b4';
+  L11 'terminal prepared-asset state STAGED (no live offer)'; L31/50 'store/CHECKOUT_LINK.txt';
+  L72 'No live offer URL exists.'; L14/74 'No PASS verdict'.
+git ls-tree HEAD blob hashes at 90585ff (paths prefixed .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/):
+  evidence/BLOCKER_EVIDENCE.md 573ce22dc0949649c95ef82f7d75fa936b06f248
+  evidence/publish_stage.log 451996b3db9ca78212b4c4e9f969250dc16ea325
+  mission_log.md 902615a9560d1a8fa0c8476a79dbefb640c1214a
+  offer/CHECKOUT_INSTRUCTIONS.md ef2d6487b31d5257792bdfb1dde92f49dd02dd7e
+  store/CHECKOUT_LINK.txt 96e30078f6e84dc7bc04fa88ec25cd4b6b3212f7
+
+## 2026-10-20T23:10:47Z — RETRY PHASE 3 — HOSTED ZIP FRESH VERIFICATION + BUILD INTEGRITY (both pinned URLs)
+-- [branch-pinned codex/spoc-harness-v1] HEAD --
+HTTP/2 200 | content-type: application/zip | content-length: 40299
+-- [branch-pinned] GET -- GET_RESULT: 200 application/zip 40299
+sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 SHA_MATCH: YES
+unzip -t: No errors detected in compressed data of /tmp/o2kr2_retry/zip_br.bin.
+-- [commit-pinned a8563e06532ea3fd0af2b51331ba8d3be66eff5b] HEAD --
+HTTP/2 200 | content-type: application/zip | content-length: 40299
+-- [commit-pinned] GET -- GET_RESULT: 200 application/zip 40299
+sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 SHA_MATCH: YES
+unzip -t: No errors detected in compressed data of /tmp/o2kr2_retry/zip_ct.bin.
+-- local build/ integrity (O2-KR2/0/build) --
+-rw-rw-r-- 40299 pydevtoolkit-1.0.0.zip
+pydevtoolkit-1.0.0.zip: OK / pydevtoolkit-1.0.0.tar.gz: OK / SHA256SUM_C_EXIT=0
+full log: /tmp/o2kr2_retry/phase3_zip_verify.log (sha256 6be6ffc0f953574c21247101618a5c96a87d9a23a695a2241294c171db28945b)
+
+## APPEND NOTE (this file)
+This retry section is a pure append: sha256 of this file's first 7010 bytes equals the pre-append hash
+a5592b02125682041e926350f82306e2961c7c7bdce20b5326c040810ee912ed recorded above. The commit containing this
+append cannot embed its own hash; it is re-established post-push by fresh git fetch/ls-remote and
+commit-pinned raw fetch-backs and reported with the WP report. No PASS verdict is issued here; no live offer
+is claimed (certification is WP2's separate audit).
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R1 — TIP STATE + PRE-APPEND BASELINES (fresh, tee'd; fixes the FIRST-RETRY gap: no content proof existed for offer/CHECKOUT_INSTRUCTIONS.md)
+git fetch origin codex/spoc-harness-v1 -> exit 0
+HEAD=86e769d74405646785d814ffc58795a166641342
+origin_tip=86e769d74405646785d814ffc58795a166641342
+ls_remote=86e769d74405646785d814ffc58795a166641342
+tree_dirty_lines=0
+pre-append sha256 baselines (pure-append proof anchors):
+  ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40  evidence/publish_stage.log
+  bbc65d4fc93a280c0709a3c5c5ef0ce2ecd8552f1c60ec7ed4966ae4c048bea6  mission_log.md
+  6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  offer/CHECKOUT_INSTRUCTIONS.md
+  e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  store/CHECKOUT_LINK.txt
+  532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  evidence/BLOCKER_EVIDENCE.md
+receipt_flag: run_command receipts again carried the benign execution_stopped flag; all outputs below are the
+tee'd stdout captured in /tmp/o2kr2_r2/raw_content_proof.log (sha256 9b477bd123908204bb4fb0987e688db25b8e4fcdffcc41a47cacd926d0cd2047, 80 lines).
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R2 — TIP FETCH of offer/CHECKOUT_INSTRUCTIONS.md (commit-pinned 86e769d74405646785d814ffc58795a166641342)
+url_base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/86e769d74405646785d814ffc58795a166641342/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1
+HTTP=200 bytes=2713 type=text/plain; charset=utf-8
+sha256 fetched == local == 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c (SHA_MATCH_LOCAL)
+
+## 2026-10-20T23:29:03Z — RETRY-2 PHASE R2b — REQUIRED-ELEMENT GREP PROOF on the fetched tip blob (verbatim grep output)
+-- [1] single action --
+7:## The one action (must be performed by a human)
+15:That is the only action this document requests. Nothing else needs to change.
+-- [2] human creates Gumroad or Lemon Squeezy at $15.00 --
+9:1. Create the product on **Gumroad or Lemon Squeezy** at **$15.00 USD** (price
+1:# CHECKOUT INSTRUCTIONS — pydevtoolkit 1.0.0 ($15.00 USD)
+9:1. Create the product on **Gumroad or Lemon Squeezy** at **$15.00 USD** (price
+22:| Price | **$15.00 USD** (1500 cents) |
+-- [3] attach hosted zip URL --
+10:   `1500` cents), attach the hosted zip URL below as the product file, **publish** the
+-- [4] publish (lines containing) --
+1
+-- [5] paste minted link into store/CHECKOUT_LINK.txt --
+11:   product, then **paste the minted checkout link into `store/CHECKOUT_LINK.txt`**
+-- [6] hosted zip sha256 --
+25:| Hosted zip **sha256** | `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99` |
+-- [7] branch-pinned hosted zip URL --
+23:| Hosted zip (branch-pinned) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip` |
+-- [8] commit-pinned hosted zip URL --
+24:| Hosted zip (commit-pinned, immutable) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip` |
+-- [9] OFFER.md URL --
+27:| Offer copy (OFFER.md) | `https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/store/OFFER.md` |
+-- [10] no-minted-link check: census of ALL https URLs in the document --
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+      1 https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/store/OFFER.md
+non_github_url_count=0
+vendor_checkout_pattern_count=0
+R2b RESULT: the instruction document contains exactly one action ([1]-[5] verbatim lines 7-11, closed by line 15
+"That is the only action this document requests"), the hosted zip URL with its sha256 [6][7][8], the OFFER.md URL
+[9], and NO minted/example/vendor checkout link (only 3 raw.githubusercontent URLs exist in the file; 0
+non-github URLs; 0 vendor/checkout patterns).
+
+## 2026-10-20T23:29:27Z — RETRY-2 PHASE R3 — TIP FETCH of store/CHECKOUT_LINK.txt (must contain NO link)
+HTTP=200 bytes=326 type=text/plain; charset=utf-8
+sha256 fetched == local == e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8 (SHA_MATCH_LOCAL)
+http_or_url_occurrences=0
+url_scheme_count=0
+R3 RESULT: the checkout placeholder holds no link of any kind (by design, pending the human action).
+
+## 2026-10-20T23:29:27Z — RETRY-2 PHASE R4 — TIP FETCH of evidence/BLOCKER_EVIDENCE.md (incl. the Lemon Squeezy timestamp line, closing the first-retry residual)
+HTTP=200 bytes=7644 type=text/plain; charset=utf-8
+sha256 fetched == local == 532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649 (SHA_MATCH_LOCAL)
+-- Lemon Squeezy started timestamp (verbatim line) --
+56:| Started (UTC) | `2026-10-20T22:28:52Z` |
+-- LS 405 + verbatim body line --
+58:| HTTP status | **405** (Method Not Allowed) |
+67:{"jsonapi":{"version":"1.0"},"errors":[{"detail":"The POST method is not supported for route v1\/products. Supported methods: GET, HEAD.","status":"405","title":"Method Not Allowed"}]}
+59:| Response body | **184 bytes**, sha256 `6b0f03ad5804d8ec500b1345f34e2029710c0daeb21a5e219ced58a581a0ed78` |
+64:Verbatim response body (184 bytes, from artifact `aed37d178ea4621f07f202b772abb0a2`):
+-- Gumroad 401 + artifact ID occurrence counts --
+grep -c '2026-10-20T22:28:39Z' -> 4
+grep -c '5d807a3b8891908a3e3ccb30e7257804' -> 2
+grep -c 'aed37d178ea4621f07f202b772abb0a2' -> 2
+grep -c '62e2d9c1bd870a81cc0e1d6ccb7060b4' -> 2
+-- dashboard human step BLOCKED + fallback probes (verbatim lines) --
+8:dashboard-listing human step is BLOCKED (no credentials). Terminal state: prepared-asset
+82:## 3. Gumroad dashboard-listing human step — BLOCKED (no credentials)
+103:https://0x0.st -> 200
+102:https://litterbox.catbox.moe -> 200
+100:https://tmpfiles.org -> 000
+101:https://catbox.moe -> 000
+grep -c 'Zero uploads were made to any third-party host' -> 1
+R4 RESULT: blocker archive re-proven at the tip, now with the Lemon Squeezy ISO-8601 timestamp
+2026-10-20T22:28:52Z shown verbatim (line 56) alongside the Gumroad 2026-10-20T22:28:39Z entries.
+
+## RETRY-2 APPEND NOTE
+This section is a pure append: sha256 of this file's first 12769 bytes equals the pre-append baseline
+ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 (verified immediately after this append).
+The commit carrying this append cannot embed its own hash; the post-push verification section (appended next)
+records that commit hash plus fresh fetch-backs, hosted-zip and CHECKSUMS re-verification. No PASS verdict is
+issued in this log and no live offer is claimed (certification is WP2's separate audit).
+
+## 2026-10-20T23:35:02Z — RETRY-2 POST-PUSH VERIFICATION (tee'd to /tmp/o2kr2_r2/raw_postpush.log)
+CONTENT-PROOF COMMIT (the append above): d0241c8215ea31b69010398452b67524edecc318
+push output verbatim: "86e769d..d0241c8  codex/spoc-harness-v1 -> codex/spoc-harness-v1" (PUSH_EXIT=0);
+parents: d0241c8 parent 86e769d; diff-tree shows exactly two files, both M:
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/publish_stage.log
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+fresh ls-remote after push: d0241c8215ea31b69010398452b67524edecc318 (tip == HEAD == remote).
+V1 tip state: git fetch exit 0; ls_remote=d0241c8215ea31b69010398452b67524edecc318.
+V2 commit-pinned fetch-backs (base .../spoc-harness/d0241c8215ea31b69010398452b67524edecc318/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2):
+  1/offer/CHECKOUT_INSTRUCTIONS.md -> HTTP=200 bytes=2713 type=text/plain; charset=utf-8
+  1/store/CHECKOUT_LINK.txt        -> HTTP=200 bytes=326  type=text/plain; charset=utf-8
+  1/evidence/BLOCKER_EVIDENCE.md   -> HTTP=200 bytes=7644 type=text/plain; charset=utf-8
+  1/evidence/publish_stage.log     -> HTTP=200 bytes=20009 type=text/plain; charset=utf-8
+  1/mission_log.md                 -> HTTP=200 bytes=11628 type=text/plain; charset=utf-8
+  0/store/OFFER.md                 -> HTTP=200 bytes=5956 type=text/plain; charset=utf-8
+V3 fetched sha256 == pinned local, all six:
+  6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  CHECKOUT_INSTRUCTIONS.md
+  e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  CHECKOUT_LINK.txt
+  532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  BLOCKER_EVIDENCE.md
+  6f1f99001935c9861c48a86d4eca1d7682838fb39f241c36391a3571385014f1  publish_stage.log (pre-V-section state)
+  b818c1ffc345e9522e60b482be1efa6ddf9a5ea826a84101cbc23f816d3b9f0a  mission_log.md
+  1bd65f0d40d58a3243e838a6926f0093d33c1f8c97b1b028b591b6d9d2112cd5  OFFER.md (O2-KR2/0 copy)
+V4 pure-append proof on the FETCHED bytes at d0241c8 (append-only integrity across the wire):
+  head -c 12769 publish_stage.log -> ee14fa5bf509bc0369fd7bcbe26be4221b17fd9f180cd8328ee4dfcc7429eb40 EXACT
+  head -c  8083 mission_log.md    -> bbc65d4fc93a280c0709a3c5c5ef0ce2ecd8552f1c60ec7ed4966ae4c048bea6 EXACT
+V5 hosted zip branch-pinned header: HTTP/2 200, content-type application/zip, content-length 40299.
+V6 hosted zip commit-pinned (a8563e06532ea3fd0af2b51331ba8d3be66eff5b) full GET: HTTP=200 bytes=40299
+   type=application/zip; sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 EXACT;
+   unzip -t: "No errors detected in compressed data".
+V7 sha256sum -c CHECKSUMS.txt in O2-KR2/0/build: "pydevtoolkit-1.0.0.zip: OK" / "pydevtoolkit-1.0.0.tar.gz:
+   OK", SHA256SUM_C_EXIT=0 — the package is byte-identical to the O2-KR1 build (untouched).
+
+## RETRY-2 FINAL NOTE (2026-10-20T23:35:07Z)
+Second append in this file: pure append again — sha256 of the first 20009 bytes equals
+6f1f99001935c9861c48a86d4eca1d7682838fb39f241c36391a3571385014f1 (verified immediately after this append).
+This verification commit also cannot embed its own hash; the tip hash it creates is re-established post-push by
+fresh git ls-remote/fetch and a commit-pinned fetch-back of this log reported with the WP report. Every outcome
+above comes from the tee'd command output — no invented responses. Still no live offer and no PASS verdict
+(certification is WP2's separate audit).

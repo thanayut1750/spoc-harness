@@ -1,0 +1,105 @@
+# O2-KR5 Mirrored-Listing Receipt Log (WP-O2KR5-1-TRIGGER-MIRROR, directory 5)
+
+Evidence for: mirrored listing pushed additions-only to codex/spoc-harness-v1 with
+push receipt, raw.githubusercontent.com fetch-back at the pushed commit (HTTP 200 +
+sha256 byte-exact), scope safety, and final tip / clean tree.
+Decision context: evidence/o2kr5_decision_log.md ENTRY 1 (TRIGGER FIRED;
+CHOSEN_CHANNEL mirrored listing).
+
+## SECTION 0 — CONTEXT (pre-work state)
+
+- PRE_WORK_TIP (ls-remote, 2026-10-21T15:39:14Z): 9b4a8020c3a93bd06de3ada3e278e079d632843f
+  (assignment's 780d7fd was stale; fresh clone at that tip, clean tree).
+- Repo: https://github.com/thanayut1750/spoc-harness branch codex/spoc-harness-v1
+  (the only machine channel that verifiably works).
+- Primary evidence re-read at this tip (fresh raw.githubusercontent.com GETs, this session):
+  - O2-KR3/0/offer/ANNOUNCEMENT.md: HTTP 200, 1,594 bytes,
+    sha256 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91
+    (== pinned copy at commit 6bb5530, HTTP 200, same sha256).
+  - O2-KR2/2/mission_log.md: HTTP 200, 30,968 bytes,
+    sha256 2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4.
+  - Fresh read-only ledger summary (tool:7bdf3aa0d66a5279c833dabe2820f852, action=summary,
+    no 'add'): total_earned 0, entry_count 0, remaining 100.0, goal_reached false —
+    evidence/o2kr5_ledger_snapshot.log.
+
+## SECTION 1 — MIRROR BUILD (local, before push)
+
+- File: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/listing/MIRROR_O2KR5.md
+- Structure: provenance header (cites ANNOUNCEMENT.md commit 6bb5530,
+  committer date 2026-10-21T04:13:06Z, sha256 430fce45…, 1,594 B) + BEGIN marker +
+  byte-exact body of ANNOUNCEMENT.md @ 6bb5530 to EOF.
+- BODY EXTRACTION CHECK: awk post-marker body == ANNOUNCEMENT.md — cmp BYTE-EXACT
+  (1594 bytes == 1594 bytes; body sha256 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91).
+- MIRROR_LOCAL_SHA256: 03152eed808a13f059a8fab437cd0139027a77c4d12d58553dc71a8231c6cf02
+- MIRROR_SIZE: 2,784 bytes. Offer facts, prices, and the single permitted product URL
+  (recorded free-zip link) unchanged; NO buy/order/checkout URL added.
+
+## SECTION 2 — PRE-PUSH SCOPE CHECK
+
+- git add -f limited to the 3 new O2-KR5/5 files (.harness/ is gitignored; -f matches
+  the recorded practice for committed workspace evidence).
+- PRE_PUSH git diff --name-only HEAD (staged):
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/evidence/o2kr5_decision_log.md
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/evidence/o2kr5_ledger_snapshot.log
+  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/listing/MIRROR_O2KR5.md
+- SCOPE_OK: only new O2-KR5/5 files; no prior-KR path staged.
+- Staged numstat: 66+0 / 16+0 / 51+0 = 133 insertions, 0 deletions (additions-only).
+
+## SECTION 3 — PUSH RECEIPT
+
+- COMMIT_SHA: 1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7
+  (parent 9b4a8020c3a93bd06de3ada3e278e079d632843f; 3 files changed, 133 insertions(+)).
+- PUSH_EXIT=0 (push via the recorded proven remote configuration of
+  github.com/thanayut1750/spoc-harness; push output: "9b4a802..1dac17e
+  codex/spoc-harness-v1 -> codex/spoc-harness-v1").
+- Note: first push attempt with the credential-less clone URL failed
+  ("could not read Username"); resolved by pushing through the harness repo's recorded
+  remote URL — no credentials were created, fabricated, or changed; no third-party
+  destination contacted.
+- ls-remote cross-check: refs/heads/codex/spoc-harness-v1 =
+  1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7.
+
+## SECTION 4 — FETCH-BACKS AT THE PUSHED COMMIT (raw.githubusercontent.com)
+
+- FB-1 MIRRORED LISTING (the AC receipt):
+  URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/listing/MIRROR_O2KR5.md
+  HTTP_STATUS: 200
+  FETCHED_SHA256: 03152eed808a13f059a8fab437cd0139027a77c4d12d58553dc71a8231c6cf02
+  LOCAL_SHA256:   03152eed808a13f059a8fab437cd0139027a77c4d12d58553dc71a8231c6cf02
+  VERDICT: MATCH — byte-exact (cmp exit 0). REQUIRED AC SATISFIED.
+- FB-2 DECISION LOG (supplementary):
+  URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/evidence/o2kr5_decision_log.md
+  HTTP_STATUS: 200
+  FETCHED_SHA256: b8abdfeafbc503db6c4c9b5ff969e1747c7e52adc685e868d0400d4b1e5e1ee6
+  LOCAL_SHA256:   b8abdfeafbc503db6c4c9b5ff969e1747c7e52adc685e868d0400d4b1e5e1ee6
+  VERDICT: MATCH — byte-exact (cmp exit 0).
+
+## SECTION 5 — POST-PUSH ADDENDUM (this log's own publication)
+
+This log file itself is committed additions-only (single new file) after Section 4 and
+pushed; its commit SHA is recorded in the POST-PUSH-1 receipt appended below. The final
+tip of this work package equals the SHA of the commit containing this file's final
+version; per Git construction a commit cannot contain its own SHA, so the final tip is
+recorded in (a) the POST-PUSH-1 receipt below for this log's first commit and (b) the
+assignment close-out summary, which also carries the final-tip fetch-back of this file
+(HTTP 200 + sha256 byte-exact) and the clean-tree receipt. No further O2-KR5 commits
+follow the log's final commit.
+
+## SECTION 6 — POST-PUSH-1 RECEIPT (appended after the log's first push)
+
+- LOG_COMMIT_L1: a97e93ca0a4ae0e4e8b0609e0301e4bd2834a094 (parent
+  1dac17e48ccff4ebd059b1c08b2dc5eb1f1e47b7; single new file, 86 insertions(+),
+  additions-only; pre-commit scope check passed: only this log file staged).
+- PUSH_L1_EXIT=0 (push output: "1dac17e..a97e93c  codex/spoc-harness-v1 ->
+  codex/spoc-harness-v1").
+- LOG v1 FETCH-BACK at L1 (raw.githubusercontent.com):
+  URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/a97e93ca0a4ae0e4e8b0609e0301e4bd2834a094/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/5/evidence/o2kr5_mirrored_listing.log
+  HTTP_STATUS: 200
+  FETCHED_SHA256: f4dd59c901be22496d36fd476640d554e6741712695ddcb5311a19167da28a05
+  LOCAL_SHA256:   f4dd59c901be22496d36fd476640d554e6741712695ddcb5311a19167da28a05
+  VERDICT: MATCH — byte-exact (cmp exit 0).
+- This addendum is committed as the final O2-KR5 commit of this work package (L2; the
+  only staged change is this file's append). The L2 SHA, the clean-tree receipt, the
+  full-range scope check (9b4a802..L2 = exactly the 4 new O2-KR5/5 files), and the
+  byte-exact fetch-back of this final version at L2 are recorded in the assignment
+  close-out summary (a commit cannot embed its own SHA).

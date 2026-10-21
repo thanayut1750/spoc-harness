@@ -1,0 +1,33 @@
+O2-KR5 STEP 2 — baseline ledger invocation for the trigger evaluation (attempt 1)
+=====================================================================================
+Policy: exactly ONE sanctioned read-only invocation this attempt; action "add" is
+FORBIDDEN — no confirmed sale exists, the tool rejects amount<=0, and any nonzero add
+without payment-processor proof would be fabrication. Recorded zero-state expectation
+(total_earned 0.0 / entry_count 0, per O2-KR4 ledger records) holds.
+
+INVOCATION (verbatim)
+-------------------------------------------------------------------------------------
+run_mission_tool
+  tool_id:   tool:7bdf3aa0d66a5279c833dabe2820f852
+  arguments: {"action": "summary", "include_entries": true}
+
+STDOUT (verbatim, unedited)
+-------------------------------------------------------------------------------------
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/1/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+
+RECEIPT IDS (verbatim from invocation result)
+-------------------------------------------------------------------------------------
+artifact_ids: ["816eb56c9b24522c67fa8fd7b8db15bc", "fb520194b7d6cf3faae3a1eb97df4859", "7b2efe399b623c74446bf77c4636895e"]
+
+TRIGGER-RELEVANT FACTS DERIVED (verbatim fields)
+-------------------------------------------------------------------------------------
+total_earned: 0            (= $0.00 ledger total)
+entry_count:  0            (= 0 sales)
+remaining:    100.0        (gap to goal unchanged)
+goal_reached: false
+currency:     USD          goal: 100.0
+
+FRESH class per evidence/O2-KR5/0/evidence/citations.md §C4 (invocation receipt cited).
+No 'add' attempted. No sale fabricated. Ledger file remains unwritten by this run
+(no accepted add anywhere in the mission), consistent with O2-KR4 recorded state.
+=====================================================================================

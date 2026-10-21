@@ -1,0 +1,222 @@
+# evidence/o2kr3_fetchback.log — O2-KR3 run 0 post-push raw fetch-back
+# Addendum 9 promised: post-push raw fetch-back of every committed file in this follow-up commit.
+BRANCH: codex/spoc-harness-v1
+COMMIT_UNDER_TEST: 6bb55308e7dd8e2436e182a32814e7a64cea5444
+COMMIT_SUBJECT: O2-KR3 run 0: rules-first outreach log (8 single attempts, 6 channel classes, honest free-download copy) + ANNOUNCEMENT.md fallback + ADDENDUM 9
+FILE_COUNT_EXPECTED: 38
+FETCH_STARTED_UTC: 2026-10-21T04:19:55Z
+METHOD: curl -sS -o <tmpbody> -w '%{http_code}' <commit-pinned raw URL>; sha256(fetched) vs sha256(git show COMMIT:<path>)
+URL_BASE: https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/
+
+FB01 | UTC=2026-10-21T04:19:55Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+FB01 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+FB01 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=553e5f2396c86822974d674c0804512e4396fb93be2ce82a16bd3ad529f595b5 FETCHED_BYTES=26211
+FB01 | LOCAL_SHA256=553e5f2396c86822974d674c0804512e4396fb93be2ce82a16bd3ad529f595b5 LOCAL_BYTES=26211
+FB01 | VERDICT=MATCH
+FB02 | UTC=2026-10-21T04:19:55Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-apidoc.html
+FB02 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-apidoc.html
+FB02 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=48057ec8f9f0234f8fa38966c91bfcc007d9c7d8a2b6a4ee0e30b3b80b702597 FETCHED_BYTES=703999
+FB02 | LOCAL_SHA256=48057ec8f9f0234f8fa38966c91bfcc007d9c7d8a2b6a4ee0e30b3b80b702597 LOCAL_BYTES=703999
+FB02 | VERDICT=MATCH
+FB03 | UTC=2026-10-21T04:19:56Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-post-body.json
+FB03 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-post-body.json
+FB03 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=ff8e893bf7a7cd8d84cc6176e41f963d4d825e867cbb61cb6e15decf530588bc FETCHED_BYTES=37
+FB03 | LOCAL_SHA256=ff8e893bf7a7cd8d84cc6176e41f963d4d825e867cbb61cb6e15decf530588bc LOCAL_BYTES=37
+FB03 | VERDICT=MATCH
+FB04 | UTC=2026-10-21T04:19:56Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-post-request.json
+FB04 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-post-request.json
+FB04 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=b7161bd82a857ab9d8bb2c7ca52bfb3156676c68f3a2143a482cc0a32da67f41 FETCHED_BYTES=468
+FB04 | LOCAL_SHA256=b7161bd82a857ab9d8bb2c7ca52bfb3156676c68f3a2143a482cc0a32da67f41 LOCAL_BYTES=468
+FB04 | VERDICT=MATCH
+FB05 | UTC=2026-10-21T04:19:57Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-terms.html
+FB05 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto-terms.html
+FB05 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=3cf6465c919e56a52c0fad2c1479070236d07acca7f1355db54f6e81ade6600b FETCHED_BYTES=5077
+FB05 | LOCAL_SHA256=3cf6465c919e56a52c0fad2c1479070236d07acca7f1355db54f6e81ade6600b LOCAL_BYTES=5077
+FB05 | VERDICT=MATCH
+FB06 | UTC=2026-10-21T04:19:57Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto.log
+FB06 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/devto.log
+FB06 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=5090b4a9bf73095b60b0dd962d7eddc05cda46e7df05ae510fbed98f79121079 FETCHED_BYTES=1391
+FB06 | LOCAL_SHA256=5090b4a9bf73095b60b0dd962d7eddc05cda46e7df05ae510fbed98f79121079 LOCAL_BYTES=1391
+FB06 | VERDICT=MATCH
+FB07 | UTC=2026-10-21T04:19:57Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-post-body.json
+FB07 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-post-body.json
+FB07 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=b7dbd173f33b19650f61b1c528737e2037cf768d90076fdfce5d32541765e29e FETCHED_BYTES=120
+FB07 | LOCAL_SHA256=b7dbd173f33b19650f61b1c528737e2037cf768d90076fdfce5d32541765e29e LOCAL_BYTES=120
+FB07 | VERDICT=MATCH
+FB08 | UTC=2026-10-21T04:19:58Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-post-request.json
+FB08 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-post-request.json
+FB08 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=730516fab7eac2e2ac8ae851fac2d66ae5afbbf3a8fb087b9756c72b14906d19 FETCHED_BYTES=287
+FB08 | LOCAL_SHA256=730516fab7eac2e2ac8ae851fac2d66ae5afbbf3a8fb087b9756c72b14906d19 LOCAL_BYTES=287
+FB08 | VERDICT=MATCH
+FB09 | UTC=2026-10-21T04:19:58Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-terms.html
+FB09 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github-terms.html
+FB09 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=b6812b712397d759ac755f234401b3476bc5013591ba1900d195fc189752cdae FETCHED_BYTES=366804
+FB09 | LOCAL_SHA256=b6812b712397d759ac755f234401b3476bc5013591ba1900d195fc189752cdae LOCAL_BYTES=366804
+FB09 | VERDICT=MATCH
+FB10 | UTC=2026-10-21T04:19:59Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github.log
+FB10 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/github.log
+FB10 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=16c3b2be2433ed90d419327fa02f62c22247e2a3c6e6f96b361b199a81a9419d FETCHED_BYTES=2253
+FB10 | LOCAL_SHA256=16c3b2be2433ed90d419327fa02f62c22247e2a3c6e6f96b361b199a81a9419d LOCAL_BYTES=2253
+FB10 | VERDICT=MATCH
+FB11 | UTC=2026-10-21T04:20:00Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn-guidelines.html
+FB11 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn-guidelines.html
+FB11 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=47dbe61e3db0e10ba11597196caf714a4e0172fc9f46e245a3181a3d9871a7fa FETCHED_BYTES=5864
+FB11 | LOCAL_SHA256=47dbe61e3db0e10ba11597196caf714a4e0172fc9f46e245a3181a3d9871a7fa LOCAL_BYTES=5864
+FB11 | VERDICT=MATCH
+FB12 | UTC=2026-10-21T04:20:00Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn-submit-response.html
+FB12 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn-submit-response.html
+FB12 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=552e394d8d9ace3fdbbdc283f740a957c5823e76ded0ee804bbbf95800cf3d37 FETCHED_BYTES=1169
+FB12 | LOCAL_SHA256=552e394d8d9ace3fdbbdc283f740a957c5823e76ded0ee804bbbf95800cf3d37 LOCAL_BYTES=1169
+FB12 | VERDICT=MATCH
+FB13 | UTC=2026-10-21T04:20:01Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn.log
+FB13 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/hn.log
+FB13 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=21fb12e20b73009c86051598fbbadaf21795f52a611438f57219303245ea7978 FETCHED_BYTES=1215
+FB13 | LOCAL_SHA256=21fb12e20b73009c86051598fbbadaf21795f52a611438f57219303245ea7978 LOCAL_BYTES=1215
+FB13 | VERDICT=MATCH
+FB14 | UTC=2026-10-21T04:20:01Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow-422-body.json
+FB14 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow-422-body.json
+FB14 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=453cb17f4eb77313036838221a051ea746c6e3157a9336898ef1eef599954628 FETCHED_BYTES=187
+FB14 | LOCAL_SHA256=453cb17f4eb77313036838221a051ea746c6e3157a9336898ef1eef599954628 LOCAL_BYTES=187
+FB14 | VERDICT=MATCH
+FB15 | UTC=2026-10-21T04:20:02Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow-doc.html
+FB15 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow-doc.html
+FB15 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=e25c5112f3ac869c590b8622f7852b6fbc0fd309e1a4a39b9016cb54eeb16036 FETCHED_BYTES=28555
+FB15 | LOCAL_SHA256=e25c5112f3ac869c590b8622f7852b6fbc0fd309e1a4a39b9016cb54eeb16036 LOCAL_BYTES=28555
+FB15 | VERDICT=MATCH
+FB16 | UTC=2026-10-21T04:20:02Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow.log
+FB16 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/indexnow.log
+FB16 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=3ca000a99e0f988c2d7f3943f8a8eef3052d0bcf58ae8991f8afeddb68fb1738 FETCHED_BYTES=2638
+FB16 | LOCAL_SHA256=3ca000a99e0f988c2d7f3943f8a8eef3052d0bcf58ae8991f8afeddb68fb1738 LOCAL_BYTES=2638
+FB16 | VERDICT=MATCH
+FB17 | UTC=2026-10-21T04:20:03Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-about.html
+FB17 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-about.html
+FB17 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=40dbf236b20dbbdbac6543864ba2981e95d0f9b1475ff8de1756ea6a5791e14f FETCHED_BYTES=49285
+FB17 | LOCAL_SHA256=40dbf236b20dbbdbac6543864ba2981e95d0f9b1475ff8de1756ea6a5791e14f LOCAL_BYTES=49285
+FB17 | VERDICT=MATCH
+FB18 | UTC=2026-10-21T04:20:03Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-docs.html
+FB18 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-docs.html
+FB18 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=1225860b4868495c17da2c53eaa158d864d47f07adb0ae412d0e63337294bec2 FETCHED_BYTES=27429
+FB18 | LOCAL_SHA256=1225860b4868495c17da2c53eaa158d864d47f07adb0ae412d0e63337294bec2 LOCAL_BYTES=27429
+FB18 | VERDICT=MATCH
+FB19 | UTC=2026-10-21T04:20:04Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-instance-rules.json
+FB19 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-instance-rules.json
+FB19 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=1c9ef131651ff98ae4dc6f0c246ad00f837b5fd3cb0695f468f23dede18efff8 FETCHED_BYTES=23352
+FB19 | LOCAL_SHA256=1c9ef131651ff98ae4dc6f0c246ad00f837b5fd3cb0695f468f23dede18efff8 LOCAL_BYTES=23352
+FB19 | VERDICT=MATCH
+FB20 | UTC=2026-10-21T04:20:04Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-post-body.json
+FB20 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon-post-body.json
+FB20 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=070da09d0b2013413ace4c33aded04c6d5886309471986c9da6f1bf65f25e8af FETCHED_BYTES=39
+FB20 | LOCAL_SHA256=070da09d0b2013413ace4c33aded04c6d5886309471986c9da6f1bf65f25e8af LOCAL_BYTES=39
+FB20 | VERDICT=MATCH
+FB21 | UTC=2026-10-21T04:20:05Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon.log
+FB21 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/mastodon.log
+FB21 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=ac35859318a35d285541f573356ea34a8e4c086cdff424cdfa3c1364954df67f FETCHED_BYTES=2793
+FB21 | LOCAL_SHA256=ac35859318a35d285541f573356ea34a8e4c086cdff424cdfa3c1364954df67f LOCAL_BYTES=2793
+FB21 | VERDICT=MATCH
+FB22 | UTC=2026-10-21T04:20:05Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/pingomatic-home.html
+FB22 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/pingomatic-home.html
+FB22 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=8853b804944e3af20b6be93af3ab982292eea6ced25dd6c1b340195ae6fef359 FETCHED_BYTES=36
+FB22 | LOCAL_SHA256=8853b804944e3af20b6be93af3ab982292eea6ced25dd6c1b340195ae6fef359 LOCAL_BYTES=36
+FB22 | VERDICT=MATCH
+FB23 | UTC=2026-10-21T04:20:06Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/pingomatic.log
+FB23 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/pingomatic.log
+FB23 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=adb7b196db595a3cd2ce09da6bc77d4ac631a6693604753fee959a19c1cdeac3 FETCHED_BYTES=1108
+FB23 | LOCAL_SHA256=adb7b196db595a3cd2ce09da6bc77d4ac631a6693604753fee959a19c1cdeac3 LOCAL_BYTES=1108
+FB23 | VERDICT=MATCH
+FB24 | UTC=2026-10-21T04:20:06Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-post-request.txt
+FB24 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-post-request.txt
+FB24 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=5a922044f7c86edbe188c47975a4e051f17b65f7901fe42fe1aa46f1d171b7cd FETCHED_BYTES=515
+FB24 | LOCAL_SHA256=5a922044f7c86edbe188c47975a4e051f17b65f7901fe42fe1aa46f1d171b7cd LOCAL_BYTES=515
+FB24 | VERDICT=MATCH
+FB25 | UTC=2026-10-21T04:20:07Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-rules-fetch-403.html
+FB25 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-rules-fetch-403.html
+FB25 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=13bcba13bd1bad5aace04e8a76880b710337a8d595224967e874401832cc203c FETCHED_BYTES=189908
+FB25 | LOCAL_SHA256=13bcba13bd1bad5aace04e8a76880b710337a8d595224967e874401832cc203c LOCAL_BYTES=189908
+FB25 | VERDICT=MATCH
+FB26 | UTC=2026-10-21T04:20:07Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-rules-fetch-403.json
+FB26 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit-rules-fetch-403.json
+FB26 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=13bcba13bd1bad5aace04e8a76880b710337a8d595224967e874401832cc203c FETCHED_BYTES=189908
+FB26 | LOCAL_SHA256=13bcba13bd1bad5aace04e8a76880b710337a8d595224967e874401832cc203c LOCAL_BYTES=189908
+FB26 | VERDICT=MATCH
+FB27 | UTC=2026-10-21T04:20:08Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit.log
+FB27 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddit.log
+FB27 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=90c22edfb4cbc1954a6b3d528b70ca36e1388584cc30fe0f5be2d13de74b6d85 FETCHED_BYTES=192161
+FB27 | LOCAL_SHA256=90c22edfb4cbc1954a6b3d528b70ca36e1388584cc30fe0f5be2d13de74b6d85 LOCAL_BYTES=192161
+FB27 | VERDICT=MATCH
+FB28 | UTC=2026-10-21T04:20:08Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddithelp-403-challenge.html
+FB28 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/reddithelp-403-challenge.html
+FB28 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=d281202102467dbca2c8a112dff01d73c500216724d155a953f9b6416a56259e FETCHED_BYTES=5902
+FB28 | LOCAL_SHA256=d281202102467dbca2c8a112dff01d73c500216724d155a953f9b6416a56259e LOCAL_BYTES=5902
+FB28 | VERDICT=MATCH
+FB29 | UTC=2026-10-21T04:20:09Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/verbatim_quotes.txt
+FB29 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/verbatim_quotes.txt
+FB29 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=e905527f554dc0c2a54c39892afd667a3d174f557dc67d2e3f2c2f75d99582f2 FETCHED_BYTES=2333
+FB29 | LOCAL_SHA256=e905527f554dc0c2a54c39892afd667a3d174f557dc67d2e3f2c2f75d99582f2 LOCAL_BYTES=2333
+FB29 | VERDICT=MATCH
+FB30 | UTC=2026-10-21T04:20:09Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-auth-overview.html
+FB30 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-auth-overview.html
+FB30 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=5c2096f637c0062433381cbc02bbce554f3defde386a1abbc083eddf5585458f FETCHED_BYTES=591895
+FB30 | LOCAL_SHA256=5c2096f637c0062433381cbc02bbce554f3defde386a1abbc083eddf5585458f LOCAL_BYTES=591895
+FB30 | VERDICT=MATCH
+FB31 | UTC=2026-10-21T04:20:10Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-automation.html
+FB31 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-automation.html
+FB31 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=0f7225d0c85a7c93c3687f7e50b742a53e68be7cd6bccb31b6c1ede6edd12444 FETCHED_BYTES=5513
+FB31 | LOCAL_SHA256=0f7225d0c85a7c93c3687f7e50b742a53e68be7cd6bccb31b6c1ede6edd12444 LOCAL_BYTES=5513
+FB31 | VERDICT=MATCH
+FB32 | UTC=2026-10-21T04:20:10Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-docs.html
+FB32 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-docs.html
+FB32 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=eae86ef7fdc825e883df93937a5fb1c70ccbc8d5650f27e37ab86bbd3285122a FETCHED_BYTES=627980
+FB32 | LOCAL_SHA256=eae86ef7fdc825e883df93937a5fb1c70ccbc8d5650f27e37ab86bbd3285122a LOCAL_BYTES=627980
+FB32 | VERDICT=MATCH
+FB33 | UTC=2026-10-21T04:20:11Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-post-body.json
+FB33 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-post-body.json
+FB33 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=8f20ff0c6196b3d88227a60b7b32325bae08a23c17051edb358c5e321540d76f FETCHED_BYTES=99
+FB33 | LOCAL_SHA256=8f20ff0c6196b3d88227a60b7b32325bae08a23c17051edb358c5e321540d76f LOCAL_BYTES=99
+FB33 | VERDICT=MATCH
+FB34 | UTC=2026-10-21T04:20:11Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-post-request.json
+FB34 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x-post-request.json
+FB34 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=b7c34e0e3c6df957cc66a07348dcea6bad738076f9fda26f5133eaeabffb1480 FETCHED_BYTES=338
+FB34 | LOCAL_SHA256=b7c34e0e3c6df957cc66a07348dcea6bad738076f9fda26f5133eaeabffb1480 LOCAL_BYTES=338
+FB34 | VERDICT=MATCH
+FB35 | UTC=2026-10-21T04:20:12Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x.log
+FB35 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach/x.log
+FB35 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=3178e6e7cc8274cb179dc86c9dcf75f12a7b93741bc8da47a73a829446b698c0 FETCHED_BYTES=3087
+FB35 | LOCAL_SHA256=3178e6e7cc8274cb179dc86c9dcf75f12a7b93741bc8da47a73a829446b698c0 LOCAL_BYTES=3087
+FB35 | VERDICT=MATCH
+FB36 | UTC=2026-10-21T04:20:12Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_credentials_sweep.log
+FB36 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_credentials_sweep.log
+FB36 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=2fdcea3141de619e1b1ccaf15b032116e6e293ae94904678301abd2aa51a7bea FETCHED_BYTES=1485
+FB36 | LOCAL_SHA256=2fdcea3141de619e1b1ccaf15b032116e6e293ae94904678301abd2aa51a7bea LOCAL_BYTES=1485
+FB36 | VERDICT=MATCH
+FB37 | UTC=2026-10-21T04:20:13Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+FB37 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+FB37 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 FETCHED_BYTES=19398
+FB37 | LOCAL_SHA256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 LOCAL_BYTES=19398
+FB37 | VERDICT=MATCH
+FB38 | UTC=2026-10-21T04:20:13Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+FB38 | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6bb55308e7dd8e2436e182a32814e7a64cea5444/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+FB38 | HTTP_STATUS=200 CURL_EXIT=0 FETCHED_SHA256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 FETCHED_BYTES=1594
+FB38 | LOCAL_SHA256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 LOCAL_BYTES=1594
+FB38 | VERDICT=MATCH
+
+FETCHBACK_SUMMARY: files=38 HTTP200_MATCH=38 MISMATCH=0 CURL_ERRORS=0
+FETCHBACK_FINISHED_UTC: 2026-10-21T04:20:14Z
+RESULT: ALL_COMMITTED_FILES_FETCHED_BACK_HTTP200_BYTE_EXACT
+
+SUPPLEMENTARY ROW — IndexNow key file (committed in this run at 7368190, predecessor of 6bb5530):
+FB-KEY | UTC=2026-10-21T04:20:53Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+FB-KEY | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+FB-KEY | HTTP_STATUS=200 FETCHED_SHA256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f FETCHED_BYTES=32
+FB-KEY | LOCAL_SHA256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f
+FB-KEY | KEY_FILE_CONTENT_IS_EXACT_32HEX_KEY=03d3363d8c5f23bfe7ce970e0ac7cd08
+FB-KEY | VERDICT=MATCH
+
+SELF-VERIFY (commit B = 91895496da2ea1b2443adee01fa0c6d56a2517d7, pushed 6bb5530..9189549, PUSH_EXIT=0):
+SV01 | UTC=2026-10-21T04:21:35Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_fetchback.log | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/91895496da2ea1b2443adee01fa0c6d56a2517d7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_fetchback.log
+SV01 | HTTP_STATUS=200 FETCHED_SHA256=b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7 LOCAL_SHA256=db81fbfd02c5d948f6aca58f7615ead3dc372010dbc0ba8cdec9cd5fc81e7696 VERDICT=MISMATCH
+SV02 | UTC=2026-10-21T04:21:36Z | FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/fetchback_run.sh | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/91895496da2ea1b2443adee01fa0c6d56a2517d7/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/fetchback_run.sh
+SV02 | HTTP_STATUS=200 FETCHED_SHA256=5a852f08eef6d792186c4ace806c607c64a301dcd147930cfd47ed45815c968b LOCAL_SHA256=5a852f08eef6d792186c4ace806c607c64a301dcd147930cfd47ed45815c968b VERDICT=MATCH
+SELF_VERIFY_SUMMARY: rows=2 MATCH=1 MISMATCH=1
+NOTE: this section documents commit-B fetch-backs; the log itself was amended with this section in a follow-up commit, whose tip is verified fresh in the closing check.
+SV01-CLARIFICATION | UTC=2026-10-21T04:22:01Z | sha256(git show 9189549:<log>) = b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7
+SV01-CLARIFICATION | VERDICT_COMMITTED_CONTENT=BYTE_EXACT_MATCH (fetched b547ac004bdb33c0ba8c925ee42a60aa7ce0e0b559ec8f36b1233b6c8eca1af7 == committed-at-B sha) — SV01 MISMATCH was caused solely by the subsequent local amendment that produced this SELF-VERIFY section, not by any fetch difference.

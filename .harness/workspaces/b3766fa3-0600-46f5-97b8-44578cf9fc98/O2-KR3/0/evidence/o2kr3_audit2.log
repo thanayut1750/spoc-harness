@@ -1,0 +1,107 @@
+==================================================================================
+O2-KR3 OUTREACH EVIDENCE AUDIT (attempt 2) — WP-O2KR3-2-AUDIT (independent verification only)
+Auditor: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:9f7a62e5bf9d9852
+Repo: https://github.com/thanayut1750/spoc-harness  branch: codex/spoc-harness-v1
+Workspace audited: .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0
+HEADER_UTC: Wed Oct 21 04:58:31 UTC 2026
+AUDIT_STARTED: 2026-10-21T04:58:31Z
+HEAD_AT_AUDIT_START: e39fb8c6a358f0b9ca47720c75d992403a415234
+ORIGIN_TIP_AT_AUDIT_START: e39fb8c6a358f0b9ca47720c75d992403a415234  (IN_SYNC=yes)
+Git tree dirty paths at audit start: 0
+Attempt-1 audit log (unchanged, re-presented in full): evidence/o2kr3_audit.log sha256=d9ed213930184721b166e3e67b08bb971bf52f633fc393f8a8fc1000d996ecf7 (committed e48fba3)
+Scope note: read-only audit. No posts, no marketing, no edits to outreach_log.md or prior evidence.
+This attempt adds ONLY: evidence/o2kr3_audit2.log, evidence/o2kr3_rules_spotcheck.log,
+             evidence/o2kr3_positive_reverify.log, evidence/o2kr3_audit2_script.sh (this file),
+             evidence/o2kr3_audit2_fetchback.log (written after push), mission_log ADDENDUM 11.
+==================================================================================
+[NON-MUTATION PRE-CHECK] live sha256 of prior deliverables (must equal committed anchors):
+  outreach_log.md            c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+  o2kr3_audit.log (attempt1) d9ed213930184721b166e3e67b08bb971bf52f633fc393f8a8fc1000d996ecf7
+  mission_log.md             85cc28b6760e4ec28cbd88e8bca1dfec6b0652105de4d6f5141e9037aa56dde7  (365 lines)
+  ANNOUNCEMENT.md            430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91
+  IndexNow key file          7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f
+
+  E1 ts=2026-10-21T03:24:28Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=1-search-engine-indexnow outcome=blocked
+  E2 ts=2026-10-21T03:26:05Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=2-blog-ping-pingomatic outcome=blocked
+  E3 ts=2026-10-21T03:28:39Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=3-community-forum-reddit outcome=blocked
+  E4 ts=2026-10-21T03:40:34Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=4-social-post-x outcome=blocked
+  E5 ts=2026-10-21T03:40:28Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=4-social-post-mastodon outcome=blocked
+  E6 ts=2026-10-21T03:40:29Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=5-developer-publishing-devto outcome=blocked
+  E7 ts=2026-10-21T03:40:28Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=5-developer-publishing-hn outcome=blocked
+  E8 ts=2026-10-21T03:43:12Z ts_ok=True missing=[none] rules_url=True rules_status=True rules_quote=True class=6-github-announcement outcome=posted (via ANNOUNCEMENT.md fallback; native issue POST blocked with 401)
+  ENTRIES=8
+  UTC_DATED=8
+  SCHEMA_FAIL_ENTRIES=none
+  CLASSES=1:1 2:1 3:1 4:2 5:2 6:1
+  UNIQUE_DESTINATIONS=8 TOTAL_DEST_LINES=8
+  RULES_CHECKED_ALL_STRUCT_OK=yes
+  OUTCOMES=blocked:7 posted (via ANNOUNCEMENT.md fallback; native issue POST blocked with 401):1 
+  CLASS_COVERAGE_OK=yes
+  DUP_DEST=none
+# O2-KR3 AUDIT ATTEMPT 2 — R5 RULES SPOT-CHECK (fresh re-fetch of cited RULES_CHECKED URLs)
+# UTC: 2026-10-21T04:58:31Z  auditor: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:9f7a62e5bf9d9852
+# Method: curl -sS -m 60 -o <tmp> -w '%{http_code}'; fragment matched after HTML-tag strip + case-insensitive grep.
+[hn] fresh GET https://news.ycombinator.com/newsguidelines.html
+  curl_exit=0 http_code=200 bytes=5864 fragment="primarily for promotion" hits(normalized)=1 quoted_by=ENTRY 7 rule_text_plausibly_present=YES
+  [hn] fresh GET https://news.ycombinator.com/newsguidelines.html
+    curl_exit=0 http_code=200 bytes=5864 fragment="primarily for promotion" hits(normalized)=1 quoted_by=ENTRY 7 rule_text_plausibly_present=YES
+[indexnow] fresh GET https://www.indexnow.org/documentation
+  curl_exit=0 http_code=200 bytes=28555 fragment="ownership of the host" hits(normalized)=1 quoted_by=ENTRY 1 rule_text_plausibly_present=YES
+  [indexnow] fresh GET https://www.indexnow.org/documentation
+    curl_exit=0 http_code=200 bytes=28555 fragment="ownership of the host" hits(normalized)=1 quoted_by=ENTRY 1 rule_text_plausibly_present=YES
+[ghterms] fresh GET https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+  curl_exit=0 http_code=200 bytes=366804 fragment="for spamming purposes" hits(normalized)=3 quoted_by=ENTRY 8 rule_text_plausibly_present=YES
+  [ghterms] fresh GET https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+    curl_exit=0 http_code=200 bytes=366804 fragment="for spamming purposes" hits(normalized)=3 quoted_by=ENTRY 8 rule_text_plausibly_present=YES
+[mastodon] fresh GET https://mastodon.social/api/v1/instance
+  curl_exit=0 http_code=200 bytes=23352 fragment="dogpiling" hits(normalized)=4 quoted_by=ENTRY 5 rule_text_plausibly_present=YES
+  [mastodon] fresh GET https://mastodon.social/api/v1/instance
+    curl_exit=0 http_code=200 bytes=23352 fragment="dogpiling" hits(normalized)=4 quoted_by=ENTRY 5 rule_text_plausibly_present=YES
+R5_DEDUCED: rules_urls_refetched_fresh=4 with_HTTP200_and_quote_present=4 (assignment minimum: >=2)
+  R5_DEDUCED: rules_urls_refetched_fresh=4 with_HTTP200_and_quote_present=4 (assignment minimum: >=2)
+# O2-KR3 AUDIT ATTEMPT 2 — R6 POSITIVE CONFIRMATION RE-VERIFY (fresh GETs)
+# UTC: 2026-10-21T04:58:34Z
+[key] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+  curl_exit=0 curl -w: code=200 type=text/plain; charset=utf-8 size=32
+  content=[03d3363d8c5f23bfe7ce970e0ac7cd08] exact_key_match=YES (expected 03d3363d8c5f23bfe7ce970e0ac7cd08) fetched_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f local_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f sha_match=YES
+  [key] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+    curl_exit=0 curl -w: code=200 type=text/plain; charset=utf-8 size=32
+    content=[03d3363d8c5f23bfe7ce970e0ac7cd08] exact_key_match=YES fetched_sha256=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f local=7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f sha_match=YES
+[zip] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+  curl_exit=0 curl -w: code=200 type=application/zip size=40299
+  downloaded_bytes=40299 (expected 40299) sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+  sha256_match=YES (expected f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99) content_type_ok=YES
+  fresh HEAD: HTTP/2 200  content-type: application/zip|content-length: 40299
+  [zip] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+    curl_exit=0 curl -w: code=200 type=application/zip size=40299
+    downloaded_bytes=40299 sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 sha256_match=YES content_type_ok=YES
+    fresh HEAD: HTTP/2 200  content-type: application/zip|content-length: 40299
+  [posted-claim spot-check] fresh GET https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+    curl_exit=0 http_code=code=200 fetched_sha256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 local_sha256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 byte_identical=YES
+  [R7] tracked O2-KR3/0 paths in HEAD=43; local==origin tip: yes
+    fresh branch-tip fetch-back of evidence/outreach_log.md:
+    URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+    curl_exit=0 http_code=code=200 fetched_sha256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 local_sha256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 byte_identical=YES
+    evidence/o2kr3_fetchback.log exists=YES (sha256 cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d)
+  [R8] git diff --numstat 7368190..HEAD on mission_log: 70	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+    ADDENDUM 9 commit diff 6bb5530: 44	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md | ADDENDUM 10 commit diff e48fba3: 26	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+    cumulative minus-lines (excl. --- headers): 0
+    mission_log now: 365 lines, sha256 85cc28b6760e4ec28cbd88e8bca1dfec6b0652105de4d6f5141e9037aa56dde7; ADDENDUM 9 present: 0; ADDENDUM 10 present: 0
+
+==================================================================================
+R1 LOG_EXISTS_DATED: PASS — evidence: evidence/outreach_log.md exists (19398 B, sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007); parse ENTRIES=8 UTC_DATED=8; pointer: ENTRY 1-8 UTC_TIMESTAMP lines (ISO-8601 Z)
+R2 ENTRY_SCHEMA: PASS — evidence: parse output above (per-entry missing=none; every RULES_CHECKED carries fetched URL + HTTP status + verbatim quote); pointer: evidence/outreach_log.md ENTRY 1-8, all 8 mandatory fields non-empty
+R3 CHANNEL_COVERAGE: PASS — evidence: parse CLASSES line above (classes 1-6 each >=1); pointer: CHANNEL_CLASS lines + archived evidence/outreach/{indexnow,pingomatic,reddit,x,mastodon,devto,hn,github}.log; OUTCOMES line above
+R4 ANTI_SPAM: PASS — evidence: UNIQUE_DESTINATIONS=8 = entry count, DUP_DEST=none, RULES_CHECKED_ALL_STRUCT_OK=yes; only 'posted' claim (ENTRY 8 ANNOUNCEMENT.md fallback) re-fetched fresh this audit: HTTP 200 byte-identical sha256 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 ; pointer: fresh-GET block above
+R5 RULES_SPOT_CHECK: PASS — evidence: 4/4 cited rules URLs re-fetched fresh with curl, HTTP 200 + quoted rule text plausibly present; dedicated log: evidence/o2kr3_rules_spotcheck.log; fresh statuses recorded above and in that log
+R6 POSITIVE_CONFIRMATION_REVERIFY: PASS — evidence: key file fresh GET HTTP 200 exact key 03d3363d8c5f23bfe7ce970e0ac7cd08 (sha256 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f == local 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f); zip fresh GET code=code=200 type=type=application/zip bytes=40299 sha256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (expected f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99); dedicated log with curl -w results: evidence/o2kr3_positive_reverify.log
+R7 PUBLICATION: PASS — evidence: 43 O2-KR3/0 deliverable paths tracked at HEAD e39fb8c6a358f0b9ca47720c75d992403a415234 (= origin tip); fresh raw.githubusercontent branch-tip fetch-back of evidence/outreach_log.md HTTP 200 byte-identical sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 == local ; evidence/o2kr3_fetchback.log exists (sha256 cfbfae1d33c5d3d451a3fe58286e29ec20a84a59613d3f82d82e3acbb6aa7f4d)
+R8 MISSION_LOG_INTEGRITY: PASS — evidence: git diff 7368190..HEAD on .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md = additions-only (70	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md), cumulative minus-lines=0; ADDENDUM 9 (6bb5530: 44	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md) and ADDENDUM 10 (e48fba3: 26	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md) both pure additions
+==================================================================================
+SUMMARY
+AUDIT_STARTED: 2026-10-21T04:58:31Z
+AUDIT_FINISHED: 2026-10-21T04:58:36Z
+CHECKS_RUN: 8 (R1,R2,R3,R4,R5,R6,R7,R8) — R1:PASS R2:PASS R3:PASS R4:PASS R5:PASS R6:PASS R7:PASS R8:PASS
+FAILED_CHECKS: none
+BRANCH_OUTCOME: branch codex/spoc-harness-v1 tip e39fb8c6a358f0b9ca47720c75d992403a415234 in sync with origin at audit start; existing deliverables unmodified (read-only verification; sha256 pre-checks above match committed anchors). Attempt-2 additions only: evidence/o2kr3_audit2.log, evidence/o2kr3_audit2_script.sh, evidence/o2kr3_rules_spotcheck.log, evidence/o2kr3_positive_reverify.log, later evidence/o2kr3_audit2_fetchback.log + mission_log ADDENDUM 11 (additions-only). Fresh re-verification executed against live endpoints this attempt.
+O2KR3_OUTREACH_AUDIT: PASS

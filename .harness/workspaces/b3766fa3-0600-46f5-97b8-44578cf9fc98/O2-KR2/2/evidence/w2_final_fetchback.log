@@ -1,0 +1,54 @@
+W2_FINAL_FETCHBACK_UTC=2026-10-21T02:56:25Z
+COMMIT=bc8167ca45fe4ce4c6952771000cf29b0f90cb3f BRANCH=codex/spoc-harness-v1
+
+=== FB1: mission_log.md (commit-pinned bc8167ca45fe4ce4c6952771000cf29b0f90cb3f) fetch-back ===
+URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+HTTP=200
+ac298363335b6cb21c8fa38deafc3b72717d75adeaf3c3c298031ee42921ee5b  /tmp/fb_mission_log.md
+ac298363335b6cb21c8fa38deafc3b72717d75adeaf3c3c298031ee42921ee5b  2/mission_log.md
+MISSION_LOG_BYTE_IDENTICAL=YES
+244:ADDENDUM 8 - WP-O2KR2-2 (run 2): documented-correct Lemon Squeezy REST fallback
+
+=== FB2: offer/CHECKOUT_INSTRUCTIONS.md (commit-pinned bc8167ca45fe4ce4c6952771000cf29b0f90cb3f) ===
+URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/offer/CHECKOUT_INSTRUCTIONS.md
+HTTP=200
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  /tmp/fb_instr.md
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  1/offer/CHECKOUT_INSTRUCTIONS.md
+INSTR_BYTE_IDENTICAL=YES
+PASTE_LINES_FETCHED=1
+
+=== FB3: hosted zip (branch-pinned and commit-pinned a8563e06532ea3fd0af2b51331ba8d3be66eff5b) ===
+HTTP=200 TYPE=application/zip SIZE=40299
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  /tmp/fb_zip_branch.zip
+HTTP=200 TYPE=application/zip SIZE=40299
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  /tmp/fb_zip_commit.zip
+
+=== FB4: ../1/evidence/BLOCKER_EVIDENCE.md (commit-pinned bc8167ca45fe4ce4c6952771000cf29b0f90cb3f) ===
+URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/BLOCKER_EVIDENCE.md
+HTTP=200
+532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  /tmp/fb_blocker.md
+532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  1/evidence/BLOCKER_EVIDENCE.md
+BLOCKER_BYTE_IDENTICAL=YES
+
+=== FB5: staging invariants (local, run-2 tree) ===
+grep: 2/store/CHECKOUT_LINK.txt: No such file or directory
+CHECKOUT_LINK_URL_COUNT=
+OFFER_PASTE_ACTION_COUNT=0
+RUN2_OFFER_FILES=GUMROAD_HUMAN_STEP.md GUMROAD_LISTING_PACKAGE.md LEMONSQUEEZY_HUMAN_STEP.md 
+W2_FINAL_FETCHBACK_DONE_UTC=2026-10-21T02:56:27Z
+
+=== FB5-FIX: CHECKOUT_LINK.txt link-free re-check (correct path) ===
+FB5FIX_UTC=2026-10-21T02:57:07Z
+FILE=./0/store/CHECKOUT_LINK.txt
+0 ./0/store/CHECKOUT_LINK.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./0/store/CHECKOUT_LINK.txt
+CHECKOUT_LINK_URL_COUNT=0
+FILE=./1/store/CHECKOUT_LINK.txt
+326 ./1/store/CHECKOUT_LINK.txt
+e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  ./1/store/CHECKOUT_LINK.txt
+CHECKOUT_LINK_URL_COUNT=0
+# store/CHECKOUT_LINK.txt — checkout link placeholder. NO checkout link exists yet.
+# After performing the single action in offer/CHECKOUT_INSTRUCTIONS.md (create the
+# Gumroad or Lemon Squeezy product at $15.00 USD, attach the hosted zip URL, publish),
+# paste the minted checkout URL on the line below this comment block.
+FB5FIX_DONE

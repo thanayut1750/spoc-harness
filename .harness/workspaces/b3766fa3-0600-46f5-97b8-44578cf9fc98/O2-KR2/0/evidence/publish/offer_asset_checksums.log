@@ -1,0 +1,9 @@
+UTC_TIMESTAMP: 2026-10-20T22:14:40Z
+CMD: sha256sum build/pydevtoolkit-1.0.0.zip build/pydevtoolkit-1.0.0.tar.gz
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  build/pydevtoolkit-1.0.0.zip
+8833fb1d3d22aa94b5bdbf239e9bd2e5418d2f2ec10607a481e61bc156677eca  build/pydevtoolkit-1.0.0.tar.gz
+CMD: (cd build && sha256sum -c CHECKSUMS.txt)
+pydevtoolkit-1.0.0.zip: OK
+pydevtoolkit-1.0.0.tar.gz: OK
+SHA256SUM_C_EXIT:0
+MATCH_VS_CHECKSUMS_TXT: verified above (both OK)

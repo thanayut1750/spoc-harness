@@ -1,0 +1,26 @@
+UTC_NOW: 2026-10-21T05:50:40Z
+kr_id: O2-KR4 (WP-O2KR4-2-REPORT)
+purpose: CORROBORATION ledger summary — read-only re-run of the registered revenue_ledger tool
+during the audit phase, used only to corroborate that the archived WP1 summary state
+($0.00 earned, 0 entries) still holds and that the audit left the ledger unchanged.
+No 'add' was attempted; the ledger file was verified absent before and after this run.
+
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger, registered tested mission tool)
+invoked_via: run_mission_tool
+tool source sha256: ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4
+harness artifact recording this invocation: 8f1567fc8bebd72137477095001679c4
+  (execution_artifact_ids: 557fe8902068bb86bfe95ccca8239473, 70759c64f7070126418d074227a20b44)
+invoked_by: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:5e13d1ac2f5476a2
+
+arguments (verbatim JSON, as recorded in the harness artifact):
+{"action": "summary", "currency": "USD", "goal": 100, "include_entries": true, "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+
+output (verbatim, as recorded in the harness artifact):
+{"action": "summary", "average_per_entry": 0.0, "currency": "USD", "entries": [], "entries_needed_at_average": 0, "entry_count": 0, "goal": 100.0, "goal_reached": false, "last_entry": null, "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "progress_percent": 0.0, "remaining": 100.0, "status": "ok", "total_earned": 0}
+
+READING (corroboration result):
+- status ok; total_earned = 0 ($0.00 USD); entry_count = 0; entries = []
+- remaining = 100.0 ($100.00 to goal); progress_percent = 0.0 (0% of $100); goal_reached = false
+- identical to WP1 baseline (evidence/ledger_baseline_summary.log) and WP1 final
+  (evidence/ledger_summary_final.log) readings — no entry appeared at any time.
+This corroboration run is consistent with zero confirmed sales and the UNMET $100.00 goal.

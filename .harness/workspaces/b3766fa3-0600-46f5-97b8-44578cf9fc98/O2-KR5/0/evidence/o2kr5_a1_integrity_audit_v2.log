@@ -1,0 +1,21 @@
+
+CHECKS_RUN: 16
+PASSED: 15
+FAILED: 1
+  PASS MIRROR1_header_tag 
+  PASS MIRROR2_all_ann_lines_present missing=0
+  FAIL MIRROR3_bag_of_lines_containment ann_lines=26 dropped_lines=1
+  PASS MIRROR4_provenance_block_present 
+  PASS AUDIT1_no_out_of_class urls=25 violations=0
+  PASS AUDIT2_deletions_zero deletions=0
+  PASS AUDIT3_paths_only_O2KR5 files=11 non_kr5=[]
+  PASS AUDIT4_ADJUSTED_OFFER.md f9ee536e0fac2c37
+  PASS AUDIT4_o2kr5_decision_log.md edb4ac248e44c392
+  PASS AUDIT4_o2kr5_fallback_chain.log 38d8a5e34cd7bd94
+  PASS AUDIT4_o2kr5_publish_check.log 76c0eb536057215e
+  PASS AUDIT5_paste_rs_0hits_in_a0_chain_log 
+  PASS AUDIT5_github_io_0hits_in_a0_chain_log 
+  PASS AUDIT5_rentry_0hits_in_a0_chain_log 
+  PASS AUDIT5_dpaste_com_0hits_in_a0_chain_log 
+  PASS AUDIT5_ix_io_0hits_in_a0_chain_log 
+O2KR5_A1_INTEGRITY_AUDIT: FAIL

@@ -1,0 +1,57 @@
+UTC_NOW: 2026-10-21T05:24:04Z
+purpose: proof preflight for O2-KR4 zero-confirmed-sales citations (O2-KR2 record)
+url_base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/<commit>/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/<path>
+selection_rule: keep only HTTP 200 citations whose body contains the expected marker
+commits_tested: 63e0f5caab3c61d1d2985a915419a1fa2ed9f8c9 bc8167ca45fe4ce4c6952771000cf29b0f90cb3f
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/63e0f5caab3c61d1d2985a915419a1fa2ed9f8c9/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_api_retry.log
+  HTTP_STATUS: 200
+  bytes: 6478
+  sha256: f9cbcb971ca6d404d42bda22d38811eef014b97be840b06bf3cd495c1b52d0e6
+  expected_marker: [HTTP_STATUS:401] occurrences: 2
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_api_retry.log
+  HTTP_STATUS: 200
+  bytes: 6478
+  sha256: f9cbcb971ca6d404d42bda22d38811eef014b97be840b06bf3cd495c1b52d0e6
+  expected_marker: [HTTP_STATUS:401] occurrences: 2
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_fallback_retry.log
+  HTTP_STATUS: 200
+  bytes: 4397
+  sha256: 8c3bd823e8382ab55370317045717d42c274e6907836eda97d81acafefdc06e4
+  expected_marker: [HTTP_STATUS: 401] occurrences: 2
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_human_step_outcome.md
+  HTTP_STATUS: 200
+  bytes: 3159
+  sha256: 11fb27c65e0e97de7b4f3572118edabf7fc6027e7b5e0214596b33ac8276e129
+  expected_marker: [OUTCOME: `blocked`] occurrences: 1
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_human_step_outcome.md
+  HTTP_STATUS: 200
+  bytes: 2810
+  sha256: 984a03e9351d0003329d917fa5bc328dc79fe81dfd128d5cfc9a46baae6283f2
+  expected_marker: [OUTCOME: `blocked`] occurrences: 1
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_credentials_sweep.log
+  HTTP_STATUS: 200
+  bytes: 6156
+  sha256: aa9b29bb3124504034d61637e82975a55e084f2dafd37e916a4747abef83d205
+  expected_marker: [No Gumroad or Lemon Squeezy credential] occurrences: 1
+  PREFLIGHT: KEEP
+
+URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_credentials_sweep.log
+  HTTP_STATUS: 200
+  bytes: 1553
+  sha256: 03ae852c1258d63c16ac55c448621ee6679aebe5205bfcdbdc806e1969ccb7e3
+  expected_marker: [ZERO Lemon Squeezy credentials] occurrences: 1
+  PREFLIGHT: KEEP
+
+CITATIONS_KEPT: 7
+CITATIONS_REJECTED: 0

@@ -1,0 +1,31 @@
+=== O2-KR2 run-2 staging-invariant recheck ===
+2026-10-21T01:45:20Z
+--- [1] hosted zip (commit-pinned a8563e06...) HEAD ---
+HTTP/2 200 
+content-type: application/zip
+content-length: 40299
+I_EXIT=0
+--- [1] hosted zip GET ---
+ZIP_FETCH code=200 type=application/zip bytes=40299
+ZIP_CURL_EXIT=0
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  /tmp/o2kr2_zip.bin
+--- [2] staged CHECKOUT_INSTRUCTIONS.md (commit-pinned a6991e20a87222654b4a0f13e41433ec9494802c) GET ---
+CI_FETCH code=200 type=text/plain; charset=utf-8 bytes=2713
+CI_CURL_EXIT=0
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  /tmp/o2kr2_ci.md
+CI paste-line count (expect 1): 1
+CI cmp vs local ../1/offer/CHECKOUT_INSTRUCTIONS.md: IDENTICAL
+--- [3] store/CHECKOUT_LINK.txt (commit-pinned a6991e20a87222654b4a0f13e41433ec9494802c) GET ---
+CL_FETCH code=200 type=text/plain; charset=utf-8 bytes=326
+CL_CURL_EXIT=0
+e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  /tmp/o2kr2_cl.txt
+CL link-census https?:// (expect 0): 0
+CL cmp vs local ../1/store/CHECKOUT_LINK.txt: IDENTICAL
+--- [4] run-2 offer/ paste censuses (O2-KR2/2/offer) ---
+bare-word paste lines (expect 2, both OFFER-copy prose): 2
+paste-action pattern lines (expect 0): 0
+offer/GUMROAD_LISTING_PACKAGE.md:57:copy-paste usage examples for all 16 utilities are in the included README.md.
+offer/GUMROAD_HUMAN_STEP.md:147:copy-paste usage examples for all 16 utilities are in the included README.md.
+--- [5] conclusion ---
+ZIP=HTTP200 application/zip 40299B sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (assert below)
+ZIP_INVARIANT=PASS

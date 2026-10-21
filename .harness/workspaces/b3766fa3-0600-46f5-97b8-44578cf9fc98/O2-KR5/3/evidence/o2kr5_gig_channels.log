@@ -1,0 +1,134 @@
+================================================================================
+evidence/o2kr5_gig_channels.log
+WP-O2KR5-2-GIG-CHAIN - O2-KR5 gig-platform fallback close-out
+Written: 2026-10-21T11:26Z (UTC), session of O2-KR5 Gig-Chain Verifier
+(exact write time in the git commit metadata of the additions-only push)
+--------------------------------------------------------------------------------
+DOCUMENTED CHAIN (authoritative, pinned):
+  O2-KR2 mission_log.md @ commit 553e5f237d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4,
+  L228-229 (verbatim): "fallback chain Lemon Squeezy -> Fiverr/Upwork -> prepared-asset
+  mode per playbook section 4"
+  O2-KR5 decision_log.md ENTRY 1 quotes the KR chain: "(mirrored listing, gig platforms,
+  adjusted offer)".
+  => Gig platforms in the documented chain: FIVERR and UPWORK (exactly 2). One row per
+     platform below. The mirrored listing (decision ENTRY 1) is a prior assignment; the
+     adjusted offer is out of scope for this package.
+
+HEADER 1 - ZERO O2-KR3 RECEIPT OVERLAP:
+  O2-KR3 recorded receipts (outreach_log.md, pinned
+  sha256 c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007) cover ONLY:
+  Reddit 403 block pages; X / Mastodon / dev.to / GitHub 401 probes; Hacker News login
+  wall; IndexNow 422; plus the attempt-0 pingomatic-class ping. NONE of the O2-KR3
+  destinations is a gig platform: no fiverr receipt and no upwork receipt exists in
+  O2-KR3. Both gig rows therefore use non-O2-KR3 bases:
+    FIVERR -> recorded receipt from THIS workspace's attempt 0
+              (O2-KR5/0/evidence/citations.md row B3), re-fetched fresh at its pinned
+              commit from raw.githubusercontent.com (HTTP 200, byte-exact); destination
+              NOT re-contacted (one attempt per destination preserved).
+    UPWORK -> fresh single probe this session (no recorded receipt existed anywhere;
+              precheck verified zero prior upwork contact records before the request).
+
+HEADER 2 - ANTI-RETRY / ANTI-SPAM:
+  One attempt per destination, zero retries, no login, no signup, no account creation,
+  no credentials, no cookie re-use. The upwork probe ran behind (a) an idempotency
+  guard - the script aborts WITHOUT requesting if its output log or archived body
+  already exists, so a stopped receipt can never cause a second request - and
+  (b) a contact-record precheck - zero *upwork* files in the main worktree and the
+  publication clone immediately before the request
+  (pre-run receipt 579510c4fb2ff5f38cf7cf70ab592bb9, exit 0, COUNT:0).
+
+HEADER 3 - HONESTY ON COMMAND RECEIPTS:
+  This harness records many command receipts with execution_stopped=true. No state
+  claim in this log rests on a receipt alone: every claim was re-verified from disk
+  and/or from raw.githubusercontent.com after execution (on-disk sha256, HTTP 200
+  fetch-backs, byte-exact comparisons), cited per row.
+
+HEADER 4 - LEDGER CONTEXT (read-only, unchanged by this package):
+  Cumulative net revenue $0.00, 0 ledger entries, remaining gap $100.00
+  (ledger receipt aec328a5f0a698bea695ff77d5852e8a; revenue_ledger.json absent; no
+  ledger add ever invoked). This close-out documents channel availability ONLY. It is
+  not a sale: there is no live purchase page and no buy URL anywhere in this log.
+
+COLUMNS: PLATFORM | DISPOSITION_BASIS | ACTION | HTTP_STATUS | EVIDENCE_URL |
+         VERBATIM_BLOCKER_OR_RECEIPT | CMD_RECEIPTS | OUTCOME
+================================================================================
+
+ROW 1/2
+  PLATFORM=FIVERR
+  DISPOSITION_BASIS=recorded receipt
+  ACTION=GET https://www.fiverr.com/start_selling - executed once in attempt 0; NOT
+         re-contacted in this package (the recorded attempt is the one permitted
+         attempt for this destination; re-verified via the pinned citation instead)
+  HTTP_STATUS=403
+  EVIDENCE_URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/6c83c9dfc29ec1d04b5980734da5f822a99b9817/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/citations.md
+  VERBATIM_BLOCKER_OR_RECEIPT=pinned citations.md row B3 (line 65), quoted verbatim:
+        | B3 | FRESH | destination `https://www.fiverr.com/start_selling` (single GET, HTTP 403, PXCR10002539 "It needs a human touch") | command receipt `f0c68766b0e2651f0c35783b537ab39e`, marker artifacts `d4518b30…`, `c3347593…`, `61a14a41…`, body sha256 `6af47b64…` |
+      recorded blocker: PXCR10002539 "It needs a human touch" (human-verification
+        wall; anonymous machine submission impossible without the human step)
+      recorded receipt: f0c68766b0e2651f0c35783b537ab39e; recorded body sha256
+        6af47b64215b75e2c237f1e4bb6409d9a457998c6ad0a2416f77eff72dbfe880
+      fresh re-verification of the pinned evidence file this session:
+        raw.githubusercontent.com @ 6c83c9dfc29ec1d04b5980734da5f822a99b9817 ->
+        HTTP_STATUS=200, sha256
+        b48e5316961bb95c0bba00875766af97bcc529a4db2cf53724620e3080814401,
+        byte-exact vs the publication clone worktree copy; B3 row confirmed present
+        at line 65, untruncated
+  CMD_RECEIPTS=attempt0_receipt=f0c68766b0e2651f0c35783b537ab39e;
+    fresh_pinned_refetch=3fc11dd9d6419d67d5573d092ad6858a (curl HTTP 200 + sha256
+    compare vs clone copy, exit 0)
+  OUTCOME=unavailable
+
+ROW 2/2
+  PLATFORM=UPWORK
+  DISPOSITION_BASIS=fresh probe
+  ACTION=GET https://www.upwork.com/ - single unauthenticated anonymous machine probe
+         executed this session (curl default headers; no login, no signup, no account
+         creation, no credentials, no cookies; exactly one request, no retries; zero
+         prior upwork contacts: precheck found 0 *upwork* contact-record files in the
+         main worktree and the publication clone; idempotency guard armed)
+  HTTP_STATUS=403
+  EVIDENCE_URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log
+  VERBATIM_BLOCKER_OR_RECEIPT=Cloudflare block page on the first and only request:
+      response line (verbatim): "HTTP/2 403"; header (verbatim): "server: cloudflare";
+      header (verbatim): "cf-ray: a4dfe5f8a919d326-BKK"
+      page title (verbatim): "Attention Required! | Cloudflare"
+      body verbatim strings (full unmodified body archived at the URL below):
+        "Sorry, you have been blocked"
+        "Why have I been blocked?"
+        "This website is using a security service to protect itself from online attacks."
+        "Cloudflare Ray ID: a4dfe5f8a919d326"
+        "captcha-container"
+      archived response body (verbatim, 5017 bytes, sha256
+      61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7):
+        https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html
+      probe log (CURL_EXIT=0, HTTP_STATUS=403, response headers, BODY_BYTES=5017,
+      BODY_SHA256, precheck results, committed at the same SHA_A):
+        https://raw.githubusercontent.com/thanayut1750/spoc-harness/ec18db2c298876efc003719b33ae0d1d67708dd1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log
+      structural blocker (verbatim from decision_log.md, citations A2-A7): "gig
+      submission requires account creation + identity verification, which is
+      human-only for this agent; zero machine credentials exist (recorded O2-KR2
+      terminal BLOCKED: API 401s, credential sweeps empty)"
+      consequence: no anonymous machine submission path exists (403 bot wall +
+      captcha container + account/identity requirement) -> channel unavailable; no
+      submission possible or attempted.
+  CMD_RECEIPTS=probe_run=53a84610dac220fc97e0174afa1c050f (SCRIPT_EXIT=0, CURL_EXIT=0);
+    disk_verification=6fcafa4bffb63fcc4934b8f63983b3b1 (on-disk body sha256 ==
+    BODY_SHA256 recorded in the probe log; verbatim quotes re-extracted from the
+    archived body; exit 0);
+    commit_A_push=11d7003cc855ca28a0d011db99e950ca (PUSH_A_EXIT=0,
+    SANITIZED_ERR_COUNT=0, REMOTE_TIP_EQ_SHA_A_OK via anonymous ls-remote, exit 0);
+    pre_run_zero_contact_records=579510c4fb2ff5f38cf7cf70ab592bb9 (find COUNT:0, exit 0)
+  OUTCOME=unavailable
+
+================================================================================
+SUMMARY
+  ROWS=2 (one per documented gig platform: fiverr, upwork)
+  unavailable=2 ; attempted_submission=0 ; fabricated receipts=0 ; retries=0
+  Gig-platform fallback chain state: EXHAUSTED - every documented gig platform is
+  documented as unavailable with its concrete blocker (HTTP status + verbatim quote).
+  Cumulative net revenue: UNCHANGED $0.00 (no sale; no ledger write; gap $100.00;
+  sales 0). Next documented chain step (adjusted offer) is OUT OF SCOPE for this
+  package.
+  Publication: pushed additions-only to branch codex/spoc-harness-v1. This file's own
+  fresh fetch-back receipt: evidence/o2kr5_gig_fetchback.log (same directory).
+================================================================================

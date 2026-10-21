@@ -1,0 +1,21 @@
+# O2-KR4 / WP-O2KR4-2-REPORT — sha256 manifest of all deliverables
+# scope: report/ + evidence/ (relative to workspace root O2-KR4/0)
+# generated: 2026-10-21T06:32:17Z
+# exclusions: this manifest itself (self-reference); revenue_ledger.json intentionally ABSENT (zero accepted adds, audit I1 find_count=0); mission_log.md intentionally ABSENT (never touched by O2-KR4, audit S1)
+# audit verdict at manifest time: EARNINGS_AUDIT: PASS (evidence/o2kr4_audit.log, 31/31 checks)
+#
+cdb64dc9cac2083d787ceec47f9b5f767ae92ed57038badbc6b9ab575fbada40  evidence/ledger_baseline_summary.log
+c74ce741bbef3e74ebd3843aa320bf320b827e1b03a86cc83cfd409a566fc3bd  evidence/ledger_convention.md
+112e07ff5ada8b3ad60230b89c49c7eaf2c8abc5fb2949b4d8871a8122c2a9b7  evidence/ledger_math_check.log
+75442bdadca9059c0fe37e0b49c9e1946f0843bd79bd35e50507cbf7c41c60b1  evidence/ledger_math_check.py
+cddc54d7ca7ecae73cc3be67a2d8e30851faea869b0499409793bf733964a795  evidence/ledger_summary_corroboration_wp2.log
+2945aa26d50cd69e92d145c9dedfc0a435b33940bcc4fcdc548d44bfa3ac48bb  evidence/ledger_summary_final.log
+16369b3f9b25c7872e6b4a5b711c295ecfbbe566c292e99415142cbc6312b601  evidence/ledger_tool_calls.log
+bcd81bce6e87c15da16087c378d19c9439c8e6f189b89c16fa8495ec80ca3223  evidence/ledger_zero_amount_probe.log
+b72c5d5d0228157b740f5b541ae4ccf8090bdae6b4ae446138f32ce7e0eb970a  evidence/o2kr4_audit.log
+fbf1ec39e1b70e3b6c084a0dfee1537554c64a91bff8aa8e4d7625a39eb19309  evidence/o2kr4_audit.py
+d03e4593debb9262ea69390cb92068487580118e105b6e1c790214da8351f8fc  evidence/proof_preflight.log
+543d657a45ad2949d9b330a84a7f2058f3f438076aa6b38a62fbaf9401a6c85e  evidence/proof_resolution_audit.log
+0098edf247dc80ae6802b45651d5c64cd922aa5d2d6a889245d493f4354e064f  evidence/proof_resolution_audit.sh
+421331a2cc3e1f47dadb966a6b5630deff5ea5808be81e8b1812ceecf0722633  evidence/zero_confirmed_sales_check.md
+dc2b4ebae4048181cfb3e3a938eaa18cc11ce5f1f7098ad26ab62554988d41db  report/EARNINGS_REPORT_O2KR4.md

@@ -1,0 +1,4 @@
+# store/CHECKOUT_LINK.txt — checkout link placeholder. NO checkout link exists yet.
+# After performing the single action in offer/CHECKOUT_INSTRUCTIONS.md (create the
+# Gumroad or Lemon Squeezy product at $15.00 USD, attach the hosted zip URL, publish),
+# paste the minted checkout URL on the line below this comment block.

@@ -1,0 +1,29 @@
+INDEXNOW CHANNEL LOG (O2-KR3)
+== STEP 1: docs fetched ==
+RULES_DOC: https://www.indexnow.org/documentation (read_web_page HTTP 200 @2026-10-21T03:2xZ; archived: evidence/outreach/indexnow-doc.html)
+RULE_QUOTE: 'To submit URLs, you must "prove" ownership of the host for which URLs are being submitted by hosting at least one text file within the host.'
+DOC_RESPONSE_CODES: 200 OK | 202 Accepted (key validation pending) | 400 invalid format | 403 key not valid | 422 URLs dont belong to host or key not matching schema | 429 Too Many Requests (potential Spam)
+
+== STEP 2: key generated + published ==
+KEY=03d3363d8c5f23bfe7ce970e0ac7cd08 (32 hex chars, openssl rand -hex 16)
+COMMIT=7368190654bdf4655d5657a8565e1b1e6990954c PUSH_EXIT=0
+KEYURL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/7368190654bdf4655d5657a8565e1b1e6990954c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+
+== STEP 3: key URL fetch-back verification ==
+UTC: 2026-10-21T03:24:08Z
+curl -sS -o keybody -w '%{http_code} %{content_type} %{size_download}' $KEYURL
+HTTP_STATUS_LINE: 200 text/plain; charset=utf-8 32
+BODY: 03d3363d8c5f23bfe7ce970e0ac7cd08
+KEY_MATCH: EXACT
+BODY_SHA256: 7924396c520f5a6dececd0fd4eb62c61c6f130befe808bd027c1174c2cc7598f
+
+== STEP 4: submission (ONE attempt) ==
+UTC: 2026-10-21T03:24:28Z
+curl -sS -o indexnow-body -w 'HTTP_CODE=.. CONTENT_TYPE=.. SIZE=..' $SUBURL
+FULL_REQUEST_URL: https://api.indexnow.org/IndexNow?url=https%3A%2F%2Fraw.githubusercontent.com%2Fthanayut1750%2Fspoc-harness%2Fa8563e06532ea3fd0af2b51331ba8d3be66eff5b%2F.harness%2Fworkspaces%2Fb3766fa3-0600-46f5-97b8-44578cf9fc98%2FO2-KR2%2F0%2Fbuild%2Fpydevtoolkit-1.0.0.zip&key=03d3363d8c5f23bfe7ce970e0ac7cd08&keyLocation=https%3A%2F%2Fraw.githubusercontent.com%2Fthanayut1750%2Fspoc-harness%2F7368190654bdf4655d5657a8565e1b1e6990954c%2F.harness%2Fworkspaces%2Fb3766fa3-0600-46f5-97b8-44578cf9fc98%2FO2-KR3%2F0%2Foffer%2F03d3363d8c5f23bfe7ce970e0ac7cd08.txt
+RESPONSE: HTTP_CODE=422 CONTENT_TYPE=application/json; charset=utf-8 SIZE=187
+CURL_EXIT: 0
+BODY_BYTES: 187
+BODY: {"errorCode":"InvalidRequestParameters","message":"Given url doesnot belong to your site verified through the keylocation parameter. Please verify URLs before submitting.","details":null}
+BODY_SHA256: 453cb17f4eb77313036838221a051ea746c6e3157a9336898ef1eef599954628
+INTERPRETATION: per documentation - 200=URL submitted successfully; 202=URL received, key validation pending; 400=invalid format; 403=key not valid (key not found / key not in file); 422=URLs dont belong to host or key schema mismatch; 429=too many requests (spam)

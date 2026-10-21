@@ -1,0 +1,12 @@
+# O2KR5 RETRY FRESH-VERIFY SNAPSHOT (read-only; NO new commit; publication evidence remains 64464c5/a06fc84/6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c)
+GEN_UTC=2026-10-21T13:46:49Z
+LS_REMOTE_EXIT=0 6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c	refs/heads/codex/spoc-harness-v1
+LINEAGE 0bff7b36..6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c: 64464c5 -> a06fc84 -> 6ad8ddb (3 commits, additions-only; see o2kr5_fieldproof.log + o2kr5_mirrored_listing.log)
+SCOPE rows=4 non-A=0 outside-dir4=0
+CLARIFY: feedback 'fad2609a' is an artifact-ID prefix (receipt), NOT a commit; cat-file -t fad2609a -> fatal: Not a valid object name fad2609a
+FB|o2kr5_decision_log.md|HTTP=200|sha=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|LOCAL==GIT@tip==REMOTE|MATCH
+FB|o2kr5_ledger_recheck.log|HTTP=200|sha=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|LOCAL==GIT@tip==REMOTE|MATCH
+FB|o2kr5_mirrored_listing.log|HTTP=200|sha=c4713e81a4469d96e4546502c5e0394b658fcdcb51eaf0b54140226c38a3b780|LOCAL==GIT@tip==REMOTE|MATCH
+FB|MIRROR_O2KR5.md|HTTP=200|sha=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|LOCAL==GIT@tip==REMOTE|MATCH
+TS_ALIGN: commit 6bb5530 committerDate=2026-10-21T11:13:06+07:00 (=04:13:06Z); elapsed 31121s -> 12:51:47Z (measurement instant); ENTRY_TS 12:52:19Z = write instant (+32s, disclosed); no file edit
+RETRY_VERIFY: PASS (4/4 MATCH; scope additions-only; tip+file unchanged)

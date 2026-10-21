@@ -1,0 +1,17 @@
+# Lemon Squeezy REST product-creation attempt (fallback channel, O2-KR2 STEP 2)
+UTC_TIMESTAMP: 2026-10-20T22:13:33Z
+ENDPOINT: POST https://api.lemonsqueezy.com/v1/products
+CREDENTIAL_PROBE: env | grep -iE 'lemon|squeezy' matched nothing (no LEMON_SQUEEZY_API_KEY in environment); Authorization Bearer sent empty per assignment.
+PAYLOAD_FILE: evidence/publish/lemonsqueezy_payload.json (JSON:API; name/description/price=1500/status published; description HTML per docs.lemonsqueezy.com/api/products artifact d487e23812901d61506b8dc8a3e0671f)
+DOCS_NOTE: https://docs.lemonsqueezy.com/api/products lists only Retrieve a product / List all products; no create-product endpoint documented (fetched 2026-10-20 UTC). POST executed anyway per assignment to capture the exact API response.
+EXACT_COMMAND:
+curl -sS -o evidence/publish/lemonsqueezy_body.txt -w 'HTTP_STATUS:%{http_code}\n' -X POST https://api.lemonsqueezy.com/v1/products -H "Authorization: Bearer ${LEMON_SQUEEZY_API_KEY:-}" -H "Accept: application/vnd.api+json" -H "Content-Type: application/vnd.api+json" --data-binary @evidence/publish/lemonsqueezy_payload.json
+BEGIN_RAW_OUTPUT
+HTTP_STATUS:405
+CURL_EXIT:0
+END_RAW_OUTPUT
+BODY_FILE: evidence/publish/lemonsqueezy_body.txt
+BODY_BYTES: 184
+BODY_SHA256: 6b0f03ad5804d8ec500b1345f34e2029710c0daeb21a5e219ced58a581a0ed78
+BODY_FIRST_10_LINES:
+{"jsonapi":{"version":"1.0"},"errors":[{"detail":"The POST method is not supported for route v1\/products. Supported methods: GET, HEAD.","status":"405","title":"Method Not Allowed"}]}UTC_FINISHED: 2026-10-20T22:13:34Z

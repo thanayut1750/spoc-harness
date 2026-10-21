@@ -1,0 +1,19 @@
+UTC_NOW: 2026-10-21T05:26:11Z
+kr_id: O2-KR4 (WP-O2KR4-1-LEDGER)
+purpose: FINAL revenue_ledger summary for O2-KR4 — raw output archived verbatim.
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger, registered tested mission tool)
+invoked_via: run_mission_tool
+arguments (verbatim JSON):
+{"action": "summary", "currency": "USD", "goal": 100, "include_entries": true, "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+
+raw output (verbatim):
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+
+READING (honest ledger state, consistent with evidence/zero_confirmed_sales_check.md):
+- total_earned: $0.00 (zero recorded entries; zero fabricated entries)
+- remaining to goal: $100.00 -> $100.00 UNMET
+- progress toward $100 goal: 0.0%
+- goal_reached: false
+This is the terminal honest state: the O2-KR2 dependency ended prepared-asset BLOCKED
+(no live offer, no payment rail), so no confirmed sale could ever occur. The $100 goal
+is explicitly labeled UNMET, not fabricated.

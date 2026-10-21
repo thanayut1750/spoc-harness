@@ -1,0 +1,32 @@
+GITHUB ANNOUNCEMENT CHANNEL LOG (O2-KR3) - repo thanayut1750/spoc-harness
+== RULES CHECK (rules-first) ==
+UTC: 2026-10-21T03:43:06Z
+FETCH1 terms https://docs.github.com/en/site-policy/github-terms/github-terms-of-service :
+HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=366804 FINAL_URL=https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+VERBATIM conduct/spam-relevant text:
+data-testid="NavList-link" href="/en/site-policy/acceptable-use-policies/github-impersonation">
+rea___N5Ya6"><span class="Primer_Brand__NavList-module__NavList__label___cZ4Jt">Impersonation
+ons.</p> <p>You may not use the API to download data or Content from GitHub for spamming purposes, including for the purposes of selling GitHub users&#x27; personal information, such as to recruiters, headhunters, and job boards
+ation","childPages":[]},{"href":"/en/site-policy/acceptable-use-policies/github-impersonation","title":"Impersonation","childPages":[]},{"href":"/en/site-policy/acceptable-use-policies/github-misinformation-and-disinformation","title
+== CREDENTIAL CHECK (token never printed) ==
+UTC: 2026-10-21T03:43:11Z
+GIT_CREDENTIAL_FILL_EXIT: 128
+CREDENTIAL_FILL_STDERR: fatal: could not read Username for 'https://github.com': terminal prompts disabled
+GITHUB_TOKEN_PRESENT: no
+(password line, if any, is NOT printed; only 4-char prefix would be shown)
+== SUBMISSION ATTEMPT (ONE; unauthenticated since no token obtainable) ==
+UTC: 2026-10-21T03:43:12Z
+REQUEST_BODY_SHA256: 730516fab7eac2e2ac8ae851fac2d66ae5afbbf3a8fb087b9756c72b14906d19
+HTTP_CODE=401 CONTENT_TYPE=application/json; charset=utf-8 SIZE=120
+CURL_EXIT: 0
+RESPONSE_BODY_SHA256: b7dbd173f33b19650f61b1c528737e2037cf768d90076fdfce5d32541765e29e
+RESPONSE_BODY (first 300 B):
+{
+  "message": "Requires authentication",
+  "documentation_url": "https://docs.github.com/rest",
+  "status": "401"
+}
+CONCLUSION: if 401/403/404 -> issue-post blocked; fallback = publish offer/ANNOUNCEMENT.md via git push (honest copy), raw fetch-back 200 = post-URL evidence
+== FILES ==
+b6812b712397d759ac755f234401b3476bc5013591ba1900d195fc189752cdae  evidence/outreach/github-terms.html
+b7dbd173f33b19650f61b1c528737e2037cf768d90076fdfce5d32541765e29e  evidence/outreach/github-post-body.json

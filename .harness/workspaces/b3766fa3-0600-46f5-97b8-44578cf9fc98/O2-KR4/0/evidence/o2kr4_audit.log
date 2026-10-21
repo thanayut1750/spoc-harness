@@ -1,0 +1,68 @@
+=== O2-KR4 FORENSIC EARNINGS AUDIT (WP-O2KR4-2-REPORT) ===
+UTC_NOW: 2026-10-21T06:32:17Z
+workspace: /home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0
+scope: READ-ONLY. This audit performs no ledger 'add', no modification, no removal;
+       mission_log.md is untouched; the only files this audit creates are its own
+       outputs (evidence/o2kr4_audit.log via tee; this script evidence/o2kr4_audit.py).
+
+--- SECTION P: PRE-AUDIT LEDGER STATE ---
+CHECK P1: revenue_ledger.json absent at audit start (lazy-create; zero accepted adds) ... PASS | find_count=0
+CHECK P2: 11 pre-existing evidence files match their recorded sha256 (snapshot 2026-10-21T05:39:29Z + proof-resolution files) ... PASS | files=11
+PRE report sha256: dc2b4ebae4048181cfb3e3a938eaa18cc11ce5f1f7098ad26ab62554988d41db
+PRE audit script sha256: fbf1ec39e1b70e3b6c084a0dfee1537554c64a91bff8aa8e4d7625a39eb19309
+PRE corroboration sha256: cddc54d7ca7ecae73cc3be67a2d8e30851faea869b0499409793bf733964a795
+
+--- SECTION C: CORROBORATION SUMMARY (archived verbatim) ---
+CHECK C1: corroboration summary verbatim output present in evidence/ledger_summary_corroboration_wp2.log ... PASS
+CORROBORATION_VERBATIM: {"action": "summary", "average_per_entry": 0.0, "currency": "USD", "entries": [], "entries_needed_at_average": 0, "entry_count": 0, "goal": 100.0, "goal_reached": false, "last_entry": null, "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "progress_percent": 0.0, "remaining": 100.0, "status": "ok", "total_earned": 0}
+
+--- SECTION M: INDEPENDENT RECOMPUTATION FROM ARCHIVED TOOL OUTPUTS ---
+CHECK M0: all three archived summary outputs parse (baseline, final, corroboration) ... PASS
+baseline: entries=[] | sum(entry amounts)=0.0 | tool total_earned=0 | entry_count=0 | remaining=100.0 | progress_percent=0.0 | goal_reached=False | goal=100.0 | currency=USD
+final: entries=[] | sum(entry amounts)=0.0 | tool total_earned=0 | entry_count=0 | remaining=100.0 | progress_percent=0.0 | goal_reached=False | goal=100.0 | currency=USD
+corroboration: entries=[] | sum(entry amounts)=0.0 | tool total_earned=0 | entry_count=0 | remaining=100.0 | progress_percent=0.0 | goal_reached=False | goal=100.0 | currency=USD
+CHECK M1: sum(entries) == 0.00 for every run (no entry amounts exist) ... PASS
+CHECK M2: recomputed sum(entries) == tool total_earned exactly, every run (incl. corroboration) ... PASS
+CHECK M3: entry_count field == len(entries) == 0, every run ... PASS
+CHECK M4: remaining == goal - total_earned == 100.00 ($100.00 remaining) every run ... PASS
+CHECK M5: progress_percent == total/goal*100 == 0.0% (0% toward $100) every run ... PASS
+CHECK M6: goal_reached is boolean false in every run ($100 goal honestly UNMET) ... PASS
+CHECK M7: goal == 100 and currency == USD on every run ... PASS
+CHECK M8: baseline == final == corroboration on all goal-math fields (no entry ever appeared) ... PASS
+
+--- SECTION E: ENTRY-COUNT EQUALITY (ledger == report == audit) ---
+CHECK E1: ledger entry_count == 0 ... PASS | ledger=0
+CHECK E2: report per-entry table has 0 digit-indexed entry rows (dash placeholder row is not an entry) ... PASS | report_rows=0
+CHECK E3: audit recomputed entry count == 0 ... PASS | audit=0
+CHECK E4: TRIPLE EQUALITY ledger == report == audit entry counts (all 0) ... PASS | ledger=0 report=0 audit=0
+
+--- SECTION I: LEDGER INTEGRITY (no add / modify / remove by this audit) ---
+CHECK I1: revenue_ledger.json still absent after corroboration re-run and all audit reads ... PASS | find_count=0
+CHECK I2: all pre-audit files byte-identical after audit reads (report, script, corroboration, 11 evidence files) ... PASS | files_compared=14
+CHECK I3: ledger tool call record shows exactly 3 WP1 invocations and zero accepted adds ... PASS | 1 rejected zero-amount add probe; 2 summaries; corroboration run recorded separately
+
+--- SECTION F: FABRICATION SCAN (deliverables = report/ + evidence/, audit log excluded) ---
+CHECK F1: every http(s) URL in deliverables is one of the 7 audit-resolved O2-KR2 citation URLs or a documented pattern/infra form (never a commerce URL) ... PASS | found=9 citations=7 infra=2 non_whitelist=[]
+CHECK F2: 0 non-whitelisted marketplace/order/checkout URLs in deliverables ... PASS | hits=[]
+CHECK F3: 0 invented order/checkout/receipt token patterns in deliverables ... PASS | hits=[]
+CHECK F4: every positive USD figure in the report is qualified as goal/remaining/shortfall context ... PASS | hits=[]
+CHECK F5: 0 lines in any deliverable pair 'earned' with a positive USD amount ... PASS | hits=[]
+CHECK F6: 0 occurrences of total_earned > 0 in any deliverable ... PASS | hits=[]
+CHECK F7: zero-amount guard probe on record and cited (structural anti-fabrication evidence) ... PASS | evidence/ledger_zero_amount_probe.log; tool source ec456dd5... lines 116-117; cited in report Section 8
+
+--- SECTION R: CITATION RESOLUTION CROSS-CHECK ---
+CHECK R1: proof_resolution_audit.log: URLS_FETCHED: 7, UNRESOLVED_CITATIONS: 0, PROOF_RESOLUTION: PASS ... PASS
+CHECK R2: report cites only URLs that resolved HTTP 200 with expected markers (F1 whitelist == resolved set) ... PASS | see evidence/proof_resolution_audit.log per-URL HTTP status + sha256
+
+--- SECTION S: SCOPE SAFETY ---
+CHECK S1: mission_log.md absent from this workspace (never touched by O2-KR4) ... PASS
+CHECK S2: report states the literal UNMET verdict line ... PASS
+CHECK S3: report states ACTUAL AMOUNT EARNED: $0.00 USD ... PASS
+
+--- SUMMARY ---
+CHECKS_RUN: 31
+PASSED: 31
+FAILED: 0
+ledger total_earned = $0.00 USD; remaining = $100.00; progress = 0.0%; goal_reached = false; entries = 0
+GOAL: UNMET — $100.00 shortfall; no confirmed sales; this shortfall is real, not pending and not fabricated
+EARNINGS_AUDIT: PASS

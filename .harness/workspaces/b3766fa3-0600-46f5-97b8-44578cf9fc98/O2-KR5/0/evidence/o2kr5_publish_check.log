@@ -1,0 +1,65 @@
+O2-KR5 WP-O2KR5-1-CHAIN PUBLISH CHECK (grep-based self-check + fetch-back verification)
+SELF_CHECK_UTC=2026-10-21T07:43:28Z
+REPO=github.com/thanayut1750/spoc-harness BRANCH=codex/spoc-harness-v1
+START_TIP=780d7fd0e57b3e1ca1f9f91ca9b9374ff1e2b459
+TIP1=5c3b398b1d5cbeccdd9a95d4c3588442aff39413 (commit 1: decision log + fallback chain log + ADJUSTED_OFFER.md, pushed PUSH_EXIT=0)
+
+== C0 additions-only scope (START_TIP..TIP1) ==
+61	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/ADJUSTED_OFFER.md
+84	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_decision_log.md
+216	0	.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_fallback_chain.log
+FILES_WITH_DELETIONS=0 (expect 0)
+TOUCHED_FILE_COUNT=3 (expect 3)
+
+== C1 decision-log ENTRY-1 field completeness (each expect hits=1, non-empty value) ==
+FIELD[^- \*\*evaluated_at_utc:\*\* 2[0-9]{3}-] hits=1 (expect 1)
+FIELD[^- \*\*offer_live_status:\*\* NO LIVE OFFER] hits=1 (expect 1)
+FIELD[^- \*\*elapsed_time_since_offer_live:\*\* N/A] hits=1 (expect 1)
+FIELD[^- \*\*sales_count:\*\* 0 ] hits=1 (expect 1)
+FIELD[^- \*\*ledger_total_usd:\*\* 0\.00 USD] hits=1 (expect 1)
+FIELD[^- \*\*next_channel:\*\* mirrored listing] hits=1 (expect 1)
+FIELD[^- \*\*rationale:\*\* .+] hits=1 (expect 1)
+
+== C2 fallback chain log: 3/3 channels covered in documented order ==
+CHAIN[^## 0\. TRIGGER REFERENCE] hits=1 (expect >=1)
+CHAIN[^## 1\. ONE-ATTEMPT TALLY] hits=1 (expect >=1)
+CHAIN[^## 2\. CHANNEL 1/3 — MIRRORED LISTING → UNAVAILABLE-BLOCKED] hits=1 (expect >=1)
+CHAIN[^### 2a\. 0x0\.st — ATTEMPTED ONCE] hits=1 (expect >=1)
+CHAIN[^### 2b\. dpaste\.org — API documentation probe, ATTEMPTED ONCE] hits=1 (expect >=1)
+CHAIN[^## 3\. CHANNEL 2/3 — GIG PLATFORMS → UNAVAILABLE-BLOCKED] hits=1 (expect >=1)
+CHAIN[^## 4\. CHANNEL 3/3 — ADJUSTED OFFER → EXECUTED] hits=1 (expect >=1)
+CHAIN[^## 5\. CHAIN EXHAUSTED] hits=1 (expect >=1)
+CHAIN[^## 6\. LEDGER RE-RUN AFTER CHAIN EXECUTION] hits=1 (expect >=1)
+CHAIN[^## 7\. FINAL STATE — BEST-ACHIEVED TOTAL] hits=1 (expect >=1)
+CHAIN[GOAL NOT REACHED] hits=1 (expect >=1)
+CHAIN[retries 0; accounts created 0; credentials fabricated 0; buy/order/receipt URLs invented 0] hits=1 (expect >=1)
+CHAIN[UNAVAILABLE-BLOCKED] hits=9 (expect >=2)
+CHAIN[attempt UTC timestamps present] hits=3 (expect >=3)
+CHAIN[verbatim curl commands present] hits=3 (expect >=3)
+
+== C3 invented buy/order/receipt-URL grep across the 3 new files (expect TOTAL=0) ==
+INVENTED_URL_PATTERN_HITS=0 (expect 0)
+
+== C4 ledger file state (lazy write: absent until first accepted add) ==
+REVENUE_LEDGER_JSON_COUNT=0 (expect 0)
+VERBATIM_FIND_CMD: find .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/.mission-tools -name 'revenue_ledger.json' | wc -l
+
+== C5 anchors byte-identical (local == git blob at START_TIP, plus raw fetch at START_TIP) ==
+ANCHOR .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md local=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 git@START=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 raw_http=200 raw_sha=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 VERDICT=MATCH
+ANCHOR .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md local=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 git@START=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 raw_http=200 raw_sha=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91 VERDICT=MATCH
+ANCHOR .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md local=2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4 git@START=2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4 raw_http=200 raw_sha=2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4 VERDICT=MATCH
+ANCHOR known-constant check outreach_log.md expected=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 actual=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+ANCHOR_SUMMARY pass=3 fail=0 (expect pass=3 fail=0)
+
+== C6 fetch-back of the 3 new files at TIP1 from raw.githubusercontent.com ==
+FETCHBACK .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_decision_log.md http=200 local=edb4ac248e44c3927e58a65926bc6c2e4d6d6c6d77eae80440dfac3f689203da remote=edb4ac248e44c3927e58a65926bc6c2e4d6d6c6d77eae80440dfac3f689203da VERDICT=MATCH
+FETCHBACK .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_fallback_chain.log http=200 local=38d8a5e34cd7bd947194382254a0ddf39733a1de56b16617bf7a2b6252b77dca remote=38d8a5e34cd7bd947194382254a0ddf39733a1de56b16617bf7a2b6252b77dca VERDICT=MATCH
+FETCHBACK .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/ADJUSTED_OFFER.md http=200 local=f9ee536e0fac2c377931a2caf71cac8f46b26875f9716853feb4125cedc2c800 remote=f9ee536e0fac2c377931a2caf71cac8f46b26875f9716853feb4125cedc2c800 VERDICT=MATCH
+FETCHBACK_SUMMARY pass=3 fail=0 (expect pass=3 fail=0)
+
+== C7 post-push tree state at TIP1 ==
+HEAD=5c3b398b1d5cbeccdd9a95d4c3588442aff39413
+DIRTY_LINES=0 (expect 0)
+
+CHECK_RUN=7 (C0..C7) FAILURES_SO_FAR=0
+FINAL: O2KR5_PUBLISH_CHECK: PASS (FETCHBACK_PASS=3/3, ANCHORS_UNCHANGED=3/3, INVENTED_URL_HITS=0, DECISION_LOG_FIELDS=7/7, CHANNELS=3/3)

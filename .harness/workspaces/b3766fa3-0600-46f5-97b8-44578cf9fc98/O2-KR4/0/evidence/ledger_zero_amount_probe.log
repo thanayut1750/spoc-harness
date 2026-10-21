@@ -1,0 +1,31 @@
+UTC_NOW: 2026-10-21T05:26:11Z
+kr_id: O2-KR4 (WP-O2KR4-1-LEDGER)
+purpose: ANTI-FABRICATION GUARD PROBE — attempt action='add' with amount 0.00 to prove the ledger structurally cannot accept fabricated zero/negative revenue. This is a deliberate negative test, NOT a revenue claim.
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger, registered tested mission tool)
+invoked_via: run_mission_tool
+
+arguments (verbatim JSON, as transmitted):
+{"action": "add", "amount": 0, "channel": "guard-probe", "currency": "USD", "description": "Anti-fabrication guard probe (WP-O2KR4-1-LEDGER): deliberately attempt to record a zero-amount entry to prove the ledger structurally rejects fabricated/non-positive revenue. Not a real sale; no order or payment exists. Zero confirmed sales per evidence/zero_confirmed_sales_check.md (O2-KR2 terminal prepared-asset BLOCKED).", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+note: the numeric literal 0.00 serializes to 0; both denote the same numeric zero value submitted deliberately.
+
+raw_result (verbatim, as returned by run_mission_tool):
+{"error": "ExpectedToolInputError", "detail": "Mission tool execution failed; inspect the recorded command evidence"}
+
+harness-recorded input evidence (read-only):
+.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/5851a79c07b697682ae8b1f834608aafeb773d3fb2938e62a363cf2d69cf6b96.json
+(561 B, contains the exact request JSON quoted above; sibling file bde31dfb...json records the earlier baseline summary request)
+
+underlying validation rule (tool source, read-only corroboration):
+source file: .mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/tool.py
+source sha256: ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4 (matches catalog source_sha256 exactly)
+lines 116-117:
+    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+        sys.exit(fail("amount must be a positive number for action 'add'"))
+
+post-probe ledger-state verification (fresh, read-only, 2026-10-21T05:26:11Z):
+- find across the O2-KR4 workspace and .mission-tools for 'revenue_ledger.json': 0 results
+- revenue_ledger.json does not exist -> the rejected 'add' wrote NOTHING; ledger state unchanged (still zero entries, exactly as the baseline summary reported)
+
+CONCLUSION: the invocation was REJECTED and no entry was written. The ledger structurally
+cannot hold fabricated zero/negative revenue. No retry with a nonzero amount was attempted
+(recording an unearned nonzero amount would be fabrication, violating the absolute rule).

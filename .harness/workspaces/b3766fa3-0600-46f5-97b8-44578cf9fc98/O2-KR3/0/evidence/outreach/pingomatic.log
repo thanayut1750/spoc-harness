@@ -1,0 +1,16 @@
+PINGOMATIC CHANNEL LOG (O2-KR3)
+== RULES CHECK (rules-first) ==
+UTC of rules fetch: 2026-10-21T03:26:13Z..03:26:35Z
+pingomatic.com/ -> HTTP 200, 36 B (verbatim only published text): 'You are too awesome for Ping-o-matic'
+pingomatic.com/pages/terms-of-service -> HTTP 404; /terms -> HTTP 404; /faq -> HTTP 404; /privacy -> HTTP 404; /about -> HTTP 404 (archived probes; no posted self-promotion rules exist)
+rpc.pingomatic.com/ GET -> HTTP 200, 36 B, same verbatim message (endpoint alive; no auth required per XML-RPC spec usage)
+CONCLUSION: service publishes no anti-spam/self-promo rules; single-ping policy observed voluntarily (ONE attempt, no retries)
+
+== SUBMISSION (ONE attempt) ==
+UTC: 2026-10-21T03:26:05Z
+POST https://rpc.pingomatic.com/ Content-Type: text/xml method=weblogUpdates.extendedPing
+REQUEST_BODY_SHA256: 84940135faa949f67790175d5e63ce93ff954d5718fcbbd9c203c83468464f2a
+RESPONSE: HTTP_CODE=200 CONTENT_TYPE=text/html; charset=utf-8 SIZE=36
+CURL_EXIT: 0
+RESPONSE_BODY: You are too awesome for Ping-o-matic
+RESPONSE_SHA256: 8853b804944e3af20b6be93af3ab982292eea6ced25dd6c1b340195ae6fef359

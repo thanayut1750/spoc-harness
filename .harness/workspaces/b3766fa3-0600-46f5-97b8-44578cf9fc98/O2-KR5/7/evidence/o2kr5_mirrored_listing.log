@@ -1,0 +1,60 @@
+# O2-KR5 mirrored-listing evidence — push + fetch-back receipts (dir O2-KR5/7)
+Channel: O1-KR1 fallback chain step 1 — MIRRORED LISTING
+Status: ATTEMPTED WITH EVIDENCE (terminal)
+Work package: WP-O2KR5-1-CHAIN
+
+## SECTION 1 — ARTIFACT
+- FILE: listing/MIRROR_O2KR5.md (mirror of the current offer content, provenance header
+  cites the original ANNOUNCEMENT.md publication commit 6bb55308e7dd8e2436e182a32814e7a64cea5444
+  on codex/spoc-harness-v1; tail bytes c-1594 byte-identical to the offer body, local
+  sha256 2a21fcf7d0bbb44922edd0fba09c34391f12296dcdbc6b7dbd2ffccc9d748b6f, 2815 bytes)
+- No product/buy/order/checkout URL is minted anywhere in the mirror; the offer states the
+  marketplace publish step is pending per O2-KR2 (terminal BLOCKED, human step).
+
+## SECTION 2 — CREDENTIAL-LESS TRANSPORT CHECK (recorded, not retried)
+- `git push --dry-run origin codex/spoc-harness-v1` from the freshclone (origin =
+  credential-less https://github.com/thanayut1750/spoc-harness.git) failed at auth:
+  fatal: could not read Username for 'https://github.com': No such device or address
+  DRYRUN_EXIT=128.
+- Fresh environment sweep (existence-only checks, no secret values printed): no
+  credential.helper in any scope; /home/dx/.git-credentials, /home/dx/.netrc,
+  /home/dx/.config/gh/hosts.yml absent; gh CLI absent; no askpass; no credential-bearing env
+  vars.
+- Resolution (the recorded proven mechanism of the approved dir-5 stage, see commit a97e93c
+  receipt, SECTION 3): push executed through the harness repo's operator-configured remote
+  URL, held in a shell variable only and never printed; no credential was created,
+  fabricated, or changed; the credential-less URL was not modified.
+
+## SECTION 3 — PUSH RECEIPT
+- COMMAND: git push "$UP" HEAD:refs/heads/codex/spoc-harness-v1   ($UP = operator remote URL, unprinted)
+- PUSH OUTPUT (redaction-safe):
+    To https://github.com/thanayut1750/spoc-harness.git
+       f50ec53..30cb3a1  HEAD -> codex/spoc-harness-v1
+- PUSH_EXIT=0
+- COMMIT SHA: 30cb3a1c526d10d27a459c05daf22987c19c30e6
+- COMMIT CONTENT: exactly 5 new O2-KR5/7 files, 212 insertions / 0 deletions (staged-scope
+  and numstat receipts), pre-work tip f50ec538314e67ef109386a6cefdc1390ee9a49e.
+
+## SECTION 4 — ANONYMOUS POST-PUSH CORROBORATION
+- `git ls-remote origin refs/heads/codex/spoc-harness-v1` (credential-less origin):
+  30cb3a1c526d10d27a459c05daf22987c19c30e6 refs/heads/codex/spoc-harness-v1
+
+## SECTION 5 — FETCH-BACK AT THE PUSHED COMMIT (raw.githubusercontent.com)
+- Base: https://raw.githubusercontent.com/thanayut1750/spoc-harness/30cb3a1c526d10d27a459c05daf22987c19c30e6/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/7
+- Row 1:
+    FILE=listing/MIRROR_O2KR5.md
+    HTTP_STATUS=200
+    LOCAL_SHA256=2a21fcf7d0bbb44922edd0fba09c34391f12296dcdbc6b7dbd2ffccc9d748b6f
+    FETCHED_SHA256=2a21fcf7d0bbb44922edd0fba09c34391f12296dcdbc6b7dbd2ffccc9d748b6f
+    VERDICT=MATCH (byte-exact)
+- Honesty note: the fetch-back loop's first run carried a local-path scripting bug
+  (relative path -> empty LOCAL_SHA256 -> cosmetic VERDICT=MISMATCH). Its FETCHED_SHA256
+  already equaled the recorded local hash; the corrected run above re-fetched the same
+  file once more (read-only GET of our own published object, not a channel re-probe) and
+  produced this formal MATCH. Zero external marketing destinations were contacted.
+
+## SECTION 6 — CHAIN STATUS CONTRIBUTION
+- Mirrored listing: ATTEMPTED WITH EVIDENCE (push receipt + HTTP 200 byte-exact fetch-back).
+- Publication is the only verifiably working channel class (git push to
+  github.com/thanayut1750/spoc-harness, branch codex/spoc-harness-v1), consistent with the
+  recorded O2-KR3 close-out.

@@ -1,0 +1,6 @@
+== ANTI-SPAM PRECHECK (before any request; both destinations must show 0 prior hits) ==
+UTC_NOW=2026-10-21T08:50:49Z
+paste.rs hits in attempt-0 chain log (expect 0): 0
+paste.rs hits across push-A evidence files (expect 0 files): 1
+github.io hits in attempt-0 chain log (expect 0): 0
+RULE: single attempt per destination; any outcome (success or failure) is final; no retry; no account creation; no credentials.

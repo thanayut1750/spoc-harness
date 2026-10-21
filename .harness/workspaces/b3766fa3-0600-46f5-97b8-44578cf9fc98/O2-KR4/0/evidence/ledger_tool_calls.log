@@ -1,0 +1,51 @@
+UTC_NOW: 2026-10-21T05:31:38Z
+kr_id: O2-KR4 (WP-O2KR4-1-LEDGER)
+purpose: archive of EVERY revenue_ledger invocation made during O2-KR4 — arguments and raw
+outputs verbatim. Exactly 3 invocations occurred, all exclusively via run_mission_tool with
+tool_id 'tool:7bdf3aa0d66a5279c833dabe2820f852'. The ledger JSON was never hand-edited (the
+tool never even created the file, because every 'add' was structurally rejected).
+
+=====================================================================================
+CALL 1 of 3 — BASELINE SUMMARY (executed FIRST, before any other ledger operation)
+=====================================================================================
+invoked_via: run_mission_tool
+call_id: call_-7147688525373111885
+arguments (verbatim JSON):
+{"action": "summary", "include_entries": true, "goal": 100, "currency": "USD", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+raw output (verbatim):
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+archived log: evidence/ledger_baseline_summary.log
+  artifact 419f7348c6a98b2bbd08fc84b9efd5b1, sha256 cdb64dc9cac2083d787ceec47f9b5f767ae92ed57038badbc6b9ab575fbada40
+result: pre-existing state = ZERO entries, $0.00 earned.
+
+=====================================================================================
+CALL 2 of 3 — ANTI-FABRICATION GUARD PROBE (amount 0.00 'add' — deliberately rejected)
+=====================================================================================
+invoked_via: run_mission_tool
+arguments (verbatim JSON; numeric 0.00 serializes to 0):
+{"action": "add", "amount": 0, "channel": "guard-probe", "currency": "USD", "description": "Anti-fabrication guard probe (WP-O2KR4-1-LEDGER): deliberately attempt to record a zero-amount entry to prove the ledger structurally rejects fabricated/non-positive revenue. Not a real sale; no order or payment exists. Zero confirmed sales per evidence/zero_confirmed_sales_check.md (O2-KR2 terminal prepared-asset BLOCKED).", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+raw output (verbatim — VALIDATION REJECTION):
+{"error": "ExpectedToolInputError", "detail": "Mission tool execution failed; inspect the recorded command evidence"}
+corroboration: tool source lines 116-117 reject amount<=0 with
+  fail("amount must be a positive number for action 'add'")
+  (source sha256 ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4)
+post-probe state: no entry written; revenue_ledger.json does not exist (fresh find = 0 results).
+archived log: evidence/ledger_zero_amount_probe.log, artifact 5625d6bfdaaf56612ec82f0611f09cea
+result: REJECTED — no retry with a nonzero amount was attempted (that would be fabrication).
+
+=====================================================================================
+CALL 3 of 3 — FINAL SUMMARY (terminal state)
+=====================================================================================
+invoked_via: run_mission_tool
+arguments (verbatim JSON):
+{"action": "summary", "currency": "USD", "goal": 100, "include_entries": true, "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+raw output (verbatim):
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+archived log: evidence/ledger_summary_final.log
+  artifact 776de57c0e387b8d5711b31bc719b3be, sha256 2945aa26d50cd69e92d145c9dedfc0a435b33940bcc4fcdc548d44bfa3ac48bb
+result: terminal state = ZERO entries, $0.00 earned, $100.00 remaining (UNMET), 0.0% progress.
+
+=====================================================================================
+END — 3 invocations total. No other ledger operation occurred. Independent arithmetic
+verification: evidence/ledger_math_check.log (VERDICT: PASS, 12/12 checks).
+=====================================================================================

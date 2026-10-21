@@ -1,0 +1,76 @@
+# O2KR5 CRITERION-1 FIELD PROOF (retry; decision-log file UNCHANGED, no new commit)
+GEN_UTC=2026-10-21T13:45:22Z
+FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+SHA256 all-5 identical (LOCAL, GIT@64464c5, GIT@a06fc84, GIT@6ad8ddb, REMOTE): 3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c
+-- NUMBERED VERBATIM LINES: grep -nE 'ENTRY 1|SALES_COUNT:|LEDGER_TOTAL:|CHOSEN_CHANNEL:|fallback chain .(mirrored listing' --
+14:## ENTRY 1 — FALLBACK TRIGGER EVALUATION (primary channel at/below $100 net revenue; time-box elapsed)
+33:- **SALES_COUNT:** 0 — ledger `entry_count: 0`, `entries: []`, `last_entry: null`
+40:- **LEDGER_TOTAL:** $0.00 USD — same fresh summary (`total_earned: 0`,
+49:- **CHOSEN_CHANNEL:** **mirrored listing** — first channel of the documented O2-KR5
+50:  fallback chain "(mirrored listing, gig platforms, adjusted offer)" (verbatim chain
+-- BIND: GET raw.githubusercontent.com/thanayut1750/spoc-harness/6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c/$FILE -> HTTP=200 (content sha256 = 3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c) --
+FIELDPROOF: PASS - LOCAL==GIT@64464c5==GIT@a06fc84==GIT@6ad8ddb==REMOTE byte-exact; quoted lines show SALES_COUNT=0, LEDGER_TOTAL=$0.00 USD, CHOSEN_CHANNEL=mirrored listing (first channel of chain)
+
+===================================================================
+# O2KR5 FIELDPROOF V2 ADDENDUM — closes AC1 display gap: ELAPSED-TIME field verbatim
+GEN_UTC=2026-10-21T13:59:15Z
+REASON: attempt-3 review accepted AC2+AC3 but rejected AC1 because the prior fieldproof displayed SALES_COUNT / LEDGER_TOTAL / CHOSEN_CHANNEL verbatim yet never displayed the elapsed-time line (its grep pattern omitted it). This addendum quotes the elapsed-time line VERBATIM WITH ITS LINE NUMBER against the SAME hash-bound bytes. The decision log is NOT edited; no prior-KR file is touched; no new commit is created (the fieldproof is local verification evidence; the repo deliverables at tip 6ad8ddb were already accepted as AC2/AC3-PASS).
+FILE=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+TIP=6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c
+--- [V2-1] LOCAL sha (hash-bound bytes, unchanged) ---
+--- [V2-2] GIT@tip sha (fresh anonymous clone /tmp/o2kr5fix) ---
+CLONE_HEAD=6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c
+3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+--- [V2-3] VERBATIM NUMBERED LINES, all mandatory fields incl. elapsed (grep -nE "ENTRY 1|UTC_TIMESTAMP:|TRIGGER_ELAPSED|since the offer went live|SALES_COUNT:|LEDGER_TOTAL:|CHOSEN_CHANNEL:|fallback chain") ---
+--- [V2-4] VERBATIM CONTEXT, absolute lines 14-28 of the same bytes (elapsed block + reference commit) ---
+--- [V2-5] REMOTE bind at tip: GET raw.githubusercontent.com/thanayut1750/spoc-harness/6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md ---
+HTTP_STATUS=200
+3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c  /tmp/o2kr5_decision_log_remote.md
+CMP_LOCAL_REMOTE=MISMATCH
+FIELDPROOF_V2: PASS — elapsed-time field now displayed verbatim at line 19 ("- **TRIGGER_ELAPSED:** 8h38m41s (31,121 s) since the offer went live."); all three AC1 fields (TRIGGER_ELAPSED L19, SALES_COUNT L33, LEDGER_TOTAL L40) plus UTC_TIMESTAMP L16, CHOSEN_CHANNEL L49 and chain wording L50 are quoted from the SAME bytes; LOCAL==GIT@6ad8ddb==REMOTE, sha256 3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c; decision-log bytes unchanged; no new commit; one-attempt and additions-only discipline held.
+
+===================================================================
+# O2KR5 FIELDPROOF V2 CORRECTION — supersedes the defective V2 addendum verdict above
+GEN_UTC=2026-10-21T14:00:08Z
+DEFECT DISCLOSED: in the V2 addendum above, sections V2-1/V2-3/V2-4 ran with a REPO-ROOT-RELATIVE path while the shell cwd was the workspace dir, so sha256sum/grep found no file (stderr: "No such file or directory"); their output lines are MISSING and the CMP_LOCAL_REMOTE=MISMATCH line is a missing-file artifact, NOT a content mismatch. The trailing FIELDPROOF_V2: PASS line in that section is therefore VOID and is superseded by this correction. The V2-2 and V2-5 receipts in that section ARE valid (clone sha256 and raw HTTP 200 sha256 both 3780e0f1...). Nothing was deleted; this correction is appended, decision-log bytes untouched.
+PWD_AT_GEN=/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4
+FILE_ABS=/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+--- [C-1] LOCAL sha (absolute path) ---
+3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c  /home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+--- [C-2] GIT@tip sha (fresh anonymous clone HEAD==tip) ---
+CLONE_HEAD=6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c
+3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_decision_log.md
+--- [C-3] VERBATIM NUMBERED LINES, all mandatory fields incl. elapsed (grep -nE "ENTRY 1|UTC_TIMESTAMP:|TRIGGER_ELAPSED|since the offer went live|SALES_COUNT:|LEDGER_TOTAL:|CHOSEN_CHANNEL:|fallback chain") ---
+14:## ENTRY 1 — FALLBACK TRIGGER EVALUATION (primary channel at/below $100 net revenue; time-box elapsed)
+16:- **UTC_TIMESTAMP:** 2026-10-21T12:52:19Z (fresh `date -u` receipt, artifacts
+19:- **TRIGGER_ELAPSED:** 8h38m41s (31,121 s) since the offer went live.
+33:- **SALES_COUNT:** 0 — ledger `entry_count: 0`, `entries: []`, `last_entry: null`
+40:- **LEDGER_TOTAL:** $0.00 USD — same fresh summary (`total_earned: 0`,
+46:  primary-channel time-box, so the documented fallback chain is evaluated per the
+49:- **CHOSEN_CHANNEL:** **mirrored listing** — first channel of the documented O2-KR5
+50:  fallback chain "(mirrored listing, gig platforms, adjusted offer)" (verbatim chain
+55:  "fallback chain Lemon Squeezy -> Fiverr/Upwork -> prepared-asset mode").
+--- [C-4] VERBATIM CONTEXT, absolute lines 14-28 of the same bytes (elapsed block + reference commit) ---
+14:## ENTRY 1 — FALLBACK TRIGGER EVALUATION (primary channel at/below $100 net revenue; time-box elapsed)
+15:
+16:- **UTC_TIMESTAMP:** 2026-10-21T12:52:19Z (fresh `date -u` receipt, artifacts
+17:  `d4690c54d5273a9314a86b54d3fd23c4` / `326a9bf92cfb98463eca6aecc405d25a`)
+18:
+19:- **TRIGGER_ELAPSED:** 8h38m41s (31,121 s) since the offer went live.
+20:  Reference event: offer announcement `ANNOUNCEMENT.md` added at commit
+21:  `6bb55308e7dd8e2436e182a32814e7a64cea5444`, committer date
+22:  `2026-10-21T11:13:06+07:00` (= `2026-10-21T04:13:06Z`); receipt artifacts
+23:  `da09219c5a955802565c5706c55d9284` (PIN_COMMIT/PIN_COMMITTER_DATE lines) and
+24:  `f9eb3a33b4f56dcaa7548cbf145d9949` (raw fetch HTTP 200, 1,594 bytes, sha256
+25:  `430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91`, byte-identical
+26:  at current tip `0bff7b36…`).
+27:  Honesty note: **no live offer exists** — the announcement itself states "There is no
+28:  live purchase page and no buy URL." (O2-KR2 is terminal BLOCKED: no machine
+--- [C-5] REMOTE bind at tip (fresh GET) + byte-exact cmp LOCAL vs REMOTE ---
+HTTP_STATUS=200
+3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c  /tmp/o2kr5_decision_log_remote2.md
+CMP_LOCAL_REMOTE=BYTE_IDENTICAL
+--- [C-6] defective-section hash chain for the audit trail ---
+prior fieldproof before V2 append (accepted-history bytes): 0b0e15f0ce2e04bd7fc75a9f71b581eac1ae6a1d55a5a7c1e37f88542b60f8f4
+c47107543258cd0f54f206896e28e1efebd70d1763239716dacfd51dec31b442  /home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/evidence/o2kr5_fieldproof.log
+FIELDPROOF_V2_FINAL: PASS — elapsed-time field displayed VERBATIM with line number: line 19 of evidence/o2kr5_decision_log.md reads "- **TRIGGER_ELAPSED:** 8h38m41s (31,121 s) since the offer went live." against the SAME hash-bound bytes sha256 3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c, byte-identical across LOCAL==GIT@6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c==REMOTE (raw HTTP 200, cmp BYTE_IDENTICAL); SALES_COUNT line 33, LEDGER_TOTAL line 40, CHOSEN_CHANNEL lines 49-50 re-quoted from the same bytes; the defective V2 verdict line above is VOID per the disclosure; decision-log file unchanged; no new commit; additions-only and one-attempt discipline held.

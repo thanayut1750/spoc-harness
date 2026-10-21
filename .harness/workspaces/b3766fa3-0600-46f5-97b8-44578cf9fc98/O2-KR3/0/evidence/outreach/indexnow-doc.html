@@ -1,0 +1,596 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation | IndexNow.org </title>
+    <meta name="description" content="Technical and implementation documenation for indexnow. Detailed information for webmasters/website owners on how to use IndexNow protocol. Get information from submitting one URL or set of URLs to the search engines to verifying the ownership of the website with examples.">
+    <meta name="google-site-verification" content="jhJQW3RT4QGSIi_iz_nRGud9FyV6dUleFkHG5vEcN9U" />
+    <script type="text/javascript">
+        (function (c, l, a, r, i, t, y) {
+            c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+            t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+            y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+        })(window, document, "clarity", "script", "8v9ncypwmt");
+    </script>
+    <!-- Add bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+
+    <!-- Bootstrap scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-/bQdsTh/da6pkI1MST/rWKFNjaCP5gBSY4sEBT38Q/9RBh9AH40zEOg7Hlq2THRZ"
+        crossorigin="anonymous"></script>
+
+    <!-- Add custom css -->
+    <link rel="stylesheet" href="/assets/css/styles.css">
+
+    <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+</head>
+
+<body>
+    <div class="navbar navbar-expand-lg navbar-light bg-light" style="min-height: 90px" id="pageHeader">
+        <div class="container col-md-8 col-lg-6">
+            <a class="navbar-brand" href="index">IndexNow.org</a>
+
+            <div class="navbar-collapse col-sm-10">
+                <ul class="navbar-nav ms-auto mb-2 mb-sm-0">
+                    <li class="nav-item" style="margin-left: 0px; margin-right: 46px;">
+                        <a 
+                            class="nav-link" href="index" >
+                            Home
+                        </a>
+                    </li>
+                    <li class="nav-item" style="margin-left: 0px; margin-right: 46px;">
+                        <a  class="nav-link active" aria-current="page" >
+                            Documentation
+                        </a>
+                    </li>
+                    <li class="nav-item" style="margin-left: 0px; margin-right: 46px;">
+                        <a 
+                            class="nav-link" href="faq" >
+                            FAQ
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        
+
+
+<div class="lang-dropdown">
+    <button onclick="handleDropdownClick()" class="dropbtn" id="langButton">EN</button>
+    <div id="languageDropdownMenu" class="dropdown-content">
+        <input type="text" placeholder="Search.." id="languageInput" onkeyup="filterFunction()">
+        <div class="languageList" id="languageList">
+            <a tabindex=0 href="/documentation">
+                <div class="bigLanguageText">English (United States)</div>
+                <div class="smallLanguageText">English (United States)</div>
+            </a>
+            <a tabindex=0 href="/ar_sa/documentation">
+                <div class="bigLanguageText">Arabic</div>
+                <div class="smallLanguageText">العربية</div>
+            </a>
+            <a tabindex=0 href="/eu/documentation">
+                <div class="bigLanguageText">Basque</div>
+                <div class="smallLanguageText">euskara</div>
+            </a>
+            <a tabindex=0 href="/bg_bg/documentation">
+                <div class="bigLanguageText">Bulgarian</div>
+                <div class="smallLanguageText">български</div>
+            </a>
+            <a tabindex=0 href="/ca_es/documentation">
+                <div class="bigLanguageText">Catalan</div>
+                <div class="smallLanguageText">català</div>
+            </a>
+            <a tabindex=0 href="/zh_cn/documentation">
+                <div class="bigLanguageText">Chinese (Simplified) Legacy</div>
+                <div class="smallLanguageText">中文(简体) 旧版</div>
+            </a>
+            <a tabindex=0 href="/zh_tw/documentation">
+                <div class="bigLanguageText">Chinese (Traditional) Legacy</div>
+                <div class="smallLanguageText">中文(繁體) 舊版</div>
+            </a>
+            <a tabindex=0 href="/hr_hr/documentation">
+                <div class="bigLanguageText">Croatian</div>
+                <div class="smallLanguageText">hrvatski</div>
+            </a>
+            <a tabindex=0 href="/cs_cz/documentation">
+                <div class="bigLanguageText">Czech</div>
+                <div class="smallLanguageText">čeština</div>
+            </a>
+            <a tabindex=0 href="/da_dk/documentation">
+                <div class="bigLanguageText">Danish</div>
+                <div class="smallLanguageText">dansk</div>
+            </a>
+            <a tabindex=0 href="/nl_nl/documentation">
+                <div class="bigLanguageText">Dutch</div>
+                <div class="smallLanguageText">Nederlands</div>
+            </a>
+            <a tabindex=0 href="/en_gb/documentation">
+                <div class="bigLanguageText">English (United Kingdom)</div>
+                <div class="smallLanguageText">English (United Kingdom)</div>
+            </a>
+            <a tabindex=0 href="/et_ee/documentation">
+                <div class="bigLanguageText">Estonian</div>
+                <div class="smallLanguageText">eesti</div>
+            </a>
+            <a tabindex=0 href="/fi_fi/documentation">
+                <div class="bigLanguageText">Finnish</div>
+                <div class="smallLanguageText">suomi</div>
+            </a>
+            <a tabindex=0 href="/fr_fr/documentation">
+                <div class="bigLanguageText">French</div>
+                <div class="smallLanguageText">français</div>
+            </a>
+            <a tabindex=0 href="/gl_es/documentation">
+                <div class="bigLanguageText">Galician</div>
+                <div class="smallLanguageText">galego</div>
+            </a>
+            <a tabindex=0 href="/de_de/documentation">
+                <div class="bigLanguageText">German</div>
+                <div class="smallLanguageText">Deutsch</div>
+            </a>
+            <a tabindex=0 href="/el_gr/documentation">
+                <div class="bigLanguageText">Greek</div>
+                <div class="smallLanguageText">Ελληνικά</div>
+            </a>
+            <a tabindex=0 href="/he_il/documentation">
+                <div class="bigLanguageText">Hebrew</div>
+                <div class="smallLanguageText">עברית</div>
+            </a>
+            <a tabindex=0 href="/hi_in/documentation">
+                <div class="bigLanguageText">Hindi</div>
+                <div class="smallLanguageText">हिन्दी</div>
+            </a>
+            <a tabindex=0 href="/hu_hu/documentation">
+                <div class="bigLanguageText">Hungarian</div>
+                <div class="smallLanguageText">magyar</div>
+            </a>
+            <a tabindex=0 href="/is_is/documentation">
+                <div class="bigLanguageText">Icelandic</div>
+                <div class="smallLanguageText">íslenska</div>
+            </a>
+            <a tabindex=0 href="/it_it/documentation">
+                <div class="bigLanguageText">Italian</div>
+                <div class="smallLanguageText">italiano</div>
+            </a>
+            <a tabindex=0 href="/ja_jp/documentation">
+                <div class="bigLanguageText">Japanese</div>
+                <div class="smallLanguageText">日本語</div>
+            </a>
+            <a tabindex=0 href="/ko_kr/documentation">
+                <div class="bigLanguageText">Korean</div>
+                <div class="smallLanguageText">한국어</div>
+            </a>
+            <a tabindex=0 href="/lv_lv/documentation">
+                <div class="bigLanguageText">Latvian</div>
+                <div class="smallLanguageText">latviešu</div>
+            </a>
+            <a tabindex=0 href="/lt_lt/documentation">
+                <div class="bigLanguageText">Lithuanian</div>
+                <div class="smallLanguageText">lietuvių</div>
+            </a>
+            <a tabindex=0 href="/ms_my/documentation">
+                <div class="bigLanguageText">Malay</div>
+                <div class="smallLanguageText">Melayu</div>
+            </a>
+            <a tabindex=0 href="/nb_no/documentation">
+                <div class="bigLanguageText">Norwegian, Bokmål (Norway)</div>
+                <div class="smallLanguageText">norsk bokmål (Norge)</div>
+            </a>
+            <a tabindex=0 href="/pl_pl/documentation">
+                <div class="bigLanguageText">Polish</div>
+                <div class="smallLanguageText">polski</div>
+            </a>
+            <a tabindex=0 href="/pt_br/documentation">
+                <div class="bigLanguageText">Portuguese (Brazil)</div>
+                <div class="smallLanguageText">português (Brasil)</div>
+            </a>
+            <a tabindex=0 href="/pt_pt/documentation">
+                <div class="bigLanguageText">Portuguese (Portugal)</div>
+                <div class="smallLanguageText">português (Portugal)</div>
+            </a>
+            <a tabindex=0 href="/ro_ro/documentation">
+                <div class="bigLanguageText">Romanian</div>
+                <div class="smallLanguageText">română</div>
+            </a>
+            <a tabindex=0 href="/ru_ru/documentation">
+                <div class="bigLanguageText">Russian</div>
+                <div class="smallLanguageText">русский</div>
+            </a>
+            <a tabindex=0 href="/sr_cyrl_rs/documentation">
+                <div class="bigLanguageText">Serbian</div>
+                <div class="smallLanguageText">srpski</div>
+            </a>
+            <a tabindex=0 href="/sk_sk/documentation">
+                <div class="bigLanguageText">Slovak</div>
+                <div class="smallLanguageText">slovenčina</div>
+            </a>
+            <a tabindex=0 href="/sl_si/documentation">
+                <div class="bigLanguageText">Slovenian</div>
+                <div class="smallLanguageText">slovenščina</div>
+            </a>
+            <a tabindex=0 href="/es_es/documentation">
+                <div class="bigLanguageText">Spanish</div>
+                <div class="smallLanguageText">español</div>
+            </a>
+            <a tabindex=0 href="/sv_se/documentation">
+                <div class="bigLanguageText">Swedish</div>
+                <div class="smallLanguageText">svenska</div>
+            </a>
+            <a tabindex=0 href="/th_th/documentation">
+                <div class="bigLanguageText">Thai</div>
+                <div class="smallLanguageText">ไทย</div>
+            </a>
+            <a tabindex=0 href="/tr_tr/documentation">
+                <div class="bigLanguageText">Turkish</div>
+                <div class="smallLanguageText">Türkçe</div>
+            </a>
+            <a tabindex=0 href="/uk_ua/documentation">
+                <div class="bigLanguageText">Ukrainian</div>
+                <div class="smallLanguageText">українська</div>
+            </a>
+            <a tabindex=0 href="/vi_vn/documentation">
+                <div class="bigLanguageText">Vietnamese</div>
+                <div class="smallLanguageText">Tiếng Việt</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+
+
+
+<script>
+    function handleDropdownClick() {
+        document.getElementById("languageDropdownMenu").classList.toggle("show");
+        document.getElementById("languageInput").focus();
+    }
+
+    function filterFunction() {
+        var input, filter, ul, li, a, i;
+        input = document.getElementById("languageInput");
+        filter = input.value.toUpperCase();
+        div = document.getElementById("languageDropdownMenu");
+        a = div.getElementsByTagName("a");
+        for (i = 0; i < a.length; i++) {
+            txtValue = a[i].textContent || a[i].innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                a[i].style.display = "";
+            } else {
+                a[i].style.display = "none";
+            }
+        }
+    }
+
+    function setLanguageCode() {
+        var downTriangleCode = "&#9660";
+
+        var langButton = document.getElementById("langButton");
+        langButton.innerHTML = getLanguageCode() + "&nbsp;" + downTriangleCode;
+    }
+
+    function getLanguageCode() {
+        var langCode = "EN";
+        var splitPath = (window.location.pathname).split("/");
+        if (splitPath.length > 2) {
+            var lcidSymbol = splitPath[1];
+            langCode = lcidSymbol.split("_")[0].toUpperCase();
+        }
+        return langCode;
+    }
+
+    var flag = 0;
+    window.addEventListener('click', function (event) {
+        var dropDownElem = document.getElementsByClassName("lang-dropdown")[0];
+        var langDropDownMenu = document.getElementById("languageDropdownMenu");
+        if (event.target != dropDownElem
+            && event.target.parentNode != dropDownElem
+            && flag % 2 != 0) {
+            if (langDropDownMenu.classList.contains("show")) {
+                langDropDownMenu.classList.remove("show");
+            }
+        }
+        flag += 1;
+    })
+
+    setLanguageCode();
+</script>
+                    </li>
+                    
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    
+
+
+
+<main class="container col-sm-12 col-md-8 col-lg-6">
+    <div>
+        <h1 class="page-title">
+            Documentation
+        </h1>
+
+        <section>
+            <h2 class="section-heading">
+                Submitting One URL
+            </h2>
+            <hr class="heading-underline" />
+
+            <p class="para">
+                To submit a URL using an HTTP request (replace <searchengine_URL> with the URL provided by the search engine), issue your request to the following URL:
+            </p>
+
+            <pre>
+                <code>https://&lt;searchengine&gt;/indexnow?<text class="color-key">url</text>=url-changed&<text class="color-key">key</text>=your-key</code>
+            </pre>
+
+            <ul>
+                
+                <li>
+                    url-changed is a URL of your website which has been added, updated, or deleted.  URL must be URL-escaped and encoded and please make sure that your URLs follow the <a href="https://www.ietf.org/rfc/rfc3986.txt"> RFC-3986 </a>  standard for URIs.
+                </li>
+                
+                <li>
+                    Your-key should have a minimum of 8 and a maximum of 128 hexadecimal characters. The key can contain only the following characters: lowercase characters (a-z), uppercase characters (A-Z), numbers (0-9), and dashes (-).
+                </li>
+                
+            </ul>
+
+            <p class="para">
+                For example, if you want to notify search engines that <a href="https://www.example.com/product.html">https://www.example.com/product.html</a> has been updated, and you want to use this key <text class="key"><text> your URL will be:
+            </p>
+
+            <pre>
+                <code>https://&lt;searchengine&gt;/indexnow?<text class="color-key">url</text>=https://www.example.com/product.html&<text class="color-key">key</text>=<text class="key"></text></code>
+            </pre>
+
+            <p class="para">
+                You can issue the HTTP request using your browser, wget, curl, or any other mechanism of your choosing. A successful request will return an HTTP 200 response code; if you receive a different response, verify that you don’t submit too often, that the key and URL are valid and resubmit the request. The HTTP 200 response code only indicates that the search engine has received your URL.
+            </p>
+        </section>
+
+        <section>
+            <h2 class="section-heading">
+                Submitting set of URLs
+            </h2>
+            <hr class="heading-underline" />
+
+            <p class="para">
+                To submit a set of URLs using an HTTP request issue your POST JSON request to the URL provided by Search Engines. Replace <searchengine> by the host name of the search engine.
+            </p>
+
+            <pre>
+                <code><b>POST</b> /indexnow <b>HTTP</b>/1.1</code>
+                <code><text class="color-key">Content-Type</text>: application/json; charset=utf-8</code>
+                <code><text class="color-key">Host</text>: &lt;searchengine&gt;</code>
+                <code>{</code>
+                <code>  <text class="color-key">"host"</text>: "www.example.com",</code>
+                <code>  <text class="color-key">"key"</text>: "<text class="key"></text>",</code>
+                <code>  <text class="color-key">"urlList"</text>: [</code>
+                <code>      "https://www.example.com/url1",</code>
+                <code>      "https://www.example.com/folder/url2",</code>
+                <code>      "https://www.example.com/url3"</code>
+                <code>      ]</code>
+                <code>}</code>
+            </pre>
+
+            
+            <p class="para">
+                You can submit up to 10,000 URLs per post, mixing http and https URLs if needed.
+            </p>
+            
+            <p class="para">
+                You can issue the HTTP request using wget, curl, or another mechanism of your choosing. A successful request will return an HTTP 200 response code; if you receive a different response, you should verify your request and if everything looks fine, resubmit your request. The HTTP 200 response code only indicates that the search engine has received your set of URLs.
+            </p>
+            
+            <p class="para">
+                The recommended way is to automate submission of URLs as soon as the content is added, updated, or deleted up to some limit; see best practices for user generated content in the Frequently Asked Questions.
+            </p>
+            
+
+        </section>
+
+        <section>
+            <h2 class="section-heading">
+                Verifying ownership via the key
+            </h2>
+            <hr class="heading-underline" />
+
+            <p class="para">
+                To submit URLs, you must "prove" ownership of the host for which URLs are being submitted by hosting at least one text file within the host. Once you submit your URLs to search engines, search engines will crawl the key file to verify ownership and use the key until you change the key. Only you and the search engines should know the key and your file key location.
+            </p>
+
+            <p class="para">
+                We offer two ways to verify ownership.
+            </p>
+
+            <section>
+                <div class="options">
+                    Option 1
+                </div>
+
+                <strong>
+                    Hosting a text key file at the root directory of your host.
+                </strong>
+
+                <p class="para">
+                    You must host a UTF-8 encoded text key file {your-key}.txt listing the key in the file at the root directory of your website.
+                </p>
+
+                <p class="para">
+                    For instance for the previous examples, you will need to host your UTF-8 key file at <a class="anchor-with-key">https://www.example.com/<text class="key"></text>.txt</a> and this file must contain the key <strong><text class="key"></text></strong>
+                </p>
+            </section>
+
+            <section>
+                <div class="options">
+                    Option 2
+                </div>
+
+                <strong>
+                    Hosting a text key file within your host.
+                </strong>
+
+                <p class="para">
+                    You can also host one to many UTF-8 encoded text key files in other locations within the same host and you must tell search engines the location of this text key file in each IndexNow notification by specifying the location using the keyLocation variable.
+                </p>
+
+                <p class="para">
+                    If you submit an URL, specify the key file location as keyLocation URLs parameter value.
+                </p>
+
+                <pre>
+                    <code>https://&lt;searchengine&gt;/indexnow?<text class="color-key">url</text>=http://www.example.com/product.html&<text class="color-key">key</text>=<text class="key"></text>&<text class="color-key">keyLocation</text>=http://www.example.com/myIndexNowKey63638.txt</code>
+                </pre>
+
+
+                <p class="para">
+                    If you submit a set of URLs, specify the key file location as keyLocation variable in the JSON content.
+                </p>
+
+                <pre>
+                    <code><b>POST</b> /indexnow <b>HTTP</b>/1.1</code>
+                    <code><text class="color-key">Content-Type</text>: application/json; charset=utf-8</code>
+                    <code><text class="color-key">Host</text>: &lt;searchengine&gt;</code>
+                    <code>{</code>
+                    <code>  <text class="color-key">"host"</text>: "www.example.com",</code>
+                    <code>  <text class="color-key">"key"</text>: "<text class="key"></text>",</code>
+                    <code>  <text class="color-key">"keyLocation"</text>: "https://www.example.com/myIndexNowKey63638.txt",</code>
+                    <code>  <text class="color-key">"urlList"</text>: [</code>
+                    <code>      "https://www.example.com/url1",</code>
+                    <code>      "https://www.example.com/folder/url2",</code>
+                    <code>      "https://www.example.com/url3"</code>
+                    <code>      ]</code>
+                    <code>}</code>
+                </pre>
+
+                <section>
+                    <p class="para">
+                        In this option 2, the location of a key file determines the set of URLs that can be included with this key. A key file located at <a href="http://example.com/catalog/key12457EDd.txt">http://example.com/catalog/key12457EDd.txt</a> can include any URLs starting with <a href="http://example.com/catalog/">http://example.com/catalog/</a> but cannot include URLs starting with <a href="http://example.com/help/">http://example.com/help/</a>.
+                    </p>
+
+                    <p class="para">
+                        URLs considered valid in http://example.com/catalog/ include:
+                    </p>
+
+                    <ul>
+                        
+                        <li>
+                            <a href="http://example.com/catalog/show?item=23">http://example.com/catalog/show?item=23</a>
+                        </li>
+                        
+                        <li>
+                            <a href="http://example.com/catalog/show?item=233&user=3453">http://example.com/catalog/show?item=233&user=3453</a>
+                        </li>
+                        
+                    </ul>
+                </section>
+
+                <section>
+                    <p class="para">
+                        URLs not considered valid in http://example.com/catalog/ include:
+                    </p>
+                    <ul>
+                        
+                        <li>
+                            <a href="http://example.com/image/show?item=23">http://example.com/image/show?item=23</a>
+                        </li>
+                        
+                        <li>
+                            <a href="http://example.com/image/show?item=233&user=3453">http://example.com/image/show?item=233&user=3453</a>
+                        </li>
+                        
+                    </ul>
+                </section>
+
+                <p class="para">
+                    URLs that are not considered valid in option 2 may not be considered for indexing. It is strongly recommended that you use Option 1 and place your file key at the root directory of your web server.
+                </p>
+
+                <section>
+					<h2 class="section-heading" id="response">
+						Response format
+					</h2>
+                    <hr class="heading-underline" />
+
+					<div class="col-sm-12 col-md-12">
+                        <div class="code-block-body p-3 align-items-center ">
+                            <div class="error-codes row">
+                                <div class="col-2"><b>HTTP Code</b></div>
+                                <div class="col-4"><b>Response</b></div>
+                                <div class="col-6"><b>Reasons</b></div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">200</div>
+                                <div class="col-4">OK</div>
+                                <div class="col-6">URL submitted successfully</div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">202</div>
+                                <div class="col-4">Accepted</div>
+                                <div class="col-6">URL received. IndexNow key validation pending.</div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">400</div>
+                                <div class="col-4">Bad request</div>
+                                <div class="col-6">Invalid format</div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">403</div>
+                                <div class="col-4">Forbidden</div>
+                                <div class="col-6">In case of key not valid (e.g. key not found, file found but key not in the file)</div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">422</div>
+                                <div class="longWordInText col-4">Unprocessable Entity</div>
+                                <div class="col-6">In case of URLs which don’t belong to the host or the key is not matching the schema in the protocol</div>
+                            </div>
+                            <div class="error-codes row">
+                                <div class="col-2">429</div>
+                                <div class="col-4">Too Many Requests</div>
+                                <div class="col-6">Too Many Requests (potential Spam)</div>
+                            </div>
+                        </div>
+                    </div>
+				</section>
+
+                <section>
+                    <h2 class="section-heading">
+                        Requirement for search engines
+                    </h2>
+                    <hr class="heading-underline" />
+
+                    <p class="para">
+                        Search engines adopting the IndexNow protocol agree that submitted URLs will be automatically shared 
+                        with all other participating search engines. To participate, search engines must have a noticeable presence 
+                        in at least one market or be closely linked to the search market and make a significant contribution to the number of url submissions.
+                        <a href="/searchengines">Learn more</a>
+                    </p>
+                </section>
+            </section>
+        </section>
+    </div>
+    <div class="px-0" style="opacity: 1; background: #FFFFFF;">
+    <hr style="margin-top: 13px; margin-bottom: 13px;" />
+    <div class="footer">
+        <a href="terms" style="text-decoration: none;">Terms and Conditions</a>
+    </div>
+</div>
+
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"
+    integrity="sha512-BCMqEPl2dokU3T/EFba7jrfL4FxgY6ryUh4rRC9feZw4yWUslZ3Uf/lPZ5/5UlEjn4prlQTRfIPYQkDrLCZJXA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/assets/scripts/documentation.js"></script>
+
+</body>
+
+</html>

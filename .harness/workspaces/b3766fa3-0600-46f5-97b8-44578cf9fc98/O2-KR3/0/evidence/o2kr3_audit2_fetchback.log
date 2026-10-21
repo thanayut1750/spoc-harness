@@ -1,0 +1,29 @@
+=== O2-KR3 AUDIT ATTEMPT-2 FETCH-BACK (post-push) ===
+UTC: 2026-10-21T05:04:19Z
+PUSH: e39fb8c..e7a5d23 codex/spoc-harness-v1 -> origin (receipt: PUSH_EXIT=0, FETCH_EXIT=0)
+TIP_COMMIT: e7a5d23140ca47667d0adbe7a7f4ba31da90722f
+
+--- FB1: evidence/o2kr3_audit2.log at tip ---
+FB1_HTTP_STATUS: 200
+FB1_BYTES_REMOTE: 13342  LOCAL: 13342
+FB1_SHA256_REMOTE: 30e33a4b3a6b303d999f9ac4257e8b7f533a2316399d83c6286587d57b4599e5
+FB1_SHA256_LOCAL:  30e33a4b3a6b303d999f9ac4257e8b7f533a2316399d83c6286587d57b4599e5
+FB1_VERDICT: MATCH_AUDIT2_LOG_AT_TIP
+
+--- FB2: attempt-1 evidence/o2kr3_audit.log unchanged at tip (prior evidence immutable) ---
+FB2_HTTP_STATUS: 200
+FB2_SHA256_REMOTE: d9ed213930184721b166e3e67b08bb971bf52f633fc393f8a8fc1000d996ecf7
+FB2_VERDICT: MATCH_ATTEMPT1_ANCHOR (d9ed2139...)
+
+--- FB3: prior deliverable outreach_log.md untouched at tip ---
+FB3_HTTP_STATUS: 200
+FB3_SHA256_REMOTE: c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+FB3_VERDICT: MATCH_OUTREACH_LOG_ANCHOR (c764677b...)
+
+--- CLARIFICATION (audit-log interpretation only; no audit bytes altered) ---
+Attempt-1 log line 'ADDENDUM 9 present: 0; ADDENDUM 10 present: 0' is a grep-pattern false negative:
+script grepped '^## ADDENDUM 9' but mission_log headers have no '## ' prefix.
+Fresh check this attempt: 1 x 'ADDENDUM 9 - ' at line 297; 1 x 'ADDENDUM 10 - ' at line 341.
+R8 verdict is based on git diff --numstat (0 minus-lines), not the header grep; verdict unaffected.
+
+FETCHBACK_UTC_END: 2026-10-21T05:04:20Z

@@ -1,0 +1,107 @@
+# O2-KR5 mirrored-listing receipt log — WP-O2KR5-1-TRIGGER-MIRROR (dir O2-KR5/8)
+
+Purpose: push and raw.githubusercontent.com fetch-back receipts for the stage-1 fallback
+deliverable `listing/MIRROR_O2KR5.md` of workspace
+`.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8`.
+Exactly one push attempt per commit to the recorded destination branch
+`codex/spoc-harness-v1` (no retries, no force pushes, no account creation, no credential
+fabrication); the mirrored listing carries zero invented buy/order/checkout URLs
+(URL AUDIT below). Every claim below cites an HTTP status, a sha256, or an exit code.
+
+## PUSH-1 receipt (mirrored listing + decision log v1 + reconciliation evidence)
+
+- Push base (pre-work tip): `6c66cec8018960324e906d3ff9f84c03ccc6bc5f`
+- Pre-push additions-only scope check (`git diff --cached --name-status 6c66cec8…`):
+  SCOPE_ADDITIONS_ONLY=YES — 4 files, all status `A`, all under
+  `.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8/`;
+  `git diff --cached --numstat`: 242 insertions, 0 deletions. Files:
+  `listing/MIRROR_O2KR5.md` (66 lines), `evidence/o2kr5_decision_log.md` (116 lines),
+  `evidence/o2kr5_reconciliation.log` (16 lines), `evidence/o2kr5_reconciliation_fetch.sh`
+  (60 lines). Copy from workspace to clone proven byte-identical before staging
+  (sha256 manifest diff of source vs clone paths: COPY_BYTE_IDENTICAL).
+- COMMIT1_SHA: `4039d2e7ed04dbc7af6cf46032504678e469d9ca`
+  (committer date 2026-10-22T01:29:49+07:00 = 2026-10-21T18:29:49Z)
+- Push command: `git push <operator credentialed URL, redacted> HEAD:refs/heads/codex/spoc-harness-v1`
+  Remote reply: `6c66cec..4039d2e  HEAD -> codex/spoc-harness-v1`; **PUSH_EXIT=0**
+- Independent remote confirmation: anonymous `git ls-remote` →
+  `4039d2e7ed04dbc7af6cf46032504678e469d9ca  refs/heads/codex/spoc-harness-v1`,
+  LSREMOTE_EXIT=0 (local HEAD == remote tip)
+- Clone tree after commit: clean (`git status --porcelain`: 0 entries)
+
+## FETCH-BACK receipts at the pushed commit (raw.githubusercontent.com)
+
+Base: `https://raw.githubusercontent.com/thanayut1750/spoc-harness/4039d2e7ed04dbc7af6cf46032504678e469d9ca/`
+
+FB-1 path=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8/listing/MIRROR_O2KR5.md
+FB-1 URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/4039d2e7ed04dbc7af6cf46032504678e469d9ca/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8/listing/MIRROR_O2KR5.md
+FB-1 HTTP_STATUS=200 BYTES=3846
+FB-1 FETCHED_SHA256=f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952
+FB-1 LOCAL_SHA256=f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952 GIT_SHA256=f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952
+FB-1 VERDICT=MATCH
+
+FB-2 path=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8/evidence/o2kr5_decision_log.md
+FB-2 URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/4039d2e7ed04dbc7af6cf46032504678e469d9ca/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/8/evidence/o2kr5_decision_log.md
+FB-2 HTTP_STATUS=200 BYTES=9614
+FB-2 FETCHED_SHA256=761a50016e255b4caed840d19064533700360d2ae469235b87067e9031e90e39
+FB-2 LOCAL_SHA256=761a50016e255b4caed840d19064533700360d2ae469235b87067e9031e90e39 GIT_SHA256=761a50016e255b4caed840d19064533700360d2ae469235b87067e9031e90e39
+FB-2 VERDICT=MATCH
+
+(FB-2 anchors the decision-log version pushed at commit `4039d2e…`, i.e. the version whose
+ENTRY 3 placeholder this log accompanies; LOCAL = clone working copy at the commit;
+GIT = `git show <commit>:<path>`.)
+
+## URL AUDIT (mirrored listing)
+
+- `grep -noE 'https?://[^ )>]+' listing/MIRROR_O2KR5.md` → exactly 2 URLs, both appearing
+  verbatim in the recorded announcement source (no URL added):
+  1. line 35: recorded free-zip raw URL pinned at commit
+     `a8563e06532ea3fd0af2b51331ba8d3be66eff5b` → `…/O2-KR2/0/build/pydevtoolkit-1.0.0.zip`
+  2. line 38: repository root `https://github.com/thanayut1750/spoc-harness`
+- Case-insensitive token scan (`buy|order|checkout|gumroad|lemonsqueezy|stripe|paypal|purchase`)
+  hits 7 lines, all of which are the file's own honesty/provenance statements
+  (e.g. "no buy, order, or checkout URL is added or implied"; "There is no live purchase
+  page and no buy URL."). **Zero purchase/order/checkout URLs exist in the mirrored
+  listing and none were invented.**
+
+## HONEST CLOSE (state of the mission at this publication attempt)
+
+- Cumulative net revenue remains **$0.00 USD**; remaining gap **$100.00 USD**; goal
+  **NOT reached**. Source: `report/EARNINGS_REPORT_O2KR4.md` (sha256
+  `dc2b4ebae4048181cfb3e3a938eaa18cc11ce5f1f7098ad26ab62554988d41db`; fresh fetch-back
+  row A3 at `780d7fd0…`: HTTP 200, VERDICT=MATCH in `evidence/o2kr5_reconciliation.log`);
+  ledger `entry_count` 0; `revenue_ledger.json` never created (zero accepted adds).
+- No live marketplace offer exists (O2-KR2 terminal BLOCKED — Gumroad and Lemon Squeezy
+  API HTTP 401, zero machine credentials; publish requires a human). The mirrored
+  listing is repository content with provenance, not a live offer.
+- Ledger rerun after fallback execution was already recorded at the current tip by the
+  dir-7 close-out (`O2KR5_LEDGER_RERUN: COMPLETE`, still $0.00) — cited here, not
+  re-executed, to avoid duplicating a destination attempt.
+
+## FINAL-TIP VERIFICATION
+
+Per the dir-7 close-out precedent, this section states the expected third-tip state
+**before** the third push; the actual closing fetch-back rows at the third tip
+necessarily post-date the final commit and are therefore recorded in the assignment
+session record (`evidence/o2kr5_closeout_session_record.md` in this workspace), **not**
+in a fourth commit — no new in-log promise is created and the append-regress stops here.
+
+EXPECTED AT THIRD TIP (branch `codex/spoc-harness-v1`):
+
+- ET1 `listing/MIRROR_O2KR5.md` — unchanged since commit 1; expected sha256
+  `f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952`
+  (3,846 bytes; C1/C2 fetch-backs FB-1 already matched byte-exact).
+- ET2 `evidence/o2kr5_decision_log.md` (v3, ENTRY 4 appended) — expected sha256
+  `e6dcbfd24eba3260b9da6aeb236ed26d0018de88f1efc33077669ec86c3a91ae`
+  (15,598 bytes; 4 ENTRY headers; v2 prefix byte-identical, verified pre-push:
+  head -c 11960 == `27c8a9715dbc0af3ad843aa05225c01784d0d17919b479a333a14ef72b039592`).
+- ET3 this receipt log — its own post-append sha256 is recorded in the session record
+  rather than in-log (a file cannot contain its own hash); any third-tip fetch-back of
+  this file must equal that session-record value byte-for-byte.
+
+Every claim above and in the session record cites an HTTP status, a sha256, or an exit
+code. Honesty close (unchanged): cumulative net revenue **$0.00 USD**, remaining gap
+**$100.00 USD**, **GOAL NOT REACHED**, SALES_COUNT **0**; the mirrored listing is
+repository content with provenance (announcement commit `6bb5530…`), not a live offer;
+O2-KR2 remains terminal BLOCKED; zero buy/order/checkout URLs invented; the ledger rerun
+after fallback execution remains the dir-7 recorded one (`O2KR5_LEDGER_RERUN: COMPLETE`,
+still $0.00) — cited, not re-executed.

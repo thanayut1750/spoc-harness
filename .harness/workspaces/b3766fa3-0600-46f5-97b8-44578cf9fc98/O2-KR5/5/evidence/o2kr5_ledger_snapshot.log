@@ -1,0 +1,16 @@
+O2-KR5 fresh read-only ledger snapshot (trigger-evaluation input)
+UTC: 2026-10-21T15:45:12Z (authoring receipt; invocation made 2026-10-21T15:44-15:45Z window)
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger)
+action: summary (READ-ONLY; no 'add' invoked; no entry created)
+ledger_path: /home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json
+
+TOOL OUTPUT (verbatim):
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+
+TRIGGER FIELDS DERIVED:
+- SALES_COUNT = entry_count = 0 (entries: [])
+- LEDGER_TOTAL = total_earned = $0.00 USD; remaining = $100.00; goal_reached = false
+- Matches recorded O2-KR4 state exactly (report/EARNINGS_REPORT_O2KR4.md:
+  "ACTUAL AMOUNT EARNED: $0.00 USD", "GOAL: UNMET"; ledger file absent — zero accepted
+  adds ever; invocation artifact IDs this session:
+  7de8533348199699496ae6e1e1db025f / 8e971ebc83c6a273c83113bd9ec45f6c / b9f6bf0ad5795fd1f125fe189ebde60e).
