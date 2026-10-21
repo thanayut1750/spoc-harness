@@ -106,3 +106,25 @@ FBX_RESULT: pass=7 fail=0 (7 fetch-backs expected; all must be HTTP 200 + sha256
 FETCHBACK_AFTER_CORRECTION: ALL_MATCH (pass=7 fail=0; the original HAS_MISMATCH verdict above is superseded by this corrected verdict and retained for the record)
 CORRECTION_UTC=2026-10-21T11:46:41Z
 ================================================================================
+================================================================================
+SELF FETCH-BACK AT PUSH-C TIP (receipt appended additions-only AFTER the fetch)
+PUSH_C: COMMIT_C=9eb8fd0489c103b6fdaa028e3c7a16af533f812a PUSH_C_EXIT=0 FETCH_C_EXIT=0 TEMP_REF=refs/tmp-kr5/c deleted
+REMOTE_TIP_AT_C_VERIFIED_BY_ANONYMOUS_LS_REMOTE=9eb8fd0489c103b6fdaa028e3c7a16af533f812a
+FB_TIPC | URL=https://raw.githubusercontent.com/thanayut1750/spoc-harness/9eb8fd0489c103b6fdaa028e3c7a16af533f812a/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/3/evidence/o2kr5_gig_fetchback.log | HTTP_STATUS=200 | FETCHED_SHA256=c42b4e7539675e24b2ca567344fd3cbc9ee180671d6bb870592000780bbf0721 | LOCAL_SHA256=c42b4e7539675e24b2ca567344fd3cbc9ee180671d6bb870592000780bbf0721 | VERDICT=MATCH (byte-exact, cmp IDENTICAL, 12617 B)
+NOTE: A log cannot contain the receipt of its own future bytes; this tip-C
+receipt is therefore written after the tip-C fetch and added additions-only in
+the follow-up commit, whose final log is re-fetched from raw.githubusercontent.com
+and verified byte-exact the same way (that verification is cited in the session
+close-out alongside the published final-log artifact).
+ADDENDUM-2 DISPOSITION: row 1 (fetchback log at push-C tip) = the CORRECTION block
+above, fetched back at tip C HTTP 200 byte-exact (FB_TIPC); row 2 (self fetch-back
+at tip C) = this FB_TIPC receipt, recorded inside the log at the follow-up commit.
+HONEST OUTCOME (unchanged): gig chain EXHAUSTED - Fiverr documented UNAVAILABLE on
+the recorded O2-KR3 receipt (403, B3 f0c68766b0e2651f0c35783b537ab39e, cited in
+pinned citations.md @ 6c83c9d, NOT re-contacted); Upwork documented UNAVAILABLE on
+one fresh compliant probe (HTTP 403 Cloudflare block page, no account creation, no
+credentials). This is publication/probe evidence only - NOT a sale. Cumulative net
+revenue $0.00 USD, 0 ledger entries, remaining gap $100.00; revenue_ledger.json
+absent and untouched (no writes this session); no retries, no fabricated URLs.
+CORRECTION_CLOSE_UTC=2026-10-21T11:55:00Z
+================================================================================
