@@ -174,3 +174,79 @@ corroborated via an anonymous `git ls-remote` receipt recorded in the run close-
 rather than inside this file.
 
 <!-- APPEND POST-PUSH SECTION BELOW THIS LINE -->
+
+### POST-PUSH RESULTS (appended 2026-10-21T13:20:53Z, after LOG_COMMIT was pushed)
+
+RECEIPT-FLAG DISCLOSURE: every command receipt returned by this run's execution
+environment carries the flag `execution_stopped=true` (with "interrupted receipt"
+recovery guidance) even when `exit_code=0`, stdout is complete and process duration
+is sub-second. No receipt here is trusted in isolation: each effect below is
+corroborated by an independent read-only state inspection (fresh sha256 of the
+files, `git rev-parse`/`git diff` in two independent clones, anonymous
+`git ls-remote`, and raw.githubusercontent.com fetch-backs). No interrupted command
+was replayed; each step was performed exactly once.
+
+#### LOG_COMMIT (first publication commit of this log)
+
+- LOG_COMMIT: `a06fc845d6cd3b99b117d9862daec5a7ad0a1620` (parent
+  `64464c5418e67a527802763a3fdb73dfef14142d` = COMMIT_A; author date
+  2026-10-21T20:19:37+07:00; subject "O2-KR5 stage-1 (WP-O2KR5-1, dir 4):
+  mirrored-listing execution log (sections 1-7 + trigger/push/fetch-back evidence;
+  additions-only)"; numstat 176 added / 0 deleted on the single path = this file).
+  Receipts: staging artifacts bbe72130c3fcac1f52bcfd3cf9066d09 /
+  a48fda660eaf8c635d41423b8b4ac686; commit artifacts 961d17b11af425efae04d78ee76db4c5
+  / fdf4c40d1ddf1f1c569a0fdc1046ce40.
+- Committed blob sha256 (`git show` @ LOG_COMMIT) =
+  101800480dec9a604f121bb7a41b96d871845b87cad93943bd3a64511ea4cd0e == workspace
+  copy sha256 at push time (11,604 bytes).
+- Push: PUSH_EXIT=0; remote range `64464c5..a06fc84` on
+  refs/heads/codex/spoc-harness-v1 (receipt artifacts
+  cadad91d155a24bab58d1651136d6ba8 / d8c3ff43c85de2b944a6bd2a96c9d1d2 /
+  0f36003741679ffbff6d018b5ec97adb). Transport as disclosed in section 3: the
+  staging clone has no push credentials, so LOG_COMMIT was fetched into the main
+  workspace repo as temp ref `refs/tmp-kr5/d4-head`, pushed via that repo's
+  authenticated origin, and the temp ref was deleted (TEMPREFS_REMAINING=0); the
+  main worktree was verified untouched before and after (HEAD `0bff7b36…`,
+  0 porcelain lines).
+- Independent corroboration: anonymous `git ls-remote
+  https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1`
+  -> `a06fc845d6cd3b99b117d9862daec5a7ad0a1620  refs/heads/codex/spoc-harness-v1`
+  (artifact 1d2ffc6065bc9578f18339e48efca936).
+
+#### FRESH FETCH-BACK AT LOG_COMMIT (raw.githubusercontent.com) — 4/4 MATCH
+
+```
+FB|file=evidence/o2kr5_decision_log.md|HTTP=200|BYTES=4988|SHA256=3780e0f1fac8b7d6bb800e71b1b478785dd0a96ace0f3abfbf60f45b7b7de60c|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=evidence/o2kr5_ledger_recheck.log|HTTP=200|BYTES=1910|SHA256=9f7c68c7a5ed1b8c72b8fbe48a0ce1abb86c5928852991e20a4e8cc976e4a311|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=listing/MIRROR_O2KR5.md|HTTP=200|BYTES=2851|SHA256=acf864eb6ccc2cc2e6ae9d07bee705bff56948954ab300562fced086d152e62f|LOCAL==GIT==REMOTE|VERDICT=MATCH
+FB|file=evidence/o2kr5_mirrored_listing.log|HTTP=200|BYTES=11604|SHA256=101800480dec9a604f121bb7a41b96d871845b87cad93943bd3a64511ea4cd0e|LOCAL==GIT==REMOTE|VERDICT=MATCH
+```
+
+- Result: MATCH_COUNT=4, MISMATCH_COUNT=0. The three COMMIT_A files are unchanged
+  at the new tip; this log's pushed bytes equal the pre-append workspace copy.
+  Receipt: artifact 1d2ffc6065bc9578f18339e48efca936 (fetch-back base =
+  raw.githubusercontent.com/thanayut1750/spoc-harness/
+  a06fc845d6cd3b99b117d9862daec5a7ad0a1620/.harness/workspaces/
+  b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/).
+
+#### SCOPE SWEEP 0bff7b36..LOG_COMMIT — ADDITIONS-ONLY (receipt artifact 8d62ca3ab7e63ad5fa9b74664433bba8)
+
+- Exactly 4 rows, all `A`, all under `…/O2-KR5/4/`:
+  `evidence/o2kr5_decision_log.md`, `evidence/o2kr5_ledger_recheck.log`,
+  `evidence/o2kr5_mirrored_listing.log`, `listing/MIRROR_O2KR5.md`.
+  NUMSTAT total: 334 added, 0 deleted. NON_ADD_ROWS=0; ROWS_OUTSIDE_DIR4=0.
+  O2-KR5/{0,2,3} and every other path untouched.
+
+#### CLOSING NOTE
+
+- The push of THIS section (the final stage-1 commit) cannot contain its own hash;
+  its commit SHA, PUSH_EXIT and anonymous ls-remote corroboration are recorded in
+  the run close-out, not here. After that push, a fresh raw fetch-back of this file
+  at the final tip is compared byte-exact against the workspace copy as the last
+  close-out check.
+- Stage-1 scope unchanged: mirrored listing is the only fallback channel executed
+  in this package; gig platforms, adjusted offer, chain close-out and the
+  post-fallback ledger rerun remain for the following work packages (this file and
+  `evidence/o2kr5_decision_log.md` stay appendable). Honest commercial state: no
+  sale exists, ledger total $0.00 USD, entry_count 0, gap $100.00; no price, order,
+  buy or checkout URL was created or implied.
