@@ -79,4 +79,29 @@ GIT = `git show <commit>:<path>`.)
 
 ## FINAL-TIP VERIFICATION
 
-[TO BE APPENDED AFTER SECOND PUSH]
+Per the dir-7 close-out precedent, this section states the expected third-tip state
+**before** the third push; the actual closing fetch-back rows at the third tip
+necessarily post-date the final commit and are therefore recorded in the assignment
+session record (`evidence/o2kr5_closeout_session_record.md` in this workspace), **not**
+in a fourth commit — no new in-log promise is created and the append-regress stops here.
+
+EXPECTED AT THIRD TIP (branch `codex/spoc-harness-v1`):
+
+- ET1 `listing/MIRROR_O2KR5.md` — unchanged since commit 1; expected sha256
+  `f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952`
+  (3,846 bytes; C1/C2 fetch-backs FB-1 already matched byte-exact).
+- ET2 `evidence/o2kr5_decision_log.md` (v3, ENTRY 4 appended) — expected sha256
+  `e6dcbfd24eba3260b9da6aeb236ed26d0018de88f1efc33077669ec86c3a91ae`
+  (15,598 bytes; 4 ENTRY headers; v2 prefix byte-identical, verified pre-push:
+  head -c 11960 == `27c8a9715dbc0af3ad843aa05225c01784d0d17919b479a333a14ef72b039592`).
+- ET3 this receipt log — its own post-append sha256 is recorded in the session record
+  rather than in-log (a file cannot contain its own hash); any third-tip fetch-back of
+  this file must equal that session-record value byte-for-byte.
+
+Every claim above and in the session record cites an HTTP status, a sha256, or an exit
+code. Honesty close (unchanged): cumulative net revenue **$0.00 USD**, remaining gap
+**$100.00 USD**, **GOAL NOT REACHED**, SALES_COUNT **0**; the mirrored listing is
+repository content with provenance (announcement commit `6bb5530…`), not a live offer;
+O2-KR2 remains terminal BLOCKED; zero buy/order/checkout URLs invented; the ledger rerun
+after fallback execution remains the dir-7 recorded one (`O2KR5_LEDGER_RERUN: COMPLETE`,
+still $0.00) — cited, not re-executed.

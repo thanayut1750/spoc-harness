@@ -144,3 +144,55 @@ close the log.
   second push; ENTRY 4 (appended after that push) records the byte-exact tip fetch-backs
   of both files, and the assignment close-out records the final fetch-backs at the
   third-push tip, closing this log end-to-end.
+
+## ENTRY 4 — second-push receipts (tip fetch-backs of this log and the receipt log)
+
+- UTC_TIMESTAMP: 2026-10-21T18:41:52Z (fresh `date -u` receipt at entry authoring).
+- Second push (exactly one attempt, no retry): commit
+  `ef191d3b95d9fc81c817773c674a887cdf724fd7` (committer date
+  `2026-10-22T01:33:12+07:00` = 2026-10-21T18:33:12Z) pushed to
+  `codex/spoc-harness-v1`; remote reply `4039d2e..ef191d3  HEAD ->
+  codex/spoc-harness-v1`; **PUSH2_EXIT=0**. Independent anonymous `git ls-remote`
+  re-verified fresh this session →
+  `ef191d3b95d9fc81c817773c674a887cdf724fd7  refs/heads/codex/spoc-harness-v1`
+  (LSREMOTE_EXIT=0; local clone HEAD == remote tip; clone tree clean —
+  `git status --porcelain`: 0 entries). The harness receipt's `execution_stopped=true`
+  flag is a known receipt quirk recorded despite exit code 0; success is established by
+  the independent confirmations above (anonymous ls-remote + byte-exact fetch-backs),
+  never by replaying or re-pushing.
+- Scope of the second push (`git diff --name-status 4039d2e7..ef191d3b9`): exactly
+  `M evidence/o2kr5_decision_log.md` (ENTRY 3 appended; numstat 31 insertions / 1
+  deletion — the single deleted line is v1's own pre-push placeholder
+  `[TO BE APPENDED AFTER PUSH]`, replaced by ENTRY 3) plus
+  `A evidence/o2kr5_mirrored_listing.log` (82 lines, 0 deletions). Cumulative vs
+  pre-work tip `6c66cec8`: exactly 5 added files, numstat **370 insertions /
+  0 deletions**; no prior-KR path and no prior attempt directory (O2-KR5/0, /2, /3, /4,
+  /5, /7) touched — additions-only preserved.
+- Tip fetch-backs at the pushed commit (raw.githubusercontent.com, this session, both
+  HTTP 200, triple sha256 agreement FETCHED == LOCAL == `git show <commit>:<path>`;
+  raw fetched bytes retained for this session at `/tmp/o2kr5fb_dl_c2.bin` and
+  `/tmp/o2kr5fb_ml_c2.bin`):
+  - FB-3 `evidence/o2kr5_decision_log.md` (v2, i.e. the version carrying this ENTRY 4
+    obligation) — 11,960 bytes, sha256
+    `27c8a9715dbc0af3ad843aa05225c01784d0d17919b479a333a14ef72b039592`,
+    **VERDICT=MATCH (byte-exact)**.
+  - FB-4 `evidence/o2kr5_mirrored_listing.log` — 5,393 bytes, sha256
+    `77972c2eaf3e38531ed5cfcd3f2c2724c7641046c1e2fc4483b3f8481a515f80`,
+    **VERDICT=MATCH (byte-exact)**.
+- Honesty (unchanged by these publication attempts): LEDGER_TOTAL remains **$0.00 USD**,
+  SALES_COUNT remains **0**, remaining gap **$100.00 USD**, goal **NOT reached**
+  (source: `report/EARNINGS_REPORT_O2KR4.md`, sha256
+  `dc2b4ebae4048181cfb3e3a938eaa18cc11ce5f1f7098ad26ab62554988d41db`, fresh fetch-back
+  row A3 at `780d7fd0…` in `evidence/o2kr5_reconciliation.log`); the mirrored listing is
+  repository content with provenance (announcement commit `6bb5530…`), not a live offer —
+  O2-KR2 remains terminal BLOCKED and zero buy/order/checkout URLs exist in the mirror or
+  were invented (URL AUDIT in the receipt log: exactly the two verbatim source URLs).
+  The ledger rerun after fallback execution remains the dir-7 recorded one
+  (`O2KR5_LEDGER_RERUN: COMPLETE`, still $0.00) — cited, not re-executed.
+- Log-close mechanism (dir-7 precedent): the `## FINAL-TIP VERIFICATION` section of
+  `evidence/o2kr5_mirrored_listing.log`, carried by the third push, records the expected
+  third-tip sha256 of `listing/MIRROR_O2KR5.md` (unchanged) and of this decision log
+  (the v3 bytes this entry completes); the actual closing fetch-back rows at the third
+  tip necessarily post-date the final commit and are recorded in the assignment session
+  record — no fourth commit and no new in-log promise is created, which terminates the
+  append-regress honestly.
