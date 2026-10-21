@@ -126,3 +126,34 @@ cited read-only and never touched.
   decision log (ENTRY 2 appended below ENTRY 1, lines 1-71 untouched) are committed in one
   additions-only commit from the pre-work tip `f50ec53`; close-out push/fetch-back
   receipts are appended at the end of this file immediately after the push.
+
+## ENTRY 2 CLOSE-OUT RECEIPTS (appended after the push, per the stated publication note)
+
+- CLOSEOUT_UTC: 2026-10-21T17:58:02Z entry written; receipts captured immediately after.
+- COMMIT 2 (ENTRY 2 + the two new evidence logs): `265b5a045a72c2def679660bfa6b15aea385bfac`
+  — `3 files changed, 156 insertions(+)` (39/0, 57/0, 60/0; zero deletions);
+  `git status --porcelain` clean before and after.
+- PUSH 2: `To https://github.com/thanayut1750/spoc-harness.git` / `30cb3a1..265b5a0  HEAD
+  -> codex/spoc-harness-v1` / **PUSH_EXIT=0**; post-push `git fetch` then
+  `LOCAL_HEAD=265b5a045a72c2def679660bfa6b15aea385bfac` ==
+  `origin/codex/spoc-harness-v1=265b5a045a72c2def679660bfa6b15aea385bfac`.
+- DECISION-LOG SELF-CHECK FETCH-BACK at commit `265b5a0` (raw.githubusercontent.com):
+  FETCH_HTTP=200, LOCAL_SHA256 == FETCHED_SHA256 ==
+  `b961ab26387ab81974777c07997c98fe21a348c48373d0dabe864582303ae4f2`,
+  VERDICT=DECISION_LOG_AT_265B5A0_MATCH (128 lines; this receipt block was appended after
+  that verification, so the verified bytes are ENTRY 1 + ENTRY 2 exactly).
+- ANONYMOUS CORROBORATION: `git ls-remote https://github.com/thanayut1750/spoc-harness.git
+  refs/heads/codex/spoc-harness-v1` -> `265b5a045a72c2def679660bfa6b15aea385bfac`.
+- ADDITIONS-ONLY SCOPE vs pre-work tip `f50ec538314e67ef109386a6cefdc1390ee9a49e`:
+  `git diff --name-only f50ec53..HEAD` lists exactly 7 files, ALL under
+  `.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/7/` —
+  `listing/MIRROR_O2KR5.md`, `listing/OFFER_ADJUSTED_O2KR5.md`,
+  `evidence/o2kr5_decision_log.md`, `evidence/o2kr5_gig_channels.log`,
+  `evidence/o2kr5_ledger_rerun.log`, `evidence/o2kr5_mirrored_listing.log`,
+  `evidence/o2kr5_adjusted_offer.log`. NON_DIR7_PATHS=0; every prior-KR path untouched
+  (all 7 paths are new files; no pre-existing file modified, `.gitignore` untouched).
+- FINAL STATE: FINAL TOTAL **$0.00 USD**, REMAINING GAP **$100.00 USD**, GOAL **NOT
+  REACHED**, fallback chain **EXHAUSTED** with every channel in a terminal state;
+  receipts-only reporting held throughout.
+- This close-out block itself is committed and pushed as the final commit; its tip and a
+  final byte-exact fetch-back of this file close the log.
