@@ -1,0 +1,26 @@
+# O2KR5 LEDGER RERUN — WP-O2KR5-2-GIG-OFFER-LEDGER stage 2 (dir O2-KR5/4)
+RUN_UTC=2026-10-21T15:16:00Z (approx., logged at authoring; single invocation this session)
+INVOCATION=run_mission_tool tool_id='tool:7bdf3aa0d66a5279c833dabe2820f852' arguments={"action":"summary","include_entries":true} (exactly ONE call; 'add' not invoked — no receipt-bearing sale exists, and fabricating one is prohibited)
+CONTEXT=run AFTER fallback-chain execution (gig platforms + adjusted offer closed; see evidence/o2kr5_gig_channels.log, listing/OFFER_ADJUSTED_O2KR5.md, evidence/o2kr5_fallback_chain.md)
+
+--- VERBATIM TOOL OUTPUT (artifact d264ee350d025fcecb407135bce776b4) ---
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+--- END VERBATIM TOOL OUTPUT ---
+
+READING (verbatim fields):
+- total_earned: 0  ->  FINAL TOTAL EARNED: $0.00 USD
+- remaining: 100.0  ->  REMAINING GAP: $100.00 USD
+- progress_percent: 0.0 | goal_reached: false
+- entry_count: 0 | entries: [] | last_entry: null
+- zero accepted 'add' entries exist anywhere in the ledger; revenue_ledger.json is not present as a shipped deliverable (the tool's workspace scratch path is internal and holds no accepted entries, as entry_count 0 shows)
+
+CONSISTENCY CHECKS vs GROUND TRUTH:
+- O2-KR4 zero-state (total_earned 0, entry_count 0, remaining 100.0): UNCHANGED by this package — rerun matches.
+- O2-KR5 stage-1 ledger recheck (0 earned / 0 entries / remaining 100.0): UNCHANGED — rerun matches.
+- No receipt-bearing sale occurred on any channel (mirrored listing 0 sales; Fiverr 403 unavailable; Upwork 403 unavailable; adjusted offer has NO live listing / NO buy URL — human publish pending per O2-KR2), so $0.00 is the honest expected terminal state.
+
+FINAL STATEMENT
+- FINAL TOTAL EARNED: $0.00 USD
+- REMAINING GAP: $100.00 USD
+- GOAL: NOT REACHED — all documented fallback channels exhausted; best-achieved total documented with full evidence; nothing fabricated (no sales, prices, order URLs, or receipts invented).
+O2KR5_LEDGER_RERUN: COMPLETE (verbatim output recorded; zero fabricated entries)

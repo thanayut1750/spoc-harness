@@ -80,3 +80,18 @@ here, not rewritten.
   URL was invented anywhere in this package.
 
 <!-- APPEND ENTRIES BELOW THIS LINE -->
+
+## ENTRY 2 — FALLBACK CHAIN CLOSE-OUT (WP-O2KR5-2-GIG-OFFER-LEDGER, stage 2)
+- **LOGGED_UTC:** 2026-10-21T15:16:00Z
+- **ENTRY_TYPE:** chain_close_out (additions-only append below the stage-1 marker; all lines above unchanged)
+- **SCOPE:** remaining documented channels after ENTRY 1's trigger: gig platforms, adjusted offer (mirrored listing was closed in stage 1).
+- **PER-CHANNEL STATUS:**
+  - Mirrored listing: attempted-with-evidence — MIRROR_O2KR5.md published at 6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c (PUSH_EXIT=0 receipts; fetch-backs HTTP 200 byte-exact, sha acf864eb…/c4713e81…); 0 sales resulted.
+  - Gig platform Fiverr: unavailable-with-concrete-blocker — HTTP 403, verbatim PXCR10002539 "It needs a human touch" (attempt-0 receipt f0c68766b0e2651f0c35783b537ab39e; dir-4 capture body sha256 db30683732b8ceac22ee4c72e187177dd415f20c73542ad5e266d4a94c0beeec archived as evidence/o2kr5_fiverr_signup_20261021.html; no re-contact sent — one attempt per destination; details evidence/o2kr5_gig_channels.log ROW 1/2).
+  - Gig platform Upwork: unavailable-with-concrete-blocker — HTTP/2 403 "server: cloudflare", cf-ray a4dfe5f8a919d326-BKK (attempt-0 receipt 53a84610dac220fc97e0174afa1c050f); dir-4 challenge body sha256 194f5ee133b023c76d9accf292f75ff3ed7abd3e2a53a34d8de8d805ad2f7e7a archived as evidence/o2kr5_upwork_signup_20261021.html; no re-contact sent (evidence/o2kr5_gig_channels.log ROW 2/2).
+  - Adjusted offer: attempted-with-evidence — listing/OFFER_ADJUSTED_O2KR5.md v3 (price-only adjustment $7.00 → $9.00 USD, API cents 900; CALC-ONLY $7.60 net × 14 = $106.40) published additions-only; the purchase section states the human publish step is pending per O2-KR2 and contains NO invented buy/order/checkout URLs; push/fetch-back receipts in evidence/o2kr5_adjusted_offer.log.
+- **CHAIN_STATE:** the O1-KR1 fallback chain (mirrored listing, gig platforms, adjusted offer) is EXHAUSTED — every documented channel carries exactly one recorded terminal state (attempted-with-evidence or unavailable-with-concrete-blocker); no documented channel remains untried, and the anti-spam one-attempt-per-destination rule forbids further retries.
+- **LEDGER RERUN (post-fallback):** run_mission_tool tool:7bdf3aa0d66a5279c833dabe2820f852 arguments {"action":"summary","include_entries":true} — verbatim output in evidence/o2kr5_ledger_rerun.log: status ok, currency USD, goal 100.0, total_earned 0, remaining 100.0, progress_percent 0.0, goal_reached false, entry_count 0, entries [], last_entry null. Zero accepted 'add' entries; revenue_ledger.json remains absent as a deliverable.
+- **FINAL TOTAL EARNED: $0.00 USD.**
+- **REMAINING GAP: $100.00 USD — GOAL NOT REACHED.**
+- **BEST-ACHIEVED:** $0.00 with full evidence; the chain is exhausted, and this close-out documents the honest outcome rather than stopping silently. No sales, prices, order URLs, or receipts were fabricated.
