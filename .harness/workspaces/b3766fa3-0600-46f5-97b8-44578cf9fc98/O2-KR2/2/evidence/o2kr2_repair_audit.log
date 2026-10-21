@@ -1,0 +1,193 @@
+================================================================================
+O2-KR2 WP2 REPAIR AUDIT — authoritative three-criteria final verification
+AUDIT_STARTED_UTC: 2026-10-21T02:47:09Z
+Auditor: specialist:b3766fa3-0600-46f5-97b8-44578cf9fc98:fbcc991d4d027cdf
+Scope: criterion 1 branch outcome (Gumroad prepared/blocked + Lemon Squeezy
+fallback executed/blocked), criterion 2 (prepared-asset staging), criterion 3
+(mission_log pointers). No live offer exists; none is claimed.
+================================================================================
+
+### PRE: on-disk integrity anchors
+$ sha256sum 2/mission_log.md 1/offer/CHECKOUT_INSTRUCTIONS.md 1/evidence/BLOCKER_EVIDENCE.md 1/store/CHECKOUT_LINK.txt 0/build/pydevtoolkit-1.0.0.zip 2/offer/GUMROAD_LISTING_PACKAGE.md 2/evidence/lemonsqueezy_fallback_retry.log 2/evidence/lemonsqueezy_docs_notes.md 2/evidence/lemonsqueezy_credentials_sweep.log
+29a27027a4042fe7aa7be1b1de4779621020baefe05df5953cae5d79323b2915  2/mission_log.md
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  1/offer/CHECKOUT_INSTRUCTIONS.md
+532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649  1/evidence/BLOCKER_EVIDENCE.md
+e1fd43019df9e6545c56dce7e2c6f2bc774322e16089df499a2866686adfe1f8  1/store/CHECKOUT_LINK.txt
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  0/build/pydevtoolkit-1.0.0.zip
+3542cfa267a91f8c901730cda5086f7b96e3fef480fb87f5d17cb132e32445a6  2/offer/GUMROAD_LISTING_PACKAGE.md
+8c3bd823e8382ab55370317045717d42c274e6907836eda97d81acafefdc06e4  2/evidence/lemonsqueezy_fallback_retry.log
+3127dc053571c30e019058ca47dcc09ba57541f8eec93e8df87fb8c60f2d8324  2/evidence/lemonsqueezy_docs_notes.md
+03ae852c1258d63c16ac55c448621ee6679aebe5205bfcdbdc806e1969ccb7e3  2/evidence/lemonsqueezy_credentials_sweep.log
+
+################ CRITERION 1 — branch outcome (Gumroad prepared + human step; Lemon Squeezy fallback executed) ################
+
+### CHECK A1: offer/GUMROAD_LISTING_PACKAGE.md exists, non-empty, all playbook fields non-empty
+$ test -s 2/offer/GUMROAD_LISTING_PACKAGE.md
+$ awk -F"|" "/^\\|/ && NF>=4 {f=\$2; v=\$3; gsub(/ /,\"\",f); gsub(/ /,\"\",v); n++; if (f==\"\" || v==\"\") e++} END {printf \"PLAYBOOK_TABLE_ROWS=%d EMPTY_FIELD_OR_VALUE_CELLS=%d\\n\", n, e+0}" 2/offer/GUMROAD_LISTING_PACKAGE.md
+PLAYBOOK_TABLE_ROWS=14 EMPTY_FIELD_OR_VALUE_CELLS=0
+$ grep -nE "\\\$15.00 USD|f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99|a8563e06532ea3fd0af2b51331ba8d3be66eff5b" 2/offer/GUMROAD_LISTING_PACKAGE.md | head -5
+29:**$15.00 USD** — one-time payment, single price tier. (Gumroad API cents value: `1500`.)
+69:  `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99`)
+94:https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+100:- SHA-256: `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99`
+173:| Price | $15.00 USD one-time (cents 1500) | O1-KR1/1 §3 step 4; O1-KR1/5 §3 step 4 ($15) |
+CHECK A1: PASS
+
+### CHECK A2: offer/GUMROAD_HUMAN_STEP.md exists; gumroad_human_step_outcome.md records timestamped outcome
+$ test -s 2/offer/GUMROAD_HUMAN_STEP.md
+$ grep -n "OUTCOME: \`blocked\`\|Recorded at (UTC): 2026-10-21T01:41:15Z\|invoked 2026-10-21T01:25:01Z" 2/evidence/gumroad_human_step_outcome.md
+3:**OUTCOME: `blocked`**
+6:**Step invoked by:** `offer/GUMROAD_HUMAN_STEP.md` (invoked 2026-10-21T01:25:01Z)
+CHECK A2: PASS
+
+### CHECK A3: evidence/gumroad_api_retry.log holds verbatim timestamped API result (HTTP/2 401)
+$ grep -n "HTTP/2 401\|BODY_SHA256=9db2c820f62f7e95a8b8cfb31c5f4c99d4f2b4891ad9f23291192dbaec233294\|2026-10-21T00:46:5" 2/evidence/gumroad_api_retry.log | head -8
+3:UTC_START=2026-10-21T00:46:55Z
+7:HTTP/2 401 
+29:HTTP/2 401 
+53:BODY_SHA256=9db2c820f62f7e95a8b8cfb31c5f4c99d4f2b4891ad9f23291192dbaec233294
+57:UTC_END=2026-10-21T00:46:56Z
+59:OUTCOME: HTTP/2 401 - authentication failure (www-authenticate: Bearer realm="Doorkeeper", error="invalid_token", error_description="The access token is invalid"). The POST was sent UNAUTHENTICATED by design: the credential sweep (evidence/gumroad_credentials_sweep.log, UTC 2026-10-21T00:46:35Z) found no Gumroad credential anywhere on the machine (env, ~/.netrc, ~/.config, ~/.env*, git config). Response verified verbatim above (status line + headers + body, BODY_BYTES=2301, BODY_SHA256=9db2c820f62f7e95a8b8cfb31c5f4c99d4f2b4891ad9f23291192dbaec233294, x-request-id 0d645075-c56f-4638-a7b8-63ca546065f2, HTTP_STATUS:401, CURL_EXIT=0). CONCLUSION: the Gumroad API product-creation path is BLOCKED without a credential - no product was created and no product URL was returned. This reproduces the run-1 canonical 401 archived in evidence/BLOCKER_EVIDENCE.md (POST /v2/products -> 401 at 2026-10-20T22:28:39Z; file sha256 532a1b6a29fd5def0ec19336d5c756ba48bfec95ec3bd2d012b2f288325c6649). The dashboard-listing human step (offer/GUMROAD_HUMAN_STEP.md) is therefore the credential-bearing path; its outcome is recorded in evidence/gumroad_human_step_outcome.md.
+CHECK A3: PASS
+
+### CHECK A4: evidence/lemonsqueezy_fallback_retry.log holds verbatim timestamped results (documented GET /v1/products + POST /v1/checkouts, both 401) and explicit blocked conclusion
+$ grep -n "METHOD: GET\|METHOD: POST\|URL: https://api.lemonsqueezy.com/v1\|HTTP_STATUS: 401\|TIMESTAMP_UTC: 2026-10-21T02:34:\|Unauthenticated\|Lemon Squeezy REST fallback blocked" 2/evidence/lemonsqueezy_fallback_retry.log
+15:TIMESTAMP_UTC: 2026-10-21T02:34:56Z
+16:METHOD: GET
+17:URL: https://api.lemonsqueezy.com/v1/products
+20:HTTP_STATUS: 401
+36:{"jsonapi":{"version":"1.0"},"errors":[{"detail":"Unauthenticated.","status":"401","title":"Unauthorized"}]}
+41:TIMESTAMP_UTC: 2026-10-21T02:34:58Z
+42:METHOD: POST
+43:URL: https://api.lemonsqueezy.com/v1/checkouts
+49:HTTP_STATUS: 401
+65:{"jsonapi":{"version":"1.0"},"errors":[{"detail":"Unauthenticated.","status":"401","title":"Unauthorized"}]}
+73:Lemon Squeezy REST fallback blocked (evidence: evidence/lemonsqueezy_credentials_sweep.log @2026-10-21T02:04:17Z; evidence/lemonsqueezy_docs_notes.md @2026-10-21T02:32:06Z; evidence/lemonsqueezy_fallback_retry.log REQUEST 1 @2026-10-21T02:34:56Z HTTP 401, REQUEST 2 @2026-10-21T02:34:58Z HTTP 401; evidence/BLOCKER_EVIDENCE.md run-1 405 @2026-10-20T22:28:52Z)
+$ grep -c "HTTP_STATUS: 401" 2/evidence/lemonsqueezy_fallback_retry.log  (expect 2)
+N401=2
+$ grep -n "checkout/custom URL occurrences: REQUEST1_BODY=0 REQUEST2_BODY=0" 2/evidence/lemonsqueezy_fallback_retry.log  (log must self-report zero URL candidates in both request bodies)
+70:checkout/custom URL occurrences: REQUEST1_BODY=0 REQUEST2_BODY=0
+$ grep -oE "https://[A-Za-z0-9.-]+\.lemonsqueezy\.com/[A-Za-z0-9/_.-]*" 2/evidence/lemonsqueezy_fallback_retry.log | grep -vc "^https://api\.lemonsqueezy\.com/"  (expect 0 -- only api.lemonsqueezy.com endpoints, no minted product/checkout URL)
+NON_API_LS_URLS=0
+CHECK A4: PASS
+
+### CHECK A5: sub-branch determination — no live offer URL exists or is claimed
+$ grep -cE "https?://" 1/store/CHECKOUT_LINK.txt  (expect 0 — link-free staging invariant)
+CHECKOUT_LINK_URL_COUNT=0
+$ grep -n "REQUESTED\|not yet live" 2/mission_log.md | head -4
+194:  python-dev-toolkit (REQUESTED, not live); MIT license. Ends with a 12-row field
+237:  by any endpoint; https://gumroad.com/l/python-dev-toolkit remains the REQUESTED
+SUB_BRANCH_STATEMENT: criterion-1 LIVE-OFFER sub-branch is NOT satisfied (Gumroad POST /v2/products -> 401; Lemon Squeezy documented GET /v1/products and POST /v1/checkouts -> 401; zero credentials machine-wide; no product/checkout URL was ever returned, CHECKOUT_LINK_URL_COUNT=0, so there is no live URL to HTTP-verify — none is credited). The criterion-1 BLOCKED-PATH sub-branch IS satisfied: Gumroad package prepared (A1), dashboard human step invoked with timestamped blocked outcome (A2), and verbatim timestamped API evidence archived for BOTH channels (A3, A4). Per the KR acceptance, the blocked condition routes to the criterion-2 prepared-asset branch, verified in section B.
+CHECK A5: PASS
+
+################ CRITERION 2 — prepared-asset staging (fetched evidence) ################
+
+### CHECK B1: offer/CHECKOUT_INSTRUCTIONS.md fetched over HTTP -> 200 and byte-identical to local
+$ curl -sS -o /tmp/w2_instr.md -w '%{http_code}' https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/offer/CHECKOUT_INSTRUCTIONS.md
+INSTR_HTTP_STATUS=200
+$ sha256sum /tmp/w2_instr.md 1/offer/CHECKOUT_INSTRUCTIONS.md
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  /tmp/w2_instr.md
+6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c  1/offer/CHECKOUT_INSTRUCTIONS.md
+$ diff -q /tmp/w2_instr.md 1/offer/CHECKOUT_INSTRUCTIONS.md && echo INSTR_BYTE_IDENTICAL
+INSTR_BYTE_IDENTICAL
+CHECK B1: PASS
+
+### CHECK B2: single paste action (PASTE_LINES=1 in instructions) and zero paste actions elsewhere under offer/ (PASTE_ACTION_COUNT=0)
+$ grep -cin "paste" /tmp/w2_instr.md  (expect 1)
+PASTE_LINES=1
+$ grep -n "paste the minted checkout link" /tmp/w2_instr.md
+11:   product, then **paste the minted checkout link into `store/CHECKOUT_LINK.txt`**
+$ grep -RniE "paste (the |this )?(minted |checkout )?(link|url)" 2/offer  (expect no output)
+PASTE_ACTION_COUNT=0
+$ find 1/offer -type f ! -name CHECKOUT_INSTRUCTIONS.md | wc -l  (other run-1 offer files; expect 0)
+RUN1_OFFER_OTHER_FILES=0
+(transparency: broad bare-paste matches under 2/offer — expected: only "copy-paste usage examples" wording, not paste actions)
+$ grep -Rni "paste" 2/offer || echo NO_MATCHES
+2/offer/GUMROAD_LISTING_PACKAGE.md:57:copy-paste usage examples for all 16 utilities are in the included README.md.
+2/offer/GUMROAD_HUMAN_STEP.md:147:copy-paste usage examples for all 16 utilities are in the included README.md.
+CHECK B2: PASS
+
+### CHECK B3: hosted zip -> HTTP 200, application/zip, 40,299 B, sha256 f272da22...dd4a99 (branch- and commit-pinned)
+$ curl -sS -o /tmp/w2_zip_b.zip -D /tmp/w2_zip_b.h -w '%{http_code} %{content_type} %{size_download}' https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+ZIP_BRANCH_RESULT: 200 application/zip 40299
+$ curl -sS -o /tmp/w2_zip_c.zip -D /tmp/w2_zip_c.h -w '%{http_code} %{content_type} %{size_download}' https://raw.githubusercontent.com/thanayut1750/spoc-harness/a8563e06532ea3fd0af2b51331ba8d3be66eff5b/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/0/build/pydevtoolkit-1.0.0.zip
+ZIP_COMMIT_RESULT: 200 application/zip 40299
+$ sha256sum /tmp/w2_zip_b.zip /tmp/w2_zip_c.zip
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  /tmp/w2_zip_b.zip
+f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99  /tmp/w2_zip_c.zip
+EXPECTED_SHA256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+ACTUAL_SHA256=f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99
+ZIP_INVARIANT=YES
+CHECK B3: PASS
+
+### CHECK B4: evidence/BLOCKER_EVIDENCE.md exists with archived error responses + ISO timestamps, fetchable where published
+$ test -s 1/evidence/BLOCKER_EVIDENCE.md && wc -c 1/evidence/BLOCKER_EVIDENCE.md
+7644 1/evidence/BLOCKER_EVIDENCE.md
+$ grep -oE "20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:]+Z" 1/evidence/BLOCKER_EVIDENCE.md | sort -u | head
+2026-10-20T22:12:53Z
+2026-10-20T22:13:33Z
+2026-10-20T22:28:39Z
+2026-10-20T22:28:52Z
+2026-10-20T22:28:53Z
+2026-10-20T22:29:23Z
+2026-10-20T22:42:03Z
+2026-10-20T22:42:04Z
+BLOCKER_ISO_TIMESTAMP_LINES=10
+$ curl -sS -o /tmp/w2_blocker.md -w '%{http_code}' https://raw.githubusercontent.com/thanayut1750/spoc-harness/codex/spoc-harness-v1/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/BLOCKER_EVIDENCE.md
+BLOCKER_HTTP_STATUS=200
+$ diff -q /tmp/w2_blocker.md 1/evidence/BLOCKER_EVIDENCE.md && echo BLOCKER_BYTE_IDENTICAL
+BLOCKER_BYTE_IDENTICAL
+CHECK B4: PASS
+
+################ CRITERION 3 — mission_log.md pointers + truthful acceptance line ################
+
+### CHECK C1: mission_log.md contains staged instruction-document path, hosted zip URL, verification-evidence pointers (grep -n line numbers)
+$ grep -n "offer/CHECKOUT_INSTRUCTIONS.md" 2/mission_log.md | head -4
+28:* **Staged instruction document (THE single hand-off):** `offer/CHECKOUT_INSTRUCTIONS.md`
+33:  prior workspace; this continuation designates `offer/CHECKOUT_INSTRUCTIONS.md` as the
+88:  `offer/CHECKOUT_INSTRUCTIONS.md`; the hosted zip URL and package sha256
+107:Scope: closes the single residual gap from the first retry — offer/CHECKOUT_INSTRUCTIONS.md had no content
+$ grep -n "a8563e06532ea3fd0af2b51331ba8d3be66eff5b" 2/mission_log.md | head -4
+35:* **Hosted package (already on the branch, commit `a8563e06532ea3fd0af2b51331ba8d3be66eff5b`):**
+42:  `a8563e06532ea3fd0af2b51331ba8d3be66eff5b` in the URL above.
+68:  (parent commit `a8563e06532ea3fd0af2b51331ba8d3be66eff5b`).
+98:  (`a8563e06532ea3fd0af2b51331ba8d3be66eff5b`) URLs both HTTP 200, `application/zip`, 40,299 B, sha256 exact
+$ grep -n "f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99" 2/mission_log.md | head -4
+38:  `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99` (exact), `unzip -t` OK
+89:  `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99`; the chain outcomes Gumroad
+122:  31ba8d3be66eff5b) with sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99; OFFER.md URL
+155:  f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 exact, unzip -t OK.
+$ grep -n "BLOCKER_EVIDENCE\|staging_invariants_recheck\|run2_fetchback" 2/mission_log.md | head -8
+20:| Gumroad API (primary) — POST `https://api.gumroad.com/v2/products` | **BLOCKED — HTTP 401** at `2026-10-20T22:28:39Z`, 0-byte response body | `evidence/BLOCKER_EVIDENCE.md` §1; artifact `5d807a3b8891908a3e3ccb30e7257804`; fresh re-probe `2026-10-20T22:42:03Z` also 401 / 0-byte body |
+21:| Lemon Squeezy REST (fallback) — POST `/v1/products` | **BLOCKED — HTTP 405** at `2026-10-20T22:28:52Z`–`22:28:53Z`, 184 B body "The POST method is not supported for route v1/products. Supported methods: GET, HEAD." → REST product creation structurally impossible regardless of key | `evidence/BLOCKER_EVIDENCE.md` §2; artifacts `aed37d178ea4621f07f202b772abb0a2`, `62e2d9c1bd870a81cc0e1d6ccb7060b4` |
+22:| Gumroad dashboard-listing human step | **BLOCKED** — no Gumroad/Lemon Squeezy credentials exist in the environment; agent cannot perform the dashboard step | `evidence/BLOCKER_EVIDENCE.md` §3 |
+23:| Fallback hosts (contingency probes only) | `0x0.st` → 200, `litterbox.catbox.moe` → 200, `tmpfiles.org` → 000, `catbox.moe` → 000; **zero uploads** (in-repo hosting used instead) | `evidence/BLOCKER_EVIDENCE.md` §4; artifact `a3618e5c8bc7b4ad7adb8700e73979f1` |
+45:* **Blocker archive:** `evidence/BLOCKER_EVIDENCE.md` — both blocked calls with endpoint,
+57:  curl exit 0 — verbatim in `evidence/BLOCKER_EVIDENCE.md` §5 and `evidence/publish_stage.log`.
+85:  `evidence/BLOCKER_EVIDENCE.md` were re-fetched from raw.githubusercontent.com at commit
+128:- evidence/BLOCKER_EVIDENCE.md re-proof at tip (HTTP 200, 7,644 B, sha256
+CHECK C1: PASS
+FINALIZATION_NOTE: the pointer to this audit (evidence/o2kr2_repair_audit.log) is added to mission_log.md by the post-audit ADDENDUM 8 (append-only, additions-only diff vs /tmp/mission_log_pre_audit_W2.md sha256 29a27027a4042fe7aa7be1b1de4779621020baefe05df5953cae5d79323b2915); post-commit fetch-back verification is archived in evidence/w2_final_fetchback.log and re-confirms staging invariants.
+
+### CHECK C2: mission_log acceptance line is truthful for the executed branch (PASS = staged criteria-2/3 state; no live offer claimed)
+$ grep -n "O2-KR2 publish acceptance: PASS" 2/mission_log.md
+177:O2-KR2 publish acceptance: PASS
+$ grep -niE "live (product|checkout|offer|gumroad|lemon)" 2/mission_log.md | head -5
+11:## 2026-10-20 — O2-KR2 (WP-O2KR2-1-STAGE): publish chain BLOCKED on all automated paths → terminal prepared-asset state STAGED (no live offer)
+14:**No PASS verdict is recorded here and no live offer is claimed; certification is a separate audit.**
+72:* **No live offer URL exists.** Both automated channels and the dashboard human step are
+103:Non-claims unchanged and restated: **no live offer URL exists**; no checkout link is minted or implied; **no
+142:structurally blocked, no credentials exist). There is still NO live offer and NO minted checkout URL anywhere
+$ tail -n 4 2/mission_log.md
+  permalink (never verified live).
+- Criteria-2/3 staging preserved untouched: offer/CHECKOUT_INSTRUCTIONS.md (staged,
+  run-1 audit PASS) unchanged; store/CHECKOUT_LINK.txt still link-free; the single
+  checkout-link hand-off remains in offer/CHECKOUT_INSTRUCTIONS.md.
+CHECK C2: PASS
+
+################ SUMMARY ################
+AUDIT_FINISHED_UTC: 2026-10-21T02:47:11Z
+CHECKS_RUN: A1 A2 A3 A4 A5 B1 B2 B3 B4 C1 C2
+FAILED_CHECKS: none
+BRANCH_OUTCOME: prepared-asset BLOCKED path executed and verified (no live offer; none claimed)
+REPAIR_AUDIT: PASS

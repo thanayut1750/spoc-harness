@@ -239,3 +239,57 @@ outcome recorded (BLOCKED) - 2026-10-21T01:44:20Z
 - Criteria-2/3 staging preserved untouched: offer/CHECKOUT_INSTRUCTIONS.md (staged,
   run-1 audit PASS) unchanged; store/CHECKOUT_LINK.txt still link-free; the single
   checkout-link hand-off remains in offer/CHECKOUT_INSTRUCTIONS.md.
+
+--------------------------------------------------------------------------------
+ADDENDUM 8 - WP-O2KR2-2 (run 2): documented-correct Lemon Squeezy REST fallback
+retest and authoritative three-criteria repair audit - 2026-10-21T02:54:33Z
+--------------------------------------------------------------------------------
+- Lemon Squeezy credential sweep at 2026-10-21T02:04:17Z
+  (evidence/lemonsqueezy_credentials_sweep.log, sha256
+  03ae852c1258d63c16ac55c448621ee6679aebe5205bfcdbdc806e1969ccb7e3, 1,553 B):
+  zero Lemon Squeezy credentials machine-wide (printenv LEMON/LS_/SQZ/API_KEY/TOKEN,
+  ~/.config/lemonsqueezy*, ~/.netrc, git config all empty; secrets redacted to
+  4-char prefixes).
+- Docs-first pass (evidence/lemonsqueezy_docs_notes.md, sha256
+  3127dc053571c30e019058ca47dcc09ba57541f8eec93e8df87fb8c60f2d8324, 5,664 B,
+  fetched 2026-10-21 UTC, before the first retest request at 2026-10-21T02:34:56Z): https://docs.lemonsqueezy.com/api
+  documents POST /v1/checkouts (Create a custom checkout) as the checkout-creation
+  resource, authenticated with a Bearer API key scoped to an existing store;
+  no POST /v1/products resource exists, which explains the run-1 405
+  'POST method is not supported'. The retest therefore used a different,
+  documented-correct approach.
+- Fallback retest per docs (evidence/lemonsqueezy_fallback_retry.log, sha256
+  8c3bd823e8382ab55370317045717d42c274e6907836eda97d81acafefdc06e4, 4,397 B;
+  verbatim method/URL/status/body/ISO timestamps tee'd): unauthenticated
+  documented GET https://api.lemonsqueezy.com/v1/products -> HTTP 401 at
+  2026-10-21T02:34:56Z and documented POST
+  https://api.lemonsqueezy.com/v1/checkouts -> HTTP 401 at 2026-10-21T02:34:58Z
+  (canonical authentication-required errors; no credential exists to authenticate).
+  Dashboard-less human path recorded in offer/LEMONSQUEEZY_HUMAN_STEP.md (sha256
+  febe4f336f07d8c6e4d63e1b8f2b8fb798562063e7d34f27303649de34f8c8d7, 2,591 B) with
+  outcome `blocked` in evidence/lemonsqueezy_human_step_outcome.md (sha256
+  984a03e9351d0003329d917fa5bc328dc79fe81dfd128d5cfc9a46baae6283f2, 2,810 B).
+  Log conclusion line: 'Lemon Squeezy REST fallback blocked (evidence:
+  evidence/lemonsqueezy_credentials_sweep.log + evidence/lemonsqueezy_docs_notes.md
+  + evidence/lemonsqueezy_fallback_retry.log + ../1/evidence/BLOCKER_EVIDENCE.md)'.
+  No product or checkout URL was created by any call; none is claimed.
+- Authoritative final audit of all three criteria:
+  evidence/o2kr2_repair_audit.log (sha256
+  8409ca0e7bb85a64d56364e88917879cc2991150a9cbfd0031ae1573dab7a06f, 17,235 B,
+  AUDIT_STARTED_UTC 2026-10-21T02:47:09Z / FINISHED 02:47:11Z; checks A1-A5, B1-B4,
+  C1-C2 all PASS; FAILED_CHECKS: none; final line 'REPAIR_AUDIT: PASS').
+  Criterion-1 branch outcome: the BLOCKED sub-branch is satisfied (primary Gumroad
+  path executed and 401-blocked at 2026-10-20T22:28:39Z and 22:42:03Z; fallback
+  Lemon Squeezy REST executed per docs and 401/405-blocked; dashboard human steps
+  invoked and recorded blocked), so the KR routes to prepared-asset mode; the
+  live-offer sub-branch is NOT satisfied and no live offer URL is credited.
+  Criteria 2 and 3 PASS on fetched evidence: offer/CHECKOUT_INSTRUCTIONS.md HTTP 200
+  with PASTE_LINES=1 and PASTE_ACTION_COUNT=0 elsewhere under offer/; hosted zip
+  HTTP 200 application/zip 40,299 B sha256
+  f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 (branch- and
+  commit-pinned); ../1/evidence/BLOCKER_EVIDENCE.md fetchable HTTP 200 with ISO
+  timestamps; mission_log pointers verified by grep line numbers. Terminal state:
+  prepared-asset BLOCKED path executed and verified; no live offer exists; none
+  claimed. Post-commit fetch-back verification (updated mission_log.md HTTP 200
+  byte-identical; staging invariants re-checked) is archived at
+  evidence/w2_final_fetchback.log.

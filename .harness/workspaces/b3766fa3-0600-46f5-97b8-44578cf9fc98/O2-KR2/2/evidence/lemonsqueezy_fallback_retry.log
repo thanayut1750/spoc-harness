@@ -1,0 +1,74 @@
+================================================================================
+Lemon Squeezy REST fallback retry — documented-correct attempts (O2-KR2 WP2)
+Log started (UTC): 2026-10-21T02:34:56Z
+Approach (per evidence/lemonsqueezy_docs_notes.md): the documented-correct
+creation resource is POST /v1/checkouts (Bearer auth always required); products
+have NO documented create endpoint (dashboard-only), so the run-1 POST
+/v1/products 405 was the wrong resource. No Lemon Squeezy credential exists
+machine-wide (evidence/lemonsqueezy_credentials_sweep.log, UTC_NOW=2026-10-21T02:04:17Z),
+so both documented requests are sent UNAUTHENTICATED to capture the canonical
+auth errors verbatim. Each request below archives method, URL, ISO timestamp,
+HTTP status, full response headers and body.
+================================================================================
+
+=== REQUEST 1: documented products LIST endpoint ===
+TIMESTAMP_UTC: 2026-10-21T02:34:56Z
+METHOD: GET
+URL: https://api.lemonsqueezy.com/v1/products
+AUTH: none sent (no credential exists machine-wide; see lemonsqueezy_credentials_sweep.log)
+COMMAND: curl -sS -X GET -H 'Accept: application/vnd.api+json' -D headers -o body -w '%{http_code}' https://api.lemonsqueezy.com/v1/products
+HTTP_STATUS: 401
+CURL_EXIT: 0
+--- RESPONSE HEADERS (verbatim) ---
+HTTP/2 401 
+date: Wed, 21 Oct 2026 02:34:57 GMT
+content-type: application/vnd.api+json
+content-length: 108
+x-powered-by: PHP/8.4.23
+cache-control: no-cache, private
+vary: Origin
+apigw-requestid: Fkqw2id1iYcEMcg=
+cf-cache-status: DYNAMIC
+server: cloudflare
+cf-ray: a4dcddba9acd87e6-URT
+
+--- RESPONSE BODY (verbatim) ---
+{"jsonapi":{"version":"1.0"},"errors":[{"detail":"Unauthenticated.","status":"401","title":"Unauthorized"}]}
+BODY_BYTES: 108
+BODY_SHA256: e803b63b594cbf81f0c6251a2e09046c6bf64de1bded630fe0a31ecb574a164c
+
+=== REQUEST 2: documented create-checkout endpoint (POST /v1/checkouts) ===
+TIMESTAMP_UTC: 2026-10-21T02:34:58Z
+METHOD: POST
+URL: https://api.lemonsqueezy.com/v1/checkouts
+AUTH: 'Authorization: Bearer ' sent with EMPTY token because no api_key exists machine-wide (documented header format from docs page /api/checkouts/create-checkout; ids '1'/'1' are the docs-example store/variant placeholders, not real resources)
+REQUEST_BODY_FILE: /tmp/ls_post_body.json (verbatim below)
+--- REQUEST BODY (verbatim) ---
+{"data":{"type":"checkouts","attributes":{"custom_price":1500,"product_options":{"enabled_variants":[]},"checkout_options":{},"checkout_data":{},"preview":true},"relationships":{"store":{"data":{"type":"stores","id":"1"}},"variant":{"data":{"type":"variants","id":"1"}}}}}
+COMMAND: curl -sS -X POST -H 'Accept: application/vnd.api+json' -H 'Content-Type: application/vnd.api+json' -H 'Authorization: Bearer ' --data-binary @/tmp/ls_post_body.json -D headers -o body -w '%{http_code}' https://api.lemonsqueezy.com/v1/checkouts
+HTTP_STATUS: 401
+CURL_EXIT: 0
+--- RESPONSE HEADERS (verbatim) ---
+HTTP/2 401 
+date: Wed, 21 Oct 2026 02:34:58 GMT
+content-type: application/vnd.api+json
+content-length: 108
+vary: Origin
+x-powered-by: PHP/8.4.23
+cache-control: no-cache, private
+apigw-requestid: Fkqw6i1UCYcEM8A=
+cf-cache-status: DYNAMIC
+server: cloudflare
+cf-ray: a4dcddc0cc1587e5-URT
+
+--- RESPONSE BODY (verbatim) ---
+{"jsonapi":{"version":"1.0"},"errors":[{"detail":"Unauthenticated.","status":"401","title":"Unauthorized"}]}
+BODY_BYTES: 108
+BODY_SHA256: e803b63b594cbf81f0c6251a2e09046c6bf64de1bded630fe0a31ecb574a164c
+
+=== URL-CANDIDATE CHECK ===
+checkout/custom URL occurrences: REQUEST1_BODY=0 REQUEST2_BODY=0
+=== CONCLUSION ===
+No credential exists, so the documented POST /v1/checkouts cannot be authenticated; per evidence/lemonsqueezy_docs_notes.md product creation has no API resource at all (dashboard-only) and checkout creation always requires 'Authorization: Bearer {api_key}' plus an existing store id and variant id. No product or checkout URL was created or returned; nothing to curl-verify; no live offer exists.
+Lemon Squeezy REST fallback blocked (evidence: evidence/lemonsqueezy_credentials_sweep.log @2026-10-21T02:04:17Z; evidence/lemonsqueezy_docs_notes.md @2026-10-21T02:32:06Z; evidence/lemonsqueezy_fallback_retry.log REQUEST 1 @2026-10-21T02:34:56Z HTTP 401, REQUEST 2 @2026-10-21T02:34:58Z HTTP 401; evidence/BLOCKER_EVIDENCE.md run-1 405 @2026-10-20T22:28:52Z)
+LOG_END (UTC): 2026-10-21T02:34:58Z
