@@ -1,4 +1,4 @@
-# OFFER — pydevtoolkit 1.0.0 · $15.00 · paste-checkout-link instruction sheet
+# OFFER — pydevtoolkit 1.0.0 · $15.00 · offer copy (listing-ready)
 
 STATUS: **prepared-asset mode.** Both automated publish channels were attempted for real and
 blocked (evidence archived in `evidence/publish/BLOCKERS.md`):
@@ -10,9 +10,17 @@ blocked (evidence archived in `evidence/publish/BLOCKERS.md`):
   only**, so products cannot be created via REST at all — `evidence/publish/lemonsqueezy_attempt.log`,
   2026-10-20T22:13:33Z (raw error body in `evidence/publish/lemonsqueezy_body.txt`).
 
-This document is the **single hand-off instruction**. Complete either Step A or Step B
-(~5 minutes), then paste the resulting checkout link on the marked line below **and** write
-the same URL into `store/CHECKOUT_LINK.txt` (currently an intentionally empty placeholder).
+This document is **offer copy only**. It requests no action, collects no checkout link, and
+mints no link. Minting is governed by the branch's single paste-checkout-link instruction
+document: `../../1/offer/CHECKOUT_INSTRUCTIONS.md` (path relative to this file; branch
+`codex/spoc-harness-v1`), whose consolidated blocker archive is
+`../../1/evidence/BLOCKER_EVIDENCE.md`. No checkout link exists yet.
+
+> Supersession note (audit WP-O2KR2-2, 2026-10-21): this file previously self-described as the
+> "single hand-off instruction" and carried Step A / Step B dashboard walkthroughs ending in
+> checkout-link paste actions. That role now belongs exclusively to
+> `offer/CHECKOUT_INSTRUCTIONS.md`, so the branch carries exactly one checkout instruction
+> document. All offer terms below are unchanged from the prior revision of this file.
 
 ## The offer
 
@@ -37,35 +45,6 @@ the same URL into `store/CHECKOUT_LINK.txt` (currently an intentionally empty pl
 
 Longer dashboard-ready copy (with the 16-utility table and pricing/fee note):
 `store/gumroad_listing.md`.
-
-## PASTE CHECKOUT LINK HERE: ____________
-
-## Step A — list on Gumroad (primary, ~5 steps)
-
-1. Sign in at <https://gumroad.com> (create a free account if needed), then open
-   <https://gumroad.com/products/new>.
-2. **Name:** `pydevtoolkit 1.0.0 — 16 CLI developer utilities` · **Price:** `15` USD
-   (equivalently `1500` cents — matches `price=1500` sent to the API in the archived attempt).
-3. Paste the description above (or the fuller version from `store/gumroad_listing.md`)
-   into the product description, and upload **both** asset files:
-   `build/pydevtoolkit-1.0.0.zip` and `build/pydevtoolkit-1.0.0.tar.gz`
-   (sha256 checksums below — verify after upload).
-4. Click **Publish**, open the product page, and copy the checkout link
-   (format `https://<your-subdomain>.gumroad.com/l/<permalink>`).
-5. Paste that URL on the marked line in this document and into `store/CHECKOUT_LINK.txt`,
-   then commit both.
-
-## Step B — list on Lemon Squeezy (fallback; dashboard — REST cannot create products)
-
-1. Sign in at <https://app.lemonsqueezy.com> (create the store if needed; TEST MODE is fine
-   for staging — run the one-time activation review before selling live).
-2. **Products → `+` New product**: name `pydevtoolkit 1.0.0 — 16 CLI developer utilities`,
-   description as above, price **$15.00**.
-3. Attach both asset files (`build/pydevtoolkit-1.0.0.zip`, `build/pydevtoolkit-1.0.0.tar.gz`)
-   and set the product status to **Published**.
-4. Copy the product's **buy-now / checkout URL** from the product page
-   (the API calls this `buy_now_url`).
-5. Paste that URL on the marked line in this document and into `store/CHECKOUT_LINK.txt`.
 
 Reference REST call (as attempted; per the API's own 405 response `v1/products` accepts
 GET/HEAD only, so **product creation must be done in the dashboard** — the curl below is the
