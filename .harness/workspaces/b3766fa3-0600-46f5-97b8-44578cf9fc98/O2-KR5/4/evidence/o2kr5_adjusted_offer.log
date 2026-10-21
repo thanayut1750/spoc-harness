@@ -1,0 +1,22 @@
+# O2KR5 ADJUSTED OFFER LOG — WP-O2KR5-2-GIG-OFFER-LEDGER stage 2 (dir O2-KR5/4)
+GEN_UTC=2026-10-21T15:22:00Z (authoring time; receipts below cite their own command logs)
+OFFER_FILE=listing/OFFER_ADJUSTED_O2KR5.md (v3 — ADJUSTED OFFER (O2-KR5); price-only adjustment $7.00 → $9.00 USD, API cents 900; CALC-ONLY net $7.60/sale × 14 = $106.40; tier/scope unchanged from v2 "Solo Bundle"; supersedes v2 at O2-KR5/3 sha256 8f126fe1…)
+COMPLIANCE: the offer's purchase/checkout section states the human publish step is pending per O2-KR2 (Gumroad/Lemon Squeezy API 401, zero machine credentials) and contains NO invented buy/order/checkout URLs; only the free-zip repository URL is cited (a8563e06, 40,299 B, sha256 f272da22…).
+
+PUSH RECEIPT (commit A, first publication of the adjusted offer):
+  CLONE=/tmp/o2kr5s2 (fresh clone of codex/spoc-harness-v1 @ 6ad8ddb3fe9ca2a222a3deae545f5d2be3365c4c, clean tree)
+  PRE_PUSH_DIFF_SCOPE: git diff --cached --name-status HEAD -> 8 'A' rows + 1 'M' row, ALL under .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/ (the M row is the mandated append-only ENTRY 2 extension of this KR's own decision log: +15/0); numstat deletion rows = 0; rows outside dir-4 = 0
+  COMMIT_A=963255f6650b43db55af515be292c4c009d7c694
+  PUSH_EXIT=0 (git push --quiet HEAD:refs/heads/codex/spoc-harness-v1, credential-wired URL captured in a shell variable and never printed; receipt 36051418ee45550d5a79d202e4e6c83d)
+  INDEPENDENT_TIP_VERIFY: git ls-remote https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1 -> 963255f6650b43db55af515be292c4c009d7c694 (exit 0, same receipt)
+
+FETCH-BACK RECEIPT (raw.githubusercontent.com @ T1=963255f6650b43db55af515be292c4c009d7c694; receipt 2c3d48e3a9d6c32dfce04809d1452473):
+  FB listing/OFFER_ADJUSTED_O2KR5.md: HTTP_STATUS=200, LOCAL_SHA256=aab35d40ad0b52c4326e540ccb0c89a2a74bcc17a726733338285c0cbebf79a9, VERDICT=MATCH (byte-exact vs workspace/clone copy); marker 'ADJUSTED OFFER (O2-KR5)' present in the fetched bytes (grep count 1)
+  FB evidence/o2kr5_decision_log.md: HTTP_STATUS=200, LOCAL_SHA256=8c97a0b68504fa2b381d8bdbfaa7dc229b5744ee8ad0e36a6e1ba42d0c5409c8, VERDICT=MATCH; ENTRY 2 close-out present in the fetched bytes (grep count 1)
+  FB evidence/o2kr5_gig_channels.log: HTTP_STATUS=200, LOCAL_SHA256=62bf58199b4d438156506dd70c3097381e99e84711615239da43f41a5d13f37c, VERDICT=MATCH
+  FB evidence/o2kr5_fallback_chain.md: HTTP_STATUS=200, LOCAL_SHA256=c14a316a86cac3d65942d03480367fbfa468bd9190af491b5497e4ad7e19e14c, VERDICT=MATCH
+  FB evidence/o2kr5_ledger_rerun.log: HTTP_STATUS=200, LOCAL_SHA256=28b81950bc436b243d6ab1d5be178c3de4337ea5e1e6a510bab0832687d02169, VERDICT=MATCH
+  FETCHBACK_TALLY: 5/5 HTTP 200 byte-exact MATCH, 0 mismatches
+
+HONEST STATUS: publication is the only distribution action available (repo publication); no live marketplace listing exists, so the adjusted offer cannot generate sales and no purchase is possible anywhere. FINAL TOTAL EARNED $0.00 USD; REMAINING GAP $100.00 USD (evidence/o2kr5_ledger_rerun.log).
+O2KR5_ADJUSTED_OFFER: PUBLISHED (PUSH_EXIT=0, fetch-back 5/5 byte-exact MATCH, no invented URLs)
