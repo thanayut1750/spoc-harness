@@ -1,0 +1,32 @@
+# O2-KR5 LEDGER RE-CHECK (read-only) — WP-O2KR5-1-TRIGGER-MIRROR, workspace O2-KR5/4
+
+UTC: 2026-10-21T12:52:19Z
+Purpose: fresh read-only corroboration of the recorded O2-KR4 ledger state before the
+O2-KR5 ENTRY 1 trigger evaluation. NO add was performed; no amount was recorded;
+revenue_ledger.json remains ABSENT (tool writes it lazily on first accepted add only).
+
+## Invocation (verbatim)
+
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger)
+arguments: {"action": "summary", "goal": 100, "include_entries": true}
+run receipt artifacts: dd901cb3dcc109322fb857b0f39a9ee1 / 8c1c21ff9365d3189bfa8996e4d34d1c / ed48965d43770867614ea8924a0f2f52
+
+## Output (verbatim)
+
+{"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/4/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}
+
+## Read-back on disk
+
+- find .../O2-KR5/4 -name 'revenue_ledger.json' -> no results (file ABSENT; nothing was
+  created or written by this read-only summary). Receipt: command artifact
+  06678736d290760f59872374b27a9efa (same receipt also records the fresh clone state).
+
+## Consistency with recorded upstream state
+
+- O2-KR4 final summary (recorded artifact 776de57c0e387b8d5711b31bc719b3be):
+  total_earned 0, remaining 100.0, progress_percent 0.0, goal_reached false.
+- This fresh summary: total_earned 0, entry_count 0, entries [], remaining 100.0,
+  goal_reached false. IDENTICAL zero-state. No sale exists; no ledger entry exists;
+  none was fabricated in this package.
+
+LEDGER_RECHECK: CONSISTENT_ZERO_STATE (2026-10-21T12:52:19Z)
