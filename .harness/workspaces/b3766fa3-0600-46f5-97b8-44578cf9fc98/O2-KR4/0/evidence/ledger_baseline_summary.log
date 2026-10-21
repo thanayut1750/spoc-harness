@@ -1,0 +1,11 @@
+UTC_NOW: 2026-10-21T05:24:04Z
+kr_id: O2-KR4
+work_package: WP-O2KR4-1-LEDGER
+purpose: BASELINE ledger summary — first ledger operation of this work package, executed BEFORE any 'add' attempt, establishing pre-existing ledger state.
+tool_id: tool:7bdf3aa0d66a5279c833dabe2820f852 (revenue_ledger, registered tested mission tool)
+invoked_via: run_mission_tool
+arguments (verbatim JSON):
+{"action": "summary", "include_entries": true, "goal": 100, "currency": "USD", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json"}
+raw_output (verbatim):
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+baseline_reading: total_earned=0 (USD 0.00), entry_count=0, remaining=100.0, progress_percent=0.0, goal_reached=false — empty pre-existing ledger; no revenue recorded before this work package.

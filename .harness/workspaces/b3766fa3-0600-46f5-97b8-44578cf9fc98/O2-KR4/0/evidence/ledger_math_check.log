@@ -1,0 +1,52 @@
+UTC_NOW: 2026-10-21T05:31:38Z
+purpose: independent python3 recompute of revenue_ledger totals + anti-fabrication URL assertion
+script: evidence/ledger_math_check.py (read-only; writes no ledger state)
+script_note: v2 fix - tool_id read from wrapper JSON level (v1 crashed at check 10 with KeyError before URL-grep/verdict sections)
+===
+== inputs (archived, verbatim) ==
+baseline summary: total_earned=0 entry_count=0 entries=[]
+final    summary: total_earned=0 entry_count=0 entries=[]
+== arithmetic ==
+sum(entries amounts) = 0  (from 0 entries)
+tool total_earned    = 0
+CHECK 01: sum(entry amounts) == total_earned ... PASS
+CHECK 02: recorded-entry count is 0 (list len 0 == field 0) ... PASS
+CHECK 03: entries list is exactly [] (no fabricated entries) ... PASS
+CHECK 04: goal == 100 (goal param passed explicitly on every summary run) ... PASS
+CHECK 05: currency == USD ... PASS
+CHECK 06: remaining (100.0) == goal - total_earned (100.0) ... PASS
+CHECK 07: progress_percent (0.0) == total/goal*100 (0.00) ... PASS
+CHECK 08: goal_reached is false ($100 goal honestly UNMET) ... PASS
+CHECK 09: baseline summary consistent with final summary (no entries appeared between runs) ... PASS
+CHECK 10: final summary emitted by the registered revenue_ledger tool_id ... PASS
+NOTE: revenue_ledger.json does not exist on disk (tool writes it lazily on
+      first 'add'; zero 'add' entries were ever accepted, consistent with
+      evidence/ledger_zero_amount_probe.log)
+CHECK 11: ledger file absent is consistent with zero accepted entries ... PASS
+== anti-fabrication URL grep ==
+CHECK 12: 0 invented order/product/transaction URLs across 7 O2-KR4 deliverable files ... PASS
+scanned files:
+  - ledger_baseline_summary.log
+  - ledger_convention.md
+  - ledger_math_check.log
+  - ledger_summary_final.log
+  - ledger_zero_amount_probe.log
+  - proof_preflight.log
+  - zero_confirmed_sales_check.md
+scanned patterns:
+  - gumroad product/order URL  /gumroad\.com/l//
+  - gumroad library/receipt URL  /gumroad\.com/library/
+  - gumroad API URL  /api\.gumroad\.com/
+  - lemonsqueezy tenant/checkout URL  /[a-z0-9-]+\.lemonsqueezy\.com/
+  - lemonsqueezy other store URL  /lemonsqueezy\.com/(?!docs)/
+  - generic payment/order id field  /order_id|receipt_url|transaction_id/
+
+CHECKS_RUN: 12
+FAILED_CHECKS: none
+ENTRY_COUNT: 0
+SUM_OF_ENTRIES: 0
+TOOL_TOTAL_EARNED: 0
+GOAL: 100.0  REMAINING: 100.0  PROGRESS_PERCENT: 0.0  GOAL_REACHED: False
+VERDICT: PASS
+===
+MATHCHECK_EXIT: 0
