@@ -1,0 +1,39 @@
+# O2-KR5 adjusted-offer evidence — push + fetch-back receipts (dir O2-KR5/7)
+Channel: O1-KR1 fallback chain step 3 — ADJUSTED OFFER
+Status: ATTEMPTED WITH EVIDENCE (terminal)
+Work package: WP-O2KR5-1-CHAIN
+
+## SECTION 1 — ARTIFACT
+- FILE: listing/OFFER_ADJUSTED_O2KR5.md — clearly marked 'ADJUSTED OFFER (O2-KR5)'
+- Adjustment: tiered pricing $5 (single-site sweep) / $9 (site sweep + patched harness
+  + rerun + summary report); concrete scope per tier; supersedes the prior v3 price point.
+- Version chain (recorded): v1 $9 (O2-KR5/0/ADJUSTED_OFFER.md) -> v2 $7 (8f126fe1) ->
+  v3 $9 (963255f, calc-only: net $7.60/sale, ceil(100/7.6)=14 sales = $106.40) -> v4 (this
+  file, tiered $5/$9).
+- Local sha256 66d82832a162df85beb6bd20df8ca8821fcb90f20ca1a9406f5e0531ac19c2a1 (3961 bytes).
+- Purchase/checkout section: states the marketplace publish step remains PENDING per O2-KR2
+  (terminal BLOCKED: no machine credentials; Gumroad/Lemon Squeezy API 401; human step
+  required). NO buy/order/checkout URL is invented anywhere in the file.
+
+## SECTION 2 — PUSH RECEIPT (same additions-only commit as the mirrored listing)
+- PUSH OUTPUT:
+    To https://github.com/thanayut1750/spoc-harness.git
+       f50ec53..30cb3a1  HEAD -> codex/spoc-harness-v1
+- PUSH_EXIT=0
+- COMMIT SHA: 30cb3a1c526d10d27a459c05daf22987c19c30e6
+- Transport: operator-configured remote URL held in a shell variable only, never printed;
+  credential-less clone URL remains unchanged (dry-run auth receipt DRYRUN_EXIT=128 recorded
+  in evidence/o2kr5_mirrored_listing.log SECTION 2).
+
+## SECTION 3 — FETCH-BACK AT THE PUSHED COMMIT (raw.githubusercontent.com)
+- URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/30cb3a1c526d10d27a459c05daf22987c19c30e6/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/7/listing/OFFER_ADJUSTED_O2KR5.md
+- HTTP_STATUS=200
+- LOCAL_SHA256=66d82832a162df85beb6bd20df8ca8821fcb90f20ca1a9406f5e0531ac19c2a1
+- FETCHED_SHA256=66d82832a162df85beb6bd20df8ca8821fcb90f20ca1a9406f5e0531ac19c2a1
+- VERDICT=MATCH (byte-exact)
+
+## SECTION 4 — CHAIN STATUS CONTRIBUTION
+- Adjusted offer: ATTEMPTED WITH EVIDENCE (push receipt + HTTP 200 byte-exact fetch-back).
+- Revenue effect: none yet and none claimable — no sale, no receipt, no checkout rail exists
+  (O2-KR2 terminal BLOCKED). Ledger ground truth stays total_earned $0.00 / remaining
+  $100.00 until a human publishes the offer and a genuine receipt-bearing sale occurs.

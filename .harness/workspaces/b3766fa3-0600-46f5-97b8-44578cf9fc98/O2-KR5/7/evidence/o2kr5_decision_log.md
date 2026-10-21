@@ -69,3 +69,60 @@ cited read-only and never touched.
 - SCOPE: pre-push `git diff --name-only` from the pre-work tip shows only new
   `O2-KR5/7/` files; final tip and clean-tree receipts in `evidence/o2kr5_mirrored_listing.log`
   and the run close-out.
+
+## ENTRY 2 — fallback-chain close-out (per-channel terminal status, ledger restated)
+
+- UTC_TIMESTAMP: 2026-10-21T17:58:02Z (fresh `date -u` receipt, epoch 1792605482; remote
+  tip corroborated `30cb3a1c526d10d27a459c05daf22987c19c30e6` via anonymous `git ls-remote`
+  before this entry was written).
+- PER-CHANNEL TERMINAL STATUS (O1-KR1 chain: mirrored listing -> gig platforms -> adjusted offer):
+  1. MIRRORED LISTING — ATTEMPTED WITH EVIDENCE. `listing/MIRROR_O2KR5.md` pushed
+     additions-only at commit `30cb3a1c526d10d27a459c05daf22987c19c30e6`, PUSH_EXIT=0
+     (range `f50ec53..30cb3a1` on `codex/spoc-harness-v1`); anonymous `git ls-remote`
+     corroborates the tip; raw.githubusercontent.com fetch-back at that commit:
+     HTTP_STATUS=200, LOCAL_SHA256 == FETCHED_SHA256 ==
+     `2a21fcf7d0bbb44922edd0fba09c34391f12296dcdbc6b7dbd2ffccc9d748b6f`, VERDICT=MATCH.
+     Full receipts: `evidence/o2kr5_mirrored_listing.log`.
+  2. GIG PLATFORMS — UNAVAILABLE (BLOCKED, terminal; zero new requests sent).
+     Fiverr: HTTP 403, PerimeterX human-verification wall — verbatim blocker
+     "It needs a human touch" / "Complete the task and we'll get you right back into
+     Fiverr." (PXCR10002539; archived capture body 35,958 B, sha256
+     `db30683732b8ceac22ee4c72e187177dd415f20c73542ad5e266d4a94c0beeec`). Upwork:
+     HTTP 403, Cloudflare challenge — verbatim blocker "Attention Required! | Cloudflare" /
+     "Sorry, you have been blocked" / "Enable JavaScript and cookies to continue"
+     (archived capture body 344,258 B, sha256
+     `194f5ee133b023c76d9accf292f75ff3ed7abd3e2a53a34d8de8d805ad2f7e7a`). Both cited from
+     already-recorded receipts (attempt-0 + dir-4 captures); this package sent zero HTTP
+     requests to either platform (`NO_NEW_REQUESTS_SENT=1`,
+     `evidence/o2kr5_gig_channels.log`, 2/2 platforms in recorded terminal state).
+  3. ADJUSTED OFFER — ATTEMPTED WITH EVIDENCE. `listing/OFFER_ADJUSTED_O2KR5.md`
+     ('ADJUSTED OFFER (O2-KR5)', tiered pricing $5/$9) pushed in the same additions-only
+     commit `30cb3a1c526d10d27a459c05daf22987c19c30e6`, PUSH_EXIT=0; fetch-back:
+     HTTP_STATUS=200, LOCAL_SHA256 == FETCHED_SHA256 ==
+     `66d82832a162df85beb6bd20df8ca8821fcb90f20ca1a9406f5e0531ac19c2a1`, VERDICT=MATCH.
+     Its purchase/checkout section states the marketplace publish step remains PENDING per
+     O2-KR2 (terminal BLOCKED) and mints no buy/order/checkout URL.
+     Full receipts: `evidence/o2kr5_adjusted_offer.log`.
+- No channel is 'pending', 'skipped', or 'incomplete': 2 channels ATTEMPTED WITH EVIDENCE,
+  1 channel UNAVAILABLE WITH CONCRETE RECORDED BLOCKER.
+- CHAIN EXHAUSTED: **YES** — every documented channel of the O1-KR1 fallback chain
+  (mirrored listing, gig platforms, adjusted offer) now holds a terminal state, and the
+  only verifiably working publication channel (additions-only git push to
+  `codex/spoc-harness-v1`) has been used for all publishable artifacts. No further
+  documented channel remains to iterate.
+- LEDGER RERUN (fresh this session, `tool:7bdf3aa0d66a5279c833dabe2820f852`,
+  action=`summary`, verbatim output in `evidence/o2kr5_ledger_rerun.log`):
+  `total_earned: 0`, `remaining: 100.0`, `progress_percent: 0.0`, `goal_reached: false`,
+  `entry_count: 0`, `entries: []`. Zero accepted 'add' entries exist and no
+  receipt-bearing sale occurred, so the ledger state is unchanged
+  (`revenue_ledger.json` never created).
+- FINAL TOTAL: **$0.00 USD**
+- REMAINING GAP: **$100.00 USD**
+- GOAL: **NOT REACHED** — the best-achieved total is documented above with full evidence
+  rather than stopping silently. No sale, price, order/checkout URL, or receipt was
+  invented at any point.
+- PUBLICATION (this entry): the two new evidence logs
+  (`evidence/o2kr5_mirrored_listing.log`, `evidence/o2kr5_adjusted_offer.log`) and this
+  decision log (ENTRY 2 appended below ENTRY 1, lines 1-71 untouched) are committed in one
+  additions-only commit from the pre-work tip `f50ec53`; close-out push/fetch-back
+  receipts are appended at the end of this file immediately after the push.
