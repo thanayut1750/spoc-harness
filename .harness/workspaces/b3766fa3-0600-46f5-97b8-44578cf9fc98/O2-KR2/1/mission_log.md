@@ -141,3 +141,37 @@ execution_stopped flag; every cited outcome below is therefore grounded in the t
 Status restated: O2-KR2 remains in its terminal prepared-asset state (Gumroad 401 blocked, Lemon Squeezy 405
 structurally blocked, no credentials exist). There is still NO live offer and NO minted checkout URL anywhere
 in this repository; no PASS verdict is issued here — certification is WP2's separate audit.
+
+--------------------------------------------------------------------------------
+ADDENDUM 4 - WP-O2KR2-2-AUDIT (independent publish audit, attempt 2) - 2026-10-21T00:10:52Z
+--------------------------------------------------------------------------------
+Auditor: O2-KR2 Independent Offer Audit and Final Verdict (WP-O2KR2-2-AUDIT). Fresh live
+checks re-executed independently; full verbatim captures in evidence/o2kr2_audit.log
+(committed with this addendum), branch codex/spoc-harness-v1:
+
+- (a) PASS - evidence/BLOCKER_EVIDENCE.md HTTP 200: Gumroad POST HTTP 401 @
+  2026-10-20T22:28:39Z and Lemon Squeezy POST HTTP 405 @ 2026-10-20T22:28:52Z, endpoints included.
+- (b) PASS - hosted zip (a8563e06-pinned): HTTP 200, application/zip, 40,299 B, sha256
+  f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99 exact, unzip -t OK.
+- (c) PASS after remediation commit a6991e2 - offer/CHECKOUT_INSTRUCTIONS.md refetched:
+  HTTP 200, 2,713 B, sha256 6b273b814e22adf284fbc96b9f84f2a34511d394bf929e100b38bfd88df3583c
+  unchanged; exactly one live paste-checkout-link action branch-wide (its line 11); $15.00
+  x3; hosted zip URL + its sha256 + OFFER.md URL cited; no minted link. Remediation: commit
+  a6991e2 reduced O2-KR2/0/store/OFFER.md to offer copy + pointer to the single instruction
+  document (duplicate Step A/B paste actions, 'PASTE CHECKOUT LINK HERE' blank and the
+  single-hand-off self-claim removed; offer terms, prices, asset hashes and evidence index
+  unchanged; O2-KR2/0 attempt-1 records untouched as history).
+- (d) PASS - this file fetched at a6991e2: HTTP 200, 11,628 B, sha256
+  b818c1ffc345e9522e60b482be1efa6ddf9a5ea826a84101cbc23f816d3b9f0a; staged instruction-doc
+  path (L28), hosted zip URL (L36) and verification evidence (L37-38, L58-60, L98-99) present.
+- (e) PASS - sha256sum -c CHECKSUMS.txt in O2-KR2/0/build exit 0, verified twice (local bytes
+  and freshly fetched remote CHECKSUMS.txt, cmp-identical, sha256
+  f202904e630d27cc6e6a2a21d3ea3d73271a39b28f5f44a902d8b7b49e29a180).
+
+Audit verdict: 5/5 PASS from fetched evidence. The certified success state is this KR's
+staged prepared-asset mode: package hosted/committed, ONE paste-checkout-link instruction
+document, blocker evidence archived with timestamps. No live offer exists, no checkout link
+is minted here, and store/CHECKOUT_LINK.txt remains a placeholder for the documented human
+dashboard step.
+
+O2-KR2 publish acceptance: PASS
