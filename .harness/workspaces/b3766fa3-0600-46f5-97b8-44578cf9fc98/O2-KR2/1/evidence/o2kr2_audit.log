@@ -470,3 +470,55 @@ link minted, store/CHECKOUT_LINK.txt remains a placeholder pending the documente
 dashboard step. Per the audit gate, mission_log.md is appended with Addendum 4 and its final
 O2-KR2 line is set to exactly: O2-KR2 publish acceptance: PASS
 ----- end AUDIT VERDICT -----
+
+----- POST-PUSH VERIFICATION (WP-O2KR2-2-AUDIT, 2026-10-21T00:13:28Z) -----
+Commit chain recorded: 5c8dcef499706ef98cf24383ba6b452ef636af70 (mission_log.md Addendum 4 + exact final line)
+-> 628b7740e17c2462dff6d44174dbc769d0f76af8 (this audit log, added via git add -f after the first commit's
+   .gitignore refusal left it out). Both pushes to codex/spoc-harness-v1, token-scrubbed, ls-remote-confirmed.
+First fetch-back attempt (at 5c8dcef) reproduced the refusal as a live 404:
+=== POST-PUSH FETCH-BACK at COMMIT_A 5c8dcef499706ef98cf24383ba6b452ef636af70 (2026-10-21T00:11:32Z) ===
+audit log URL:  https://raw.githubusercontent.com/thanayut1750/spoc-harness/5c8dcef499706ef98cf24383ba6b452ef636af70/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/o2kr2_audit.log
+AUDIT_LOG_HTTP=404
+mission_log URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/5c8dcef499706ef98cf24383ba6b452ef636af70/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+MISSION_LOG_HTTP=200
+   14 /tmp/audit_fetched.log
+14062 /tmp/mlog_fetched.md
+14076 total
+d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed  /tmp/audit_fetched.log
+450ef0c6469927fe857be91a5b42da552f6b948572bc4392eaa9b2f500e7e863  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/o2kr2_audit.log
+efd37263bf837d8660acb872143cb185d6890f41c11fd8b107c17cbc5ec5ab02  /tmp/mlog_fetched.md
+efd37263bf837d8660acb872143cb185d6890f41c11fd8b107c17cbc5ec5ab02  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+/tmp/audit_fetched.log .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/o2kr2_audit.log differ: byte 1, line 1
+MISSION_LOG_FETCH_VS_LOCAL=IDENTICAL
+-- fetched mission_log final line --
+O2-KR2 publish acceptance: PASS
+FETCHED_FINAL_LINE_MATCH=1
+=== POST-PUSH FETCH-BACK END ===
+Fetch-back after remediation commit 628b774:
+=== POST-PUSH FETCH-BACK at COMMIT_A2 628b7740e17c2462dff6d44174dbc769d0f76af8 (2026-10-21T00:12:58Z) ===
+Context: first push 5c8dcef499706ef98cf24383ba6b452ef636af70 carried ONLY mission_log.md;
+the audit log was refused by .gitignore (evidence: 404, 14 B, d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed at 00:11:32Z);
+remediation = git add -f in commit 628b7740e17c2462dff6d44174dbc769d0f76af8. No check outcome altered.
+audit log URL:   https://raw.githubusercontent.com/thanayut1750/spoc-harness/628b7740e17c2462dff6d44174dbc769d0f76af8/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/o2kr2_audit.log
+AUDIT_LOG_HTTP=200
+mission_log URL: https://raw.githubusercontent.com/thanayut1750/spoc-harness/628b7740e17c2462dff6d44174dbc769d0f76af8/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+MISSION_LOG_HTTP=200
+39890 /tmp/audit_fetched2.log
+14062 /tmp/mlog_fetched2.md
+53952 total
+450ef0c6469927fe857be91a5b42da552f6b948572bc4392eaa9b2f500e7e863  /tmp/audit_fetched2.log
+450ef0c6469927fe857be91a5b42da552f6b948572bc4392eaa9b2f500e7e863  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/evidence/o2kr2_audit.log
+efd37263bf837d8660acb872143cb185d6890f41c11fd8b107c17cbc5ec5ab02  /tmp/mlog_fetched2.md
+efd37263bf837d8660acb872143cb185d6890f41c11fd8b107c17cbc5ec5ab02  .harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/1/mission_log.md
+AUDIT_LOG_FETCH_VS_LOCAL=IDENTICAL
+MISSION_LOG_FETCH_VS_LOCAL=IDENTICAL
+-- fetched mission_log final line --
+O2-KR2 publish acceptance: PASS
+FETCHED_FINAL_LINE_MATCH=1
+=== POST-PUSH FETCH-BACK END ===
+Recorded hashes at 628b774: audit log 39,890 B sha256
+450ef0c6469927fe857be91a5b42da552f6b948572bc4392eaa9b2f500e7e863; mission_log.md 14,062 B sha256
+efd37263bf837d8660acb872143cb185d6890f41c11fd8b107c17cbc5ec5ab02, fetched final line exactly
+'O2-KR2 publish acceptance: PASS' (FETCHED_FINAL_LINE_MATCH=1).
+This section is an append-only record of the push/fetch-back; it changes no check outcome.
+----- end POST-PUSH VERIFICATION -----
