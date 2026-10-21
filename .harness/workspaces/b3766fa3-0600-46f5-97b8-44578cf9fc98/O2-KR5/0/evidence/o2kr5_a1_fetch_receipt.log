@@ -1,0 +1,29 @@
+APPROVED_INPUT_FETCH_LOG
+RUN_UTC=2026-10-21T08:18:27Z
+FETCH name=AP1_gumroad401_63e0f5ca http=200 bytes=6478 sha256=f9cbcb971ca6d404d42bda22d38811eef014b97be840b06bf3cd495c1b52d0e6
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/63e0f5caab3c61d1d2985a915419a1fa2ed9f8c9/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_api_retry.log
+FETCH name=AP2_gumroad401_bc8167ca http=200 bytes=6478 sha256=f9cbcb971ca6d404d42bda22d38811eef014b97be840b06bf3cd495c1b52d0e6
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_api_retry.log
+FETCH name=AP3_lemon401_bc8167ca http=200 bytes=4397 sha256=8c3bd823e8382ab55370317045717d42c274e6907836eda97d81acafefdc06e4
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_fallback_retry.log
+FETCH name=AP4_gumroad_human http=200 bytes=3159 sha256=11fb27c65e0e97de7b4f3572118edabf7fc6027e7b5e0214596b33ac8276e129
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_human_step_outcome.md
+FETCH name=AP5_lemon_human http=200 bytes=2810 sha256=984a03e9351d0003329d917fa5bc328dc79fe81dfd128d5cfc9a46baae6283f2
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_human_step_outcome.md
+FETCH name=AP6_gumroad_sweep http=200 bytes=6156 sha256=aa9b29bb3124504034d61637e82975a55e084f2dafd37e916a4747abef83d205
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/gumroad_credentials_sweep.log
+FETCH name=AP7_lemon_sweep http=200 bytes=1553 sha256=03ae852c1258d63c16ac55c448621ee6679aebe5205bfcdbdc806e1969ccb7e3
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/bc8167ca45fe4ce4c6952771000cf29b0f90cb3f/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/evidence/lemonsqueezy_credentials_sweep.log
+FETCH name=AP8_outreach_log http=200 bytes=19398 sha256=c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/outreach_log.md
+FETCH name=AP9a_missionlog_KR3path http=404 bytes=14 sha256=d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/mission_log.md
+FETCH name=AP9b_missionlog_KR2path http=200 bytes=30968 sha256=2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR2/2/mission_log.md
+FETCH name=AP10a_ann_evidence_path http=404 bytes=14 sha256=d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/ANNOUNCEMENT.md
+FETCH name=AP10b_ann_offer_path http=200 bytes=1594 sha256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md
+FETCH name=AP11_reverify http=200 bytes=1266 sha256=94d062ade46585b7a3a79dee0d5da8c544fdd9de27f280bcda1cd96097c7ca9e
+  url=https://raw.githubusercontent.com/thanayut1750/spoc-harness/ef3d4f69f2dce6d5c428572c55550ffe54d4ccec/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/evidence/o2kr3_positive_reverify.log
+== END_FETCH_UTC=2026-10-21T08:18:34Z
