@@ -86,3 +86,28 @@ classes. Executed in `fallback_status.md` (pre-push, package minus the status fi
 and re-run over the complete final tree in `o2kr5_a1_final_verification.log`.
 
 No fabricated sales, receipts, statuses, or URLs; HTTP failures are reported as failures.
+
+## §C-2 FRESH — attempt-1 late declarations (appended additions-only BEFORE the corresponding request; original §A/§B/§C rows unchanged, zero deletions to this registry)
+
+Registered: 2026-10-21 (attempt 1, before the gig-platform probe of this attempt was executed).
+
+| # | Tag | Item | Destination / pattern |
+|---|---|---|---|
+| C6 | FRESH | single-shot anonymous GET probe of gig-platform host `https://www.upwork.com/` (no account, no signup, no credentials, no cookies; host never contacted before — the probe script's precheck greps the tracked tree at HEAD and aborts BEFORE any request unless the hit count is 0) | recorded whatever the HTTP status; any `https://www.upwork.com/...` string is FRESH content of this package cited only via the probe log receipt; URL strings inside the response body are redacted in the log for citation hygiene (full-body byte count + sha256 recorded instead) |
+| C7 | FRESH | gig-channel evidence files of this attempt: `o2kr5_a1_gig_probe.sh` (script, `bash -n` pre-checked) and `o2kr5_a1_gig_probe_upwork.log` (single-probe exchange log) | cited by committed sha at this attempt's push-B tip |
+| C8 | FRESH | post-execution ledger re-run file `o2kr5_a1_ledger_rerun.log` (name pre-declared in C4; single sanctioned `summary` invocation of `tool:7bdf3aa0d66a5279c833dabe2820f852`; NO `add` anywhere) and the additions-only append of decision ENTRY 2 to `evidence/decision_log.md` | cited by committed sha at this attempt's push-B tip and by the tool receipt ids recorded inside those files |
+
+Scope notes (anti-spam, binding):
+- The fiverr host is NOT re-probed this attempt: its single permitted attempt was consumed in
+  attempt 0 (citations.md §B B3: GET `https://www.fiverr.com/start_selling` → HTTP 403,
+  PXCR10002539 "It needs a human touch", receipt `f0c68766b0e2651f0c35783b537ab39e`); the
+  one-attempt-per-destination rule prohibits any second fiverr request, so B3 stands as the
+  recorded fiverr probe evidence.
+- IndexNow (A15): attempted once in O2-KR3 (HTTP 422), never retried; no second submission.
+- paste.rs (C1) and the repo-implied GitHub Pages URL (C2) each received exactly one request
+  this attempt (logged in `o2kr5_a1_c1_pasters_post.log` / `o2kr5_a1_c2_pages_get.log`);
+  neither destination is contacted again.
+
+### §C-3 — session append 2 (single guarded append; original §A–§C-2 rows unchanged; zero deletions)
+
+- A16 — APPROVED_INPUT (URL string recorded in pinned evidence A8): `https://api.github.com/repos/thanayut1750/spoc-harness/issues` — the GitHub issues-API endpoint string quoted VERBATIM in `evidence/decision_log.md` provenance quote 3, sourced from A8 `O2-KR3/0/evidence/outreach_log.md` at pinned tip `ef3d4f69f2dce6d5c428572c55550ffe54d4ccec` (recorded anchor sha `c764677b…`; attempt-1 §A fetch of that file: HTTP 200, 18,433 B, sha256 `14aae6e1e9549dd96ab1bee10a57169b322344ff0889cda0b0e77977687c9161`, string present at L96 — same line quoted in decision_log.md). Class basis identical to A12/A13/A15: a URL string recorded inside pinned APPROVED_INPUT evidence, re-cited only as that verbatim quote. NO request was made to this endpoint by attempt 1; it is registered solely so the §D rule ("every http(s):// URL in any file under O2-KR5/0/ must appear in this registry, exact or declared pattern") is satisfied with an explicit row instead of an implicit match. Registered 2026-10-21 during the pre-push-B manual §D re-enumeration. No fetch of this URL is required or performed for this row.

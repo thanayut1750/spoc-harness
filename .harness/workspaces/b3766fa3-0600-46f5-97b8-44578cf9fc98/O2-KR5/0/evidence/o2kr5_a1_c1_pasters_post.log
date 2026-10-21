@@ -1,0 +1,27 @@
+== C1: single POST https://paste.rs (anonymous paste host, no account required) ==
+UTC=2026-10-21T08:50:49Z
+METHOD=POST URL=https://paste.rs
+REQUEST_BODY=/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/mirrored_listing.md (announcement-derived mirrored listing; committed in push A 2d5b29c6eb0081240f41827848656a9d8e02a312)
+POSTED_BODY_SHA256=376f0f8b8dec77ba5759f56a39627bacfff909cc65f541f5d9943dc9da72b2a8
+CONTENT_RULE: body derived only from recorded ANNOUNCEMENT.md (ef3d4f69 tip, sha 430fce45...); only product URL is the recorded hosted-zip URL.
+NO-RETRY RULE: exactly one attempt; any outcome is final.
+CURL_EXIT=0
+HTTP_STATUS=201
+--- RESPONSE HEADERS ---
+HTTP/1.1 201 Created
+Server: nginx
+Date: Wed, 21 Oct 2026 08:50:53 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 22
+Connection: close
+permissions-policy: interest-cohort=()
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+Strict-Transport-Security: max-age=31536000; includeSubdomains;
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+
+--- RESPONSE BODY ---
+https://paste.rs/7Rnkd
+C1_OUTCOME=SUCCESS (mirror content accepted; paste URL above; this is delivery of a free-download notice, NOT any sale)

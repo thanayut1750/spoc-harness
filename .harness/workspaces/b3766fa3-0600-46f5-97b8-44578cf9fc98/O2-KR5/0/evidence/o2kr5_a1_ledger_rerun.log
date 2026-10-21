@@ -1,0 +1,58 @@
+O2-KR5 attempt 1 — post-fallback-execution ledger re-run (citations.md §C8)
+=============================================================================
+Policy: exactly one sanctioned read-only re-run invocation this attempt; action "add"
+is FORBIDDEN — no confirmed sale exists anywhere in the mission, the tool rejects
+amount<=0, and any nonzero add without payment-processor proof would be fabrication.
+No 'add' was attempted. No sale is claimed.
+
+INVOCATION (verbatim)
+-------------------------------------------------------------------------------------
+run_mission_tool
+  tool_id:   tool:7bdf3aa0d66a5279c833dabe2820f852
+  arguments: {"action": "summary", "include_entries": true}
+
+STDOUT (verbatim, unedited)
+-------------------------------------------------------------------------------------
+{"tool_id": "tool:7bdf3aa0d66a5279c833dabe2820f852", "output": {"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/1/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}}
+
+RECEIPT IDS (verbatim from the invocation result)
+-------------------------------------------------------------------------------------
+artifact_ids: ["84f026403fcb0493bc31c4d3eb9a242a", "9335cf2c1ab231dc7269ff390c3ecdfc", "bb6fbf26ab32c0debaedd42f59a8901c"]
+(session UTC date: 2026-10-21; exact invocation second is carried by the harness
+records behind the artifact ids above — the tool output itself carries no timestamp.)
+
+TIMING DISCLOSURE (honest, so no reader is misled)
+-------------------------------------------------------------------------------------
+This re-run executed AFTER (a) the mirrored-listing channel probes of this attempt
+(C1 paste.rs POST -> HTTP 201, free-download mirror, NOT a sale; C2 repo-implied GitHub
+Pages GET -> HTTP 404, blocker "Pages enablement is a repo-settings human step", no
+retry) and (c) the adjusted-offer publication (adjusted_offer.md, push A), but BEFORE
+the gig-platform single-shot upwork probe, which is DEFERRED in this session: every
+run_command receipt currently returns execution_stopped=true, which is not valid
+success evidence, so the one permitted upwork request is not spent behind an unreliable
+receipt. NO upwork request has been made as of this invocation. The per-channel final
+state is recorded in evidence/decision_log.md ENTRY 2 and evidence/fallback_status.md.
+
+RESULT FACTS (verbatim fields from the output above)
+-------------------------------------------------------------------------------------
+total_earned:    0            (= ledger total $0.00)
+entry_count:     0            (= 0 sales)
+remaining:       100.0        (gap to goal unchanged: $100.00)
+progress_percent: 0.0
+goal_reached:    false
+currency:        USD          goal: 100.0
+
+RESTATED (O2-KR5 acceptance substance)
+-------------------------------------------------------------------------------------
+Ledger total $0.00; remaining gap to the $100.00 goal = $100.00; 0 sales. Goal NOT
+reached and NOT fabricated. The ledger path above is the same instance recorded by the
+attempt-1 baseline (evidence/ledger_decision_summary.log): identical zero-state before
+and after the fallback publications — publication actions (mirror paste, offer pages)
+produce no revenue and none is claimed. The only product URL in this package remains
+A12 (hosted zip at pinned O2-KR2 evidence, free download); a mirror paste is delivery,
+not a sale.
+
+FRESH class per evidence/O2-KR5/0/evidence/citations.md §C4 and §C8 (invocation cited
+by the receipt artifact ids above). No revenue_ledger.json exists (no accepted add
+anywhere in the mission), consistent with O2-KR4 recorded state.
+=============================================================================
