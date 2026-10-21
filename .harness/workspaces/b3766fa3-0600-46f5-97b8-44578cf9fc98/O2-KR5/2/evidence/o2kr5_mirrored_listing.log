@@ -1,0 +1,115 @@
+# O2-KR5 MIRRORED LISTING — EXECUTION LOG (attempt 2, WP-O2KR5-1-TRIGGER-MIRROR)
+
+Channel executed: mirrored listing — first fallback in the O1-KR1 documented chain
+(mirrored listing -> gig platforms -> adjusted offer). Gig platforms and adjusted offer
+are separate assignments and were NOT attempted here.
+Publication channel: additions-only git push to https://github.com/thanayut1750/spoc-harness,
+branch `codex/spoc-harness-v1` (the one publication channel with verifiable prior success).
+LOG_WRITTEN_UTC: 2026-10-21T10:53:44Z (receipt: `date -u '+LOG_NOW_UTC=…'` →
+LOG_NOW_UTC=2026-10-21T10:53:44Z; same command re-confirmed clone /tmp/o2kr5_a2 clean at
+commit d088536, TREE_EXIT=0).
+
+NOTE_ON_RECEIPTS: this session's run_command receipts carry execution_stopped=true
+(systemic; exit_code 0 with full stdout). Per standing instruction, no state claim below
+rests on a stopped receipt alone: every claim is backed by an independently re-verified
+effect — anonymous `git ls-remote`, `curl` HTTP status + sha256 from
+raw.githubusercontent.com, `git diff`/`rev-parse` output, or a previously published
+receipt artifact.
+
+## PRE-WORK STATE
+- PRE_WORK_TIP: `81d2734a985bd1b825a65d79b1b4062004df59ca`
+  (receipt: `git ls-remote https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1`
+  at 2026-10-21T10:45:44Z → `81d2734… refs/heads/codex/spoc-harness-v1`, LS_REMOTE_EXIT=0;
+  fresh clone /tmp/o2kr5_a2 HEAD == remote tip, working tree clean).
+- Anchor hashes at pre-work tip (receipt: find+sha256sum, DONE_EXIT=0):
+  - `.harness/…/O2-KR3/0/evidence/outreach_log.md` = c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007
+  - `.harness/…/O2-KR2/2/mission_log.md` = 2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4
+
+## OFFER SOURCE (read-only extraction)
+- Receipt: `git show 6bb55308e7dd8e2436e182a32814e7a64cea5444:.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md > /tmp/ann_pinned.md`
+  → ANN_EXTRACT_EXIT=0; ANN_SHA256=430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91;
+  ANN_BYTES=1594; PIN_COMMIT=6bb55308e7dd8e2436e182a32814e7a64cea5444;
+  PIN_COMMITTER_DATE=2026-10-21T11:13:06+07:00 (= 2026-10-21T04:13:06Z).
+- The announcement states "There is no live purchase page and no buy URL." — mirrored verbatim.
+
+## TRIGGER DECISION (full entry: evidence/o2kr5_decision_log.md, ENTRY 1)
+- FIRED: TRIGGER_ELAPSED 6h32m38s since announcement commit 04:13:06Z; SALES_COUNT 0
+  (O2-KR4 ledger state; fresh re-check below); LEDGER_TOTAL $0.00; CHOSEN_CHANNEL
+  "mirrored listing" (first unexecuted O1-KR1 channel).
+- Ledger READ-ONLY re-check this session (receipt artifact aec328a5f0a698bea695ff77d5852e8a):
+  `run_mission_tool tool:7bdf3aa0d66a5279c833dabe2820f852 {"action":"summary","goal":100,"include_entries":true}`
+  → total_earned 0, remaining 100.0, progress_percent 0.0, goal_reached false,
+  entry_count 0, entries []. No `add` invoked; revenue_ledger.json remains absent
+  (lazy-write on first accepted add).
+
+## MIRROR CONSTRUCTION
+- `listing/MIRROR_O2KR5.md` = provenance header (8 HTML-comment lines) + pinned
+  ANNOUNCEMENT.md bytes, built by `cat header /tmp/ann_pinned.md > MIRROR_O2KR5.md`.
+- Receipts (single command chain, DONE_EXIT=0):
+  - HEADER_BYTES=1041
+  - BODY_SHA256 (`tail -c +1042 MIRROR | sha256sum`) = 430fce456a3481353d7678af2b1204000154f50c963acaac5d8d92f4845c5f91
+    → BYTE-EXACT equality with the pinned ANNOUNCEMENT.md @ 6bb55308….
+  - MIRROR_BYTES=2635; MIRROR_SHA256=652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261
+- `evidence/o2kr5_decision_log.md` (workspace copy == clone copy, byte-identical):
+  DL_SHA256=0e2a0885add1276f0e1ddcdbad42b4b500d3ac5481d3f113c9a5a76a1cfe4095.
+
+## PUSH A (mirrored listing + decision log)
+- Staging: `git add -f listing/MIRROR_O2KR5.md evidence/o2kr5_decision_log.md` → ADD_EXIT=0
+  (force needed because repo .gitignore line 12 = `.harness/`; identical to how all prior
+  KR workspace evidence entered this repo). `git diff --cached --name-only` receipt showed
+  exactly the 2 new O2-KR5/2 files.
+- COMMIT_A_SHA: `d088536198004f42c7c5d466c9bf9af9a252e234` (COMMIT_EXIT=0;
+  "2 files changed, 108 insertions(+)" — 0 deletions, additions-only).
+- FAILED FIRST TRANSPORT (full disclosure): pushing directly from the fresh clone failed —
+  "fatal: could not read Username for 'https://github.com': No such device or address";
+  anonymous ls-remote stayed at 81d2734… (receipt artifacts 8fbbecfe6edf62da79f6e67af55013ed /
+  0b1e3475238f3cfe8cb415d5200e9bf7). Diagnosis: plain-HTTPS clone has no credential helper,
+  no credential files, no SSH keys (SSH probe "Permission denied (publickey)"), no gh CLI.
+  This was a transport failure, NOT an outreach destination attempt; no destination was
+  re-contacted and no credential was fabricated.
+- Repaired transport (same commit, no retry against any destination): the commit was
+  fetched from the clone into the main workspace repo as a temporary ref
+  (`refs/tmp-kr5/a-head`, FETCH_LOCAL_EXIT=0) and pushed via that repo's configured
+  authenticated origin. Main repo worktree/HEAD were verified untouched: branch
+  codex/spoc-harness-v1 @ 81d2734…, `git status --porcelain` clean, before the push;
+  temp ref deleted afterwards (DEL_EXIT=0). No credential value was ever printed.
+- Push A receipt: PUSH_EXIT=0; output: "81d2734..d088536  refs/tmp-kr5/a-head -> codex/spoc-harness-v1".
+- Independent remote verification (anonymous):
+  `git ls-remote https://github.com/thanayut1750/spoc-harness.git refs/heads/codex/spoc-harness-v1`
+  → `d088536198004f42c7c5d466c9bf9af9a252e234 refs/heads/codex/spoc-harness-v1` == COMMIT_A_SHA.
+
+## FETCH-BACK AT COMMIT A (raw.githubusercontent.com)
+```
+FB|file=listing/MIRROR_O2KR5.md|HTTP=200|REMOTE_SHA256=652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261|LOCAL_SHA256=652c024753bec281ef9301a20fe4b54418bfc39d89996604b7988cbddd8f8261|VERDICT=MATCH
+FB|file=evidence/o2kr5_decision_log.md|HTTP=200|REMOTE_SHA256=0e2a0885add1276f0e1ddcdbad42b4b500d3ac5481d3f113c9a5a76a1cfe4095|LOCAL_SHA256=0e2a0885add1276f0e1ddcdbad42b4b500d3ac5481d3f113c9a5a76a1cfe4095|VERDICT=MATCH
+```
+Result: 2/2 MATCH, 0 mismatches, both HTTP 200 (receipt: curl -w '%{http_code}' +
+sha256sum comparison loop, DONE_EXIT=0).
+URLs:
+- https://raw.githubusercontent.com/thanayut1750/spoc-harness/d088536198004f42c7c5d466c9bf9af9a252e234/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/listing/MIRROR_O2KR5.md
+- https://raw.githubusercontent.com/thanayut1750/spoc-harness/d088536198004f42c7c5d466c9bf9af9a252e234/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/evidence/o2kr5_decision_log.md
+
+## SCOPE CHECK (additions-only)
+`git diff --name-only 81d2734a985bd1b825a65d79b1b4062004df59ca..d088536198004f42c7c5d466c9bf9af9a252e234`:
+```
+.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/evidence/o2kr5_decision_log.md
+.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/2/listing/MIRROR_O2KR5.md
+```
+Only the 2 new O2-KR5 attempt-2 files; zero prior-KR paths touched; outreach_log.md and
+mission_log.md untouched.
+
+## ANCHOR INTEGRITY AT COMMIT A
+- O2-KR3/0/evidence/outreach_log.md = c764677b7d8369253f6ad1139f8039e475f022aa602232808a9bfe0225a47007 (unchanged)
+- O2-KR2/2/mission_log.md = 2d58fc1b7d6f7cd7b0f7713f80c68ebf14da339c8ff88bd2c5615a5dab011fb4 (unchanged)
+(receipt: `git show <sha>:<path> | sha256sum` at COMMIT_A_SHA)
+
+## HONEST OUTCOME
+- This mirrored listing is a PUBLICATION, not a sale. No purchase page and no buy URL
+  exists; the only product link is the free A12 zip already pinned in the announcement
+  (sha256 f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99).
+- No sale, price, order URL, or receipt was fabricated; no ledger write was performed
+  (summary only). No new external destination was contacted.
+- Expected cumulative net revenue after this fallback: $0.00. Remaining gap: $100.00.
+  Sales: 0.
+- Next chain channels (gig platforms, adjusted offer) are separate assignments —
+  not attempted in this log.
