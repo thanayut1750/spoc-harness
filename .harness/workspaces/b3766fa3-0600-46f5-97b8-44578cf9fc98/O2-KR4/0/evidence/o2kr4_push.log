@@ -1,0 +1,27 @@
+=== O2-KR4 WP-O2KR4-2-REPORT — push + fetch-back verification ===
+UTC_NOW: 2026-10-21T06:39:48Z
+cwd for local hashing: /home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR4/0
+branch: codex/spoc-harness-v1
+pre-push tip: ef3d4f69f2dce6d5c428572c55550ffe54d4ccec
+pushed commit: c5b1974e9efea960b86ec72f4eaefae0c7295681 (PUSH_EXIT=0; ef3d4f6..c5b1974)
+mode: additions-only — 16 NEW files staged (1262 insertions / 0 deletions); mission_log.md NOT in this workspace and NOT touched
+note: first fetch-back attempt ran from repo root (local CWD bug, local sha empty) — superseded by this run; all remote GETs were already HTTP 200
+
+FB report/EARNINGS_REPORT_O2KR4.md                  HTTP=200 local=dc2b4ebae404 remote=dc2b4ebae404 MATCH
+FB evidence/ledger_baseline_summary.log             HTTP=200 local=cdb64dc9cac2 remote=cdb64dc9cac2 MATCH
+FB evidence/ledger_convention.md                    HTTP=200 local=c74ce741bbef remote=c74ce741bbef MATCH
+FB evidence/ledger_math_check.log                   HTTP=200 local=112e07ff5ada remote=112e07ff5ada MATCH
+FB evidence/ledger_math_check.py                    HTTP=200 local=75442bdadca9 remote=75442bdadca9 MATCH
+FB evidence/ledger_summary_corroboration_wp2.log    HTTP=200 local=cddc54d7ca7e remote=cddc54d7ca7e MATCH
+FB evidence/ledger_summary_final.log                HTTP=200 local=2945aa26d50c remote=2945aa26d50c MATCH
+FB evidence/ledger_tool_calls.log                   HTTP=200 local=16369b3f9b25 remote=16369b3f9b25 MATCH
+FB evidence/ledger_zero_amount_probe.log            HTTP=200 local=bcd81bce6e87 remote=bcd81bce6e87 MATCH
+FB evidence/o2kr4_audit.log                         HTTP=200 local=b72c5d5d0228 remote=b72c5d5d0228 MATCH
+FB evidence/o2kr4_audit.py                          HTTP=200 local=fbf1ec39e1b7 remote=fbf1ec39e1b7 MATCH
+FB evidence/proof_preflight.log                     HTTP=200 local=d03e4593debb remote=d03e4593debb MATCH
+FB evidence/proof_resolution_audit.log              HTTP=200 local=543d657a45ad remote=543d657a45ad MATCH
+FB evidence/proof_resolution_audit.sh               HTTP=200 local=0098edf247dc remote=0098edf247dc MATCH
+FB evidence/zero_confirmed_sales_check.md           HTTP=200 local=421331a2cc3e remote=421331a2cc3e MATCH
+FB evidence/o2kr4_sha256_manifest.txt               HTTP=200 local=a562d1acd51b remote=a562d1acd51b MATCH
+
+FETCHBACK_RESULT: pass=16 fail=0
