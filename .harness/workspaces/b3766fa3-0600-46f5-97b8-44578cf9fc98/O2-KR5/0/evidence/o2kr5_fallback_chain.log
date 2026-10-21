@@ -1,0 +1,216 @@
+# O2-KR5 Fallback Chain Execution Log (WP-O2KR5-1-CHAIN)
+
+- KR: O2-KR5 (fallback chain after primary-channel time-box), run `b3766fa3-0600-46f5-97b8-44578cf9fc98`
+- Repository: https://github.com/thanayut1750/spoc-harness, branch `codex/spoc-harness-v1`
+- Start state: tip `780d7fd0e57b3e1ca1f9f91ca9b9374ff1e2b459`, clean tree, HEAD == origin tip (fresh `git ls-remote` re-check)
+- Chain order (O1-KR1, authoritative for this KR): 1. mirrored listing → 2. gig platforms → 3. adjusted offer
+- Hard invariants held throughout: ONE attempt per destination, no retries, no replays; no account creation; no credential fabrication; no invented buy/order/receipt URLs; ledger `tool:7bdf3aa0d66a5279c833dabe2820f852` used with `action=summary` (READ) only — `action=add` was NEVER invoked (no proof-bearing sale exists).
+- UTC timestamps below are the `date -u` values stamped inside each attempt's own receipt (verbatim receipts archived locally under `.harness/artifacts/b3766fa3-0600-46f5-97b8-44578cf9fc98/operations/`).
+
+---
+
+## 0. TRIGGER REFERENCE (decision log ENTRY-1)
+
+`O2-KR5/0/evidence/o2kr5_decision_log.md` (ENTRY-1, sha256
+`edb4ac248e44c3927e58a65926bc6c2e4d6d6c6d77eae80440dfac3f689203da`, byte-stable; this
+log carries the chain outcome + ledger rerun per that file's footer, as directed):
+
+- evaluated_at_utc: `2026-10-21T07:02:54Z`
+- trigger_evaluation: FIRED ($0.00 of $100.00, entry_count 0, primary-channel time-box exhausted per O2-KR3 terminal state)
+- offer_live_status: NO LIVE OFFER (Gumroad publish pending with a human; API 401; only public artifact is the free-download ANNOUNCEMENT.md)
+- next_channel: mirrored listing (position 1 of 3 in the O1-KR1 fallback chain)
+
+## 1. ONE-ATTEMPT TALLY (entire chain)
+
+| # | Destination | Method | Attempts | Outcome |
+|---|---|---|---|---|
+| 1a | 0x0.st | POST (multipart file upload, anonymous, no account) | 1 | UNAVAILABLE-BLOCKED — HTTP 503, uploads disabled |
+| 1b | dpaste.org/api/ | GET (API documentation probe) | 1 | UNAVAILABLE-BLOCKED — HTTP 403 security-check wall; **no POST executed** |
+| 2 | www.fiverr.com/start_selling | GET (public seller onboarding, read-only) | 1 | UNAVAILABLE-BLOCKED — HTTP 403 human-verification wall |
+| 3 | adjusted offer (in-repo document) | file write | 1 | EXECUTED — `ADJUSTED_OFFER.md` |
+
+Totals: external network requests 3; retries 0; accounts created 0; credentials fabricated 0; buy/order/receipt URLs invented 0. Every command below is reproduced verbatim from its operations receipt; nothing was replayed.
+
+## 2. CHANNEL 1/3 — MIRRORED LISTING → UNAVAILABLE-BLOCKED
+
+### 2a. 0x0.st — ATTEMPTED ONCE at 2026-10-21T07:07:57Z
+
+Command (verbatim from operations receipt `35acc17b7f5182d7c05739ae11d534d190e69c688912486155f9e533685672a2.process.json`):
+
+```
+cd /home/dx/Agentic-harness/spoc-harness && ANN=.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR3/0/offer/ANNOUNCEMENT.md && TS=$(date -u +%Y-%m-%dT%H:%M:%SZ) && HTTP=$(curl -sS --max-time 60 -o /tmp/o2kr5_0x0_body.txt -w "%{http_code}" -F "file=@${ANN}" https://0x0.st 2>/tmp/o2kr5_0x0_err.txt); RC=$?; echo "STEP1_MIRROR_TS_UTC=$TS"; echo "DESTINATION=0x0.st (anonymous paste mirror, no account)"; echo "HTTP_STATUS=$HTTP CURL_EXIT=$RC"; echo "RESPONSE_BODY_BEGIN"; cat /tmp/o2kr5_0x0_body.txt; echo; echo "RESPONSE_BODY_END"; echo "STDERR_BEGIN"; cat /tmp/o2kr5_0x0_err.txt; echo "STDERR_END"
+```
+
+Result: `HTTP_STATUS=503 CURL_EXIT=0` — the anonymous, no-account upload was
+rejected server-side. Response body verbatim (150 bytes, sha256
+`4c1b953c778870b8895f45eb8749558fb96915aaa1291da7ea94922c664a28c2`, on-disk at
+`/tmp/o2kr5_0x0_body.txt`; stderr 0 bytes, sha256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`):
+
+> uploads disabled because it's been almost nothing but AI botnet spam for the past few months. will be back with a few changes at some point. no ETA.
+
+Concrete cause: the mirror service has disabled uploads entirely (HTTP 503,
+anti-bot-spam shutdown). No paste URL was returned, so **no mirrored-listing
+receipt URL exists; none is invented.** Per the one-attempt invariant, no retry
+was made. Receipt artifact: stdout artifact `203c3feddf251de36496863dd9f429c5`
+(file `35acc17b…​.stdout.txt`).
+
+### 2b. dpaste.org — API documentation probe, ATTEMPTED ONCE at 2026-10-21T07:08:42Z (no POST executed)
+
+Command (verbatim from operations receipt `c013991926bd705644ebf1fc3a013fc03c48ccc8b79e06f91fe48229e150eea2.process.json`):
+
+```
+TS=$(date -u +%Y-%m-%dT%H:%M:%SZ); HTTP=$(curl -sS --max-time 45 -o /tmp/o2kr5_dpaste_docs.txt -w "%{http_code}" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64)" https://dpaste.org/api/); RC=$?; echo "DOCGET_TS_UTC=$TS URL=https://dpaste.org/api/ HTTP_STATUS=$HTTP CURL_EXIT=$RC"; echo "DOCS_EXCERPT_BEGIN"; head -c 2000 /tmp/o2kr5_dpaste_docs.txt; echo; echo "DOCS_EXCERPT_END"; echo "--- grep api fields ---"; grep -o -i "content\|lexer\|format\|expires\|csrfmiddlewaretoken\|POST" /tmp/o2kr5_dpaste_docs.txt | sort | uniq -c | sort -rn | head -12
+```
+
+Result: `HTTP_STATUS=403 CURL_EXIT=0`, response 285,151 bytes (sha256
+`87aa46a8e9d37ad9aa6c911c053f08200536d5cfc5e21c1e0713ced31cc10d06`, on-disk at
+`/tmp/o2kr5_dpaste_docs.txt`) with `<title>Security Check</title>`; API field
+tokens present in the page: `format`×20, `content`×10 (so the API exists as
+documented). Concrete cause: the API documentation endpoint itself is served
+behind an interactive bot/security-check interstitial. The anonymous POST was
+**not** executed against this destination — proceeding would require solving the
+interactive challenge, and the one-attempt/no-retry invariant forbids iterating
+into it. stdout artifact `9ed6093e9be0aeb7601f2877df7a8c23` (file
+`c0139919…​.stdout.txt`).
+
+### 2c. Channel 1 verdict
+
+UNAVAILABLE-BLOCKED. Two no-account mirror destinations, one attempt each, both
+walled (0x0.st: uploads disabled, 503; dpaste: security-check, 403, no POST).
+The ANNOUNCEMENT.md content could not be mirrored; no mirror receipt URL exists.
+Proceeding to chain position 2 (gig platforms) per documented order.
+
+## 3. CHANNEL 2/3 — GIG PLATFORMS → UNAVAILABLE-BLOCKED
+
+Fiverr public seller-onboarding flow (`https://www.fiverr.com/start_selling`),
+read-only GET only — ATTEMPTED ONCE at 2026-10-21T07:09:15Z. No account action,
+no form submission, no signup.
+
+Command (verbatim from artifact `f0c68766b0e2651f0c35783b537ab39e`, file
+`62bc3e085f4f2be8af7434b87696a0488d07ba17e239a341d84bcbc548ad1197.command.json`):
+
+```
+cd /home/dx/Agentic-harness/spoc-harness && TS=$(date -u +%Y-%m-%dT%H:%M:%SZ) && HTTP=$(curl -sS -L --max-time 60 -o /tmp/o2kr5_fiverr.html -w "%{http_code} FINAL_URL=%{url_effective}" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" -H "Accept: text/html" https://www.fiverr.com/start_selling 2>/tmp/o2kr5_fiverr_err.txt); RC=$?; echo "STEP2_GIG_TS_UTC=$TS"; echo "DESTINATION=https://www.fiverr.com/start_selling (read-only GET, no account action)"; echo "RESULT=$HTTP CURL_EXIT=$RC"; echo "SIZE=$(wc -c < /tmp/o2kr5_fiverr.html) bytes"; echo "STDERR:"; cat /tmp/o2kr5_fiverr_err.txt; echo "TITLE_AND_MARKERS:"; grep -o -i "<title>[^<]*</title>" /tmp/o2kr5_fiverr.html | head -2; grep -c -i "cloudflare\|challenge\|access denied\|captcha\|just a moment" /tmp/o2kr5_fiverr.html; echo "SELLER_TEXT_HITS:"; grep -o -i "become a seller\|start selling\|sign up\|join fiverr\|create.{0,12}account\|phone\|verif[a-z]*" /tmp/o2kr5_fiverr.html | sort | uniq -c | sort -rn | head -10
+```
+
+Result: `RESULT=403 FINAL_URL=https://www.fiverr.com/start_selling CURL_EXIT=0`,
+body 35,958 bytes (sha256
+`6af47b64215b75e2c237f1e4bb6409d9a457998c6ad0a2416f77eff72dbfe880`, on-disk at
+`/tmp/o2kr5_fiverr.html`; stderr 0 bytes) with `<title>It needs a human
+touch</title>` and 10 captcha/challenge marker hits. Blocker identifiers carried
+by the challenge page (re-verified fresh this session by grep against the
+on-disk receipt: each pattern hit ≥1): errcode `PXCR10002539`, client IP
+`27.130.3.219`, traceId `99d25eed05cb42929da1680fa8f04fc4`. Marker-extraction
+receipts: artifact `d4518b308de4754bd4c22472f62cccf6` (file
+`552b7b96…​.command.json`) producing artifacts `c3347593927913e0389411735195b626`
+and `61a14a41be8421f32cc250e3313889c6`.
+
+Concrete blocker: listing a gig requires (a) account creation and (b) human
+identity/phone verification behind an active bot wall — the seller flow is not
+reachable programmatically. Creating an account or fabricating credentials is
+prohibited, so this channel is UNAVAILABLE-BLOCKED. No account was created, no
+credentials fabricated, no gig submitted, no retry. Proceeding to chain
+position 3 (adjusted offer) per documented order.
+
+## 4. CHANNEL 3/3 — ADJUSTED OFFER → EXECUTED
+
+Deliverable: `O2-KR5/0/ADJUSTED_OFFER.md` (3750 bytes, sha256
+`f9ee536e0fac2c377931a2caf71cac8f46b26875f9716853feb4125cedc2c800`, byte-stable
+since creation).
+
+Substance (all arithmetic is prepared-plan calculation, not a projection of
+actual earnings):
+
+- Price adjusted from $15.00 (prepared package §2, cents `1500`) to **$9.00
+  USD (API cents `900`)** — supersedes ONLY the price field of
+  `O2-KR2/2/offer/GUMROAD_LISTING_PACKAGE.md`; everything else unchanged.
+- Fee-model net ≈ $7.60/sale ⇒ 14 sales ≈ $106.40 ≥ $100 goal arithmetic.
+- Explicit honest-status section: **no purchasable checkout URL, no buy URL,
+  and no live listing exists**; the marketplace publish remains pending with a
+  human (machine credentials unavailable; unauthenticated marketplace API POST
+  returned HTTP 401, archived in O2-KR2 evidence).
+- The product zip itself remains a FREE download at its existing permalink
+  (raw.githubusercontent.com commit `a8563e06532ea3fd0af2b51331ba8d3be66eff5b`,
+  40,299 bytes, sha256 `f272da222502854fd3b8d12204505e3289c9a61ea129c1e44054ccf956dd4a99`) exactly as announced in `O2-KR3/0/offer/ANNOUNCEMENT.md`.
+- Human unblock path: `O2-KR2/2/offer/GUMROAD_HUMAN_STEP.md` with the single
+  change price `9.00` / cents `900`; the live listing URL is recorded only
+  after HTTP-200 verification; only then may the ledger accept a real,
+  proof-bearing sale via `action=add`.
+
+No buy URL was invented anywhere in this chain.
+
+## 5. CHAIN EXHAUSTED
+
+All 3 documented O1-KR1 fallback channels have been resolved in documented
+order: position 1 UNAVAILABLE-BLOCKED (two destinations, one attempt each),
+position 2 UNAVAILABLE-BLOCKED (one attempt), position 3 EXECUTED (documentation
+of the adjusted offer; a purchasable checkout URL cannot exist until the human
+completes the marketplace publish). No documented channel remains for another
+automated attempt, and repeating any blocked destination would violate the
+one-attempt/no-retry anti-spam invariant held since O2-KR3.
+
+## 6. LEDGER RE-RUN AFTER CHAIN EXECUTION (action=summary — READ ONLY)
+
+`run_mission_tool("tool:7bdf3aa0d66a5279c833dabe2820f852", {"action":"summary","include_entries":true})`
+was re-invoked after channel 3 completed and immediately before this log was
+finalized (invocation receipt artifact `4499caea78e0f5c0d54331a74f4218a3`; the
+ledger tool emits no timestamp of its own). Verbatim output:
+
+```
+{"status": "ok", "action": "summary", "ledger_path": "/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/.mission-tools/ec456dd54c3758ed346189237a04378d7f1b610a960799a9ce21fcb86d7b67f4/revenue_ledger.json", "currency": "USD", "goal": 100.0, "total_earned": 0, "remaining": 100.0, "progress_percent": 0.0, "goal_reached": false, "entry_count": 0, "average_per_entry": 0.0, "entries_needed_at_average": 0, "last_entry": null, "entries": []}
+```
+
+GOAL NOT REACHED: total_earned $0.00 of $100.00, entry_count 0, progress 0.0%.
+`revenue_ledger.json` remains absent on disk (the tool writes it lazily on the
+first accepted add; zero adds have ever been accepted — verified by `find`,
+count 0).
+
+## 7. FINAL STATE — BEST-ACHIEVED TOTAL (documented, not a silent stop)
+
+- **Best-achieved cumulative net revenue: $0.00 USD** (ledger `total_earned: 0`,
+  `entry_count: 0`). **Remaining gap to the $100.00 goal: $100.00.**
+- KR O2-KR5 revenue outcome is NOT ACHIEVED by the machine. Every documented
+  O1-KR1 fallback channel terminates in a concrete, evidenced wall: mirrored
+  listing (0x0.st HTTP 503 uploads-disabled; dpaste HTTP 403 security-check, no
+  POST), gig platforms (Fiverr HTTP 403 `PXCR10002539` human-verification wall),
+  and the adjusted offer exists only as an in-repo document because no
+  purchasable checkout URL can exist before the human marketplace publish
+  (machine API 401 per O2-KR2).
+- Handoff: the single unblock path is human — publish the prepared asset at the
+  adjusted price $9.00 (API cents `900`) following
+  `O2-KR2/2/offer/GUMROAD_HUMAN_STEP.md` + `ADJUSTED_OFFER.md`. Once a live,
+  HTTP-200-verified listing URL exists and a proof-bearing sale occurs, the
+  ledger may record it via `action=add`. Until then the honest total remains
+  $0.00 and no revenue is fabricated.
+- This log documents the best-achieved total with full evidence rather than
+  stopping silently, per the KR acceptance criteria and the user's 'don't stop'
+  directive as expressed in the trigger rule.
+
+## 8. EVIDENCE PROVENANCE
+
+On-disk request bodies (all under `/tmp`, hashed this session):
+
+| File | Bytes | sha256 |
+|---|---|---|
+| /tmp/o2kr5_0x0_body.txt | 150 | 4c1b953c778870b8895f45eb8749558fb96915aaa1291da7ea94922c664a28c2 |
+| /tmp/o2kr5_0x0_err.txt | 0 | e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 |
+| /tmp/o2kr5_dpaste_docs.txt | 285151 | 87aa46a8e9d37ad9aa6c911c053f08200536d5cfc5e21c1e0713ced31cc10d06 |
+| /tmp/o2kr5_fiverr.html | 35958 | 6af47b64215b75e2c237f1e4bb6409d9a457998c6ad0a2416f77eff72dbfe880 |
+| /tmp/o2kr5_fiverr_err.txt | 0 | e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 |
+
+Receipt artifacts (harness-registered): 0x0.st stdout
+`203c3feddf251de36496863dd9f429c5`; dpaste stdout
+`9ed6093e9be0aeb7601f2877df7a8c23`; Fiverr receipt
+`f0c68766b0e2651f0c35783b537ab39e` (stdout + command.json); marker-extraction
+`d4518b308de4754bd4c22472f62cccf6` → `c3347593927913e0389411735195b626`,
+`61a14a41be8421f32cc250e3313889c6`; ledger rerun `4499caea78e0f5c0d54331a74f4218a3`.
+Verbatim command sources: local operations receipts at
+`.harness/artifacts/b3766fa3-0600-46f5-97b8-44578cf9fc98/operations/` (gitignored
+by design; body hashes above provide durable provenance).
+
+Redaction note: no GitHub credential or remote URL is reproduced anywhere in
+this log; the remote URL was only read via count-only checks (1 embedded
+credential token, never echoed).
+
+— End of fallback chain execution log (O2-KR5 / WP-O2KR5-1-CHAIN) —
