@@ -1,0 +1,52 @@
+== O2-KR5 gig-platform chain close-out (WP-O2KR5-2): single-shot anonymous upwork probe ==
+UTC=2026-10-21T11:24:51Z
+METHOD=GET URL=https://www.upwork.com/
+AUTH=none (curl default headers only; no cookies, no tokens, no account, no signup; unauthenticated anonymous machine probe)
+NO-RETRY RULE: exactly one request; whatever the outcome, this host is not contacted again by this package.
+FIVERR_NOTE: no fiverr request in this run - its single permitted attempt was consumed in attempt 0
+  (citations.md B3: GET https://www.fiverr.com/start_selling -> HTTP 403 PXCR10002539 "It needs a human touch",
+   receipt f0c68766b0e2651f0c35783b537ab39e, body sha256 6af47b64215b75e2c237f1e4bb6409d9a457998c6ad0a2416f77eff72dbfe880).
+--- PRECHECK (anti-retry, evaluated immediately before the request) ---
+*upwork* contact-record files in main worktree: 0 (required 0)
+*upwork* contact-record files in publication clone: 0 (required 0)
+documentation-only upwork mentions in publication clone tree: 10 files (chain/citation docs, NOT contact records)
+--- PROBE ---
+CURL_EXIT=0
+HTTP_STATUS=403
+--- RESPONSE HEADERS ---
+HTTP/2 403 
+date: Wed, 21 Oct 2026 11:24:51 GMT
+content-type: text/html; charset=UTF-8
+cache-control: private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0
+expires: Thu, 01 Jan 1970 00:00:01 GMT
+referrer-policy: same-origin
+x-frame-options: SAMEORIGIN
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+x-content-type-options: nosniff
+set-cookie: __cf_bm=LAdIIsK6EX9QL4hpRbkHjlO3tu6.YLU4AtaLdq6_BFg-1792581891.9488277-1.0.1.1-1il2brmgNxWEsuRIltIS.DtRAnh0PzSpKgRgwiMtaN0lLcRfFZMp5tR2awaVF5.j_e.J3w.ajoyBmcqz_63IY8eItu_F0H9Y9X4dcySy2QlVjDqw8o2DcEryktz0Igmm; HttpOnly; SameSite=None; Secure; Path=/; Domain=upwork.com; Expires=Wed, 21 Oct 2026 11:54:51 GMT
+link: </llms.txt>; rel="describedby"; type="text/markdown"; title="Site index for LLMs"
+server: cloudflare
+cf-ray: a4dfe5f8a919d326-BKK
+alt-svc: h3=":443"; ma=86400
+
+BODY_BYTES=5017
+BODY_SHA256=61d7d34c4e88c9245505ffc4c57184518f244f11d8b6ccb8cbf65052c435c1b7
+BODY_ARCHIVED=/home/dx/Agentic-harness/spoc-harness/.harness/workspaces/b3766fa3-0600-46f5-97b8-44578cf9fc98/O2-KR5/0/evidence/o2kr5_a2_upwork_body.html (genuine response body kept verbatim for quote extraction and remote byte-exact fetch-back)
+--- BODY EXCERPT (first 12 lines; http(s) URL strings redacted; full body archived with sha256 above) ---
+<!DOCTYPE html>
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+<head>
+<title>Attention Required! | Cloudflare</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+--- QUOTE CANDIDATES (verbatim strings from the archived body; URL strings redacted) ---
+<title>Attention Required! | Cloudflare</title>
+      </div><!-- /.captcha-container -->
+STRUCTURAL_BLOCKER (verbatim from decision_log.md ENTRY 2, citations A2-A7): "gig submission requires account creation + identity verification, which is human-only for this agent; zero machine credentials exist (recorded O2-KR2 terminal BLOCKED: API 401s, credential sweeps empty)"
+GIG_OUTCOME=UNAVAILABLE_WITH_BLOCKER (probe status above is informational reachability only; NO submission possible or attempted; no account created; no credentials used; this documents the channel as unavailable, not as a sale or lead)
