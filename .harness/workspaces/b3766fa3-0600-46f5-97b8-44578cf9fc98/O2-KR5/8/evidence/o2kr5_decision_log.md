@@ -113,4 +113,34 @@ close the log.
 
 ## ENTRY 3 — execution receipts (mirrored listing) — appended after the push
 
-[TO BE APPENDED AFTER PUSH]
+- UTC_TIMESTAMP: 2026-10-21T18:30:56Z (fresh `date -u` receipt at receipt authoring;
+  push executed at commit time 2026-10-21T18:29:49Z).
+- Push (exactly one attempt, no retry): commit
+  `4039d2e7ed04dbc7af6cf46032504678e469d9ca` pushed to `codex/spoc-harness-v1`;
+  remote reply `6c66cec..4039d2e  HEAD -> codex/spoc-harness-v1`; **PUSH_EXIT=0**;
+  independent anonymous `git ls-remote` confirmation →
+  `4039d2e7ed04dbc7af6cf46032504678e469d9ca  refs/heads/codex/spoc-harness-v1`
+  (LSREMOTE_EXIT=0; local HEAD == remote tip). Pre-push scope receipt:
+  SCOPE_ADDITIONS_ONLY=YES — 4 new files, all status `A`, all under this workspace
+  directory; numstat 242 insertions / 0 deletions vs pre-work tip `6c66cec8`; no prior-KR
+  path and no prior attempt directory (O2-KR5/0, /2, /3, /4, /5, /7) touched. Full
+  receipts: `evidence/o2kr5_mirrored_listing.log`, PUSH-1 section.
+- Fetch-back at the pushed commit (raw.githubusercontent.com, both HTTP 200, triple
+  sha256 agreement FETCHED == LOCAL == `git show <commit>:<path>`):
+  - FB-1 `listing/MIRROR_O2KR5.md` — 3,846 bytes, sha256
+    `f8798d3259c837ce20d13cb0a141bec05e98d1365fbe18050881c76dc2217952`, **VERDICT=MATCH
+    (byte-exact)** — the AC-required mirrored-listing fetch-back receipt.
+  - FB-2 `evidence/o2kr5_decision_log.md` (v1, i.e. the version carrying the placeholder
+    this entry replaces) — 9,614 bytes, sha256
+    `761a50016e255b4caed840d19064533700360d2ae469235b87067e9031e90e39`, VERDICT=MATCH.
+- Honesty (unchanged by this publication attempt): LEDGER_TOTAL remains **$0.00 USD**,
+  SALES_COUNT remains **0**, remaining gap **$100.00 USD**, goal **NOT reached**; the
+  mirrored listing is repository content with provenance (announcement commit
+  `6bb5530…`), not a live offer — O2-KR2 remains terminal BLOCKED and no purchase,
+  order, or checkout URL exists or was invented (URL AUDIT in the receipt log: exactly
+  the two source URLs, verbatim). Ledger rerun already recorded at the tip by dir-7
+  (`O2KR5_LEDGER_RERUN: COMPLETE`, still $0.00) — cited, not re-executed.
+- Next receipts: this entry and `evidence/o2kr5_mirrored_listing.log` are carried by the
+  second push; ENTRY 4 (appended after that push) records the byte-exact tip fetch-backs
+  of both files, and the assignment close-out records the final fetch-backs at the
+  third-push tip, closing this log end-to-end.
