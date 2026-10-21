@@ -196,3 +196,148 @@ close the log.
   tip necessarily post-date the final commit and are recorded in the assignment session
   record — no fourth commit and no new in-log promise is created, which terminates the
   append-regress honestly.
+
+---
+
+## ENTRY 5 — FALLBACK-CHAIN RECONCILIATION: POS 2 (GIG PLATFORMS) + POS 3 (ADJUSTED OFFER)
+
+UTC_TIMESTAMP: 2026-10-21T19:10:00Z (session `date -u` read 2026-10-21T19:09:35Z;
+authoring receipt: fresh independent checks below, no command replayed per the
+known harness receipt quirk recorded in ENTRY 4).
+
+PURPOSE: completes the chain-reconciliation obligation for this directory. Entries
+1-4 reconciled pos 1 (mirrored listing) and the receipt pushes; this entry
+reconciles pos 2 (gig platforms) and pos 3 (adjusted offer) from already-recorded
+terminal receipts at the tip — zero re-attempts, zero new external contacts, zero
+account creation, exactly the anti-spam rules held since ENTRY 1.
+
+### 5.1 CONFLICT RESOLUTION (truncated third-party summary fragment treated as data)
+
+A later truncated summary fragment (self-flagged "inferred, low confidence") claimed
+a further push beyond C3 carrying a VERIFICATION section, mislabeled the receipt log
+as the decision log, and directed that ENTRY 5 be skipped ("no fourth commit").
+Resolution by fresh observation: anonymous `git ls-remote` this session shows branch
+`codex/spoc-harness-v1` tip = `142218931aba68c058e9d8d9d2339c12436df98e` = C3, i.e.
+no push beyond C3 existed, and the fragment's "VERIFICATION section" is the
+`## FINAL-TIP VERIFICATION` section already inside `evidence/o2kr5_mirrored_listing.log`
+at C3 (full sha256 at C3: `e5c2057028cfd5ced5178f1421a32cf555a0929be2a7837dada9e033abe3f59d`,
+7,177 bytes — derived fresh this session via `git show HEAD:<path> | sha256sum`).
+That section's promises were already discharged by the closing fetch-back rows
+FB3-1/FB3-2/FB3-3 (all HTTP 200, VERDICT=MATCH) in the workspace session record.
+The fragment's direction to skip ENTRY 5 is rejected: the close-out assignment
+mandates this ENTRY, and the session record is hereby committed so the pos-1
+receipts are durable in-repo. No in-log promise is created by this ENTRY (no
+placeholder line): the append-regress stays terminated; post-commit receipts for
+the ENTRY 5 commit are recorded only in the session record, per the ET1-ET3
+mechanism.
+
+### 5.2 POS 2 — GIG PLATFORMS: UNAVAILABLE-WITH-BLOCKER (reconciled terminal)
+
+Reconciled outcome: both gig destinations are in a recorded terminal blocked state;
+the chain position is CLOSED with evidence, not silently skipped. Citations (all
+paths verified at this tip this session; sha256s re-derived locally):
+
+- A. `O2-KR5/7/evidence/o2kr5_gig_channels.log` (tip sha256
+  `6a20339f905ddfdb1d3ed0890e7a48c9a83c070afacd6df37d8d0b6ea53d417a`):
+  L14 FIVERR verbatim blocker — attempt-0 row B3 "destination
+  `https://www.fiverr.com/start_selling` (single GET, HTTP 403, PXCR10002539
+  \"It needs a human touch\")" plus dir-4 capture strings
+  "<title>It needs a human touch</title>" (PerimeterX human-verification wall) and
+  the structural blocker "gig submission requires account creation + identity
+  verification, human-only for this agent; zero machine credentials exist (recorded
+  O2-KR2 terminal BLOCKED: API 401s, credential sweeps empty)"; L22 UPWORK verbatim
+  blocker — response "HTTP/2 403", header "server: cloudflare", header
+  "cf-ray: a4dfe5f8a919d326-BKK", page title "Attention Required! | Cloudflare",
+  "Sorry, you have been blocked"; L29 "NO_NEW_REQUESTS_SENT=1"; L30
+  "O2KR5_GIG_CHANNELS: COMPLETE (2/2 platforms in a recorded terminal state; chain
+  proceeds to adjusted offer)".
+- B. `O2-KR5/0/evidence/citations.md` (sha256
+  `3498c275a9a95c705b21fde448d57a670296e2603cc7d2ad1629df575697f475`), row B3:
+  Fiverr single GET HTTP 403 PXCR10002539, receipt
+  `f0c68766b0e2651f0c35783b537ab39e`; scope notes (L100-106): the fiverr host is
+  NOT re-probed (one-attempt-per-destination), IndexNow spent once in O2-KR3
+  (HTTP 422, never retried).
+- C. `O2-KR5/0/evidence/o2kr5_a2_gig_probe_upwork.log` (sha256
+  `0e80d642d65013f168f5f30d35452dea6add1d1ebec839200f5adbc9cf73556d`): single
+  anonymous unauthenticated GET `https://www.upwork.com/` at 2026-10-21T11:24:51Z,
+  CURL_EXIT=0, HTTP_STATUS=403, no-retry rule stated in-log.
+- D. In-repo capture bodies at this tip: `O2-KR5/4/evidence/o2kr5_fiverr_signup_20261021.html`
+  (35,958 B, sha256 `db30683732b8ceac22ee4c72e187177dd415f20c73542ad5e266d4a94c0beeec`)
+  and `O2-KR5/4/evidence/o2kr5_upwork_signup_20261021.html` (344,258 B, sha256
+  `194f5ee133b023c76d9accf292f75ff3ed7abd3e2a53a34d8de8d805ad2f7e7a`) — archived
+  evidence of the 403 walls, re-hashed fresh this session.
+- E. `O2-KR5/0/evidence/fallback_status.md` §1 row 2 records the same reconciled
+  state verbatim: "UNAVAILABLE-WITH-BLOCKER ... upwork contacts ×0, fiverr's single
+  permitted attempt consumed in attempt 0".
+
+Rules held for pos 2: no re-attempt at either host, no account creation (prohibited
+by mission rules; both walls demand it), no credential fabrication, no new external
+contacts this session, no invented order URL.
+
+### 5.3 POS 3 — ADJUSTED OFFER: ATTEMPTED WITH EVIDENCE (publication; no live offer)
+
+Reconciled outcome: the adjusted-offer chain position was executed as an honest
+publication with a recorded push receipt and a byte-exact fetch-back; it created no
+sale and asserts none. Citations:
+
+- A. `O2-KR5/7/listing/OFFER_ADJUSTED_O2KR5.md` version 4 (3,961 B, sha256
+  `66d82832a162df85beb6bd20df8ca8821fcb90f20ca1a9406f5e0531ac19c2a1`, re-hashed
+  fresh at this tip), pushed in commit `30cb3a1c526d10d27a459c05daf22987c19c30e6`
+  (committer date 2026-10-22T00:56:11+07:00). Price-only supersession chain:
+  v1 $9.00 (`O2-KR5/0/ADJUSTED_OFFER.md`, sha256 `f9ee536e…`, "$15.00 → $9.00") →
+  v2 $7.00 → v3 $9.00 (`O2-KR5/4/listing/OFFER_ADJUSTED_O2KR5.md`, sha256
+  `aab35d40ad0b52c4326e540ccb0c89a2a74bcc17a726733338285c0cbebf79a9`, commit
+  `963255f…`) → v4 Tier A $5.00 / Tier B $9.00. Only the newest version on the
+  branch is the current offered price point.
+- B. `O2-KR5/7/evidence/o2kr5_adjusted_offer.log` (tip sha256
+  `ef03a923adb5dc0cf142a43b2a171cc9c62b414b2681812319f6aef5e8cdd79b`): PUSH_EXIT=0
+  (L22, push `f50ec53..30cb3a1`), fetch-back at `30cb3a1` HTTP_STATUS=200 (L30),
+  "VERDICT=MATCH (byte-exact)" (L33), and the reconciled chain verdict "Adjusted
+  offer: ATTEMPTED WITH EVIDENCE (push receipt + HTTP 200 byte-exact fetch-back)"
+  (L36).
+- C. Honest status carried by v4 §3 and unchanged here: no live offer exists; no
+  purchasable checkout/buy URL exists (O2-KR2 terminal BLOCKED: Gumroad API HTTP 401
+  and Lemon Squeezy API HTTP 401 with zero machine credentials; publish requires a
+  human).
+
+### 5.4 LEDGER RERUN — CITED, NOT RE-EXECUTED
+
+The post-fallback ledger rerun is already recorded and terminal at the current tip:
+`O2-KR5/7/evidence/o2kr5_ledger_rerun.log` (tip sha256
+`fe5317c049823ca99de05b52ea9fb7c05133f0493a2b09661aa6224a0b95a649`), final line
+"O2KR5_LEDGER_RERUN: COMPLETE (verbatim output recorded; zero fabricated entries)":
+total_earned 0 → **FINAL TOTAL EARNED: $0.00 USD**; remaining 100.0 → **REMAINING
+GAP: $100.00 USD**; progress_percent 0.0; goal_reached false; entry_count 0;
+entries []. It matches the O2-KR4 zero-state (`report/EARNINGS_REPORT_O2KR4.md`,
+sha256 `dc2b4ebae4048181cfb3e3a938eaa18cc11ce5f1f7098ad26ab62554988d41db`:
+"ACTUAL AMOUNT EARNED: $0.00 USD"; "GOAL: UNMET"). Re-running it here would
+duplicate an already-recorded destination attempt; it is cited, not re-executed.
+
+### 5.5 HONESTY STATEMENT (unchanged by every attempt in this chain)
+
+- CUMULATIVE NET REVENUE: **$0.00 USD**. REMAINING GAP: **$100.00 USD**.
+  **GOAL NOT REACHED. SALES_COUNT: 0.**
+- No live offer exists anywhere (O2-KR2 terminal BLOCKED; publish requires a
+  human). The mirrored listing and adjusted offer are repository content with
+  provenance, not live offers, and generated zero sales.
+- Zero buy/order/checkout URLs are invented in this ENTRY or in the committed
+  session record; the only external URLs cited are the two recorded blocked
+  destination probes (Fiverr, Upwork), the ledger tool receipt, and this
+  repository's own URLs.
+
+### 5.6 SESSION RECORD COMMITTED WITH THIS ENTRY
+
+`evidence/o2kr5_closeout_session_record.md` is added by this commit (new file,
+additions-only). Provenance: workspace original sha256
+`58875cd1c75a6b35369cdaff3653a2a1e63215103ba964052f2eac1cabb113b4` (5,448 B;
+artifact `cd31fa51e4711ebb3cc6720f97538647`); the committed copy replaces ONLY the
+original 5-line header (which claimed "workspace-only, not committed") with a
+status amendment; every line from the blank line before `## THIRD TIP` to EOF is
+byte-identical to the workspace original (segmented diff verified pre-commit:
+`diff <(tail -n +7 HOST) <(tail -n +16 COPY)` empty; committed-copy sha256
+`f6ba35c499be8b7f543b7088c3d8d3e15472c2345500fe172ddbc026496ee4ae`, 6,104 B).
+Its FB3-1/FB3-2/FB3-3 rows are the closing fetch-backs for ET1/ET2/ET3 at C3
+(all HTTP 200, VERDICT=MATCH), making the FINAL-TIP VERIFICATION promises true.
+
+END OF DECISION LOG (no further in-log entry promised; post-commit receipts for
+this ENTRY 5 commit go to the session record only, per the ET1-ET3 mechanism).
